@@ -131,6 +131,69 @@ struct RasterEncoderSmokeTest {
             // Expected: 56mm head width is not 55-byte ESC G width.
         }
 
-        print("EZ-2 raster, Q label-height table, S1/S2 speed, legacy profiles and ASCII-font commands passed.")
+        // A long variable field must produce more than one raster text line,
+        // including unbroken words, while never painting outside its box.
+        var wrappedDoc = LabelDocument()
+        wrappedDoc.widthMM = 40
+        wrappedDoc.heightMM = 30
+        var longText = LabelElement.text()
+        longText.xMM = 3
+        longText.yMM = 2
+        longText.widthMM = 9
+        longText.heightMM = 20
+        longText.fontSize = 5
+        longText.value = "WWWWWWWWWWWWWWWWWWWWWW"
+        wrappedDoc.elements = [longText]
+        let wrapped = try LabelRasterizer().rasterize(wrappedDoc, profile: profile)
+        func inkPixels(_ raster: LabelRaster) -> [(Int, Int)] {
+            var points: [(Int, Int)] = []
+            for y in 0..<raster.heightDots {
+                for x in 0..<raster.widthDots {
+                    let byte = raster.rows[y * raster.bytesPerLine + x / 8]
+                    if (byte & UInt8(0x80 >> (x % 8))) != 0 { points.append((x, y)) }
+                }
+            }
+            return points
+        }
+        let wrappedInk = inkPixels(wrapped)
+        assert(!wrappedInk.isEmpty)
+        assert(wrappedInk.map { $0.1 }.max()! - wrappedInk.map { $0.1 }.min()! > 27,
+               "Long unbroken variable field must wrap into multiple lines")
+        assert(wrappedInk.allSatisfy { (24...96).contains($0.0) && (16...176).contains($0.1) },
+               "Text must be clipped within original field bounds")
+
+        // No new mandatory JSON keys: older saved text layers stay left-aligned.
+        var legacyElement = try JSONSerialization.jsonObject(
+            with: JSONEncoder().encode(longText)) as! [String: Any]
+        legacyElement.removeValue(forKey: "textAlignment")
+        let oldElement = try JSONDecoder().decode(
+            LabelElement.self, from: JSONSerialization.data(withJSONObject: legacyElement))
+        assert(oldElement.effectiveTextAlignment == .left)
+
+        var centered = longText
+        centered.value = "X"
+        centered.widthMM = 25
+        centered.heightMM = 9
+        centered.fontSize = 8
+        var leftDoc = wrappedDoc
+        leftDoc.elements = [centered]
+        let leftInk = inkPixels(try LabelRasterizer().rasterize(leftDoc, profile: profile))
+        centered.textAlignment = .center
+        leftDoc.elements = [centered]
+        let centeredInk = inkPixels(try LabelRasterizer().rasterize(leftDoc, profile: profile))
+        assert(!leftInk.isEmpty && !centeredInk.isEmpty)
+        assert(centeredInk.map { $0.0 }.min()! > leftInk.map { $0.0 }.min()! + 55,
+               "Center alignment must change the physical raster, not only HTML preview")
+
+        // A calibration target must not modify any saved document or exceed
+        // the thermal head; it is printed once via the normal raster pipeline.
+        let sourceID = document.id
+        let target = EZ2CalibrationPattern.make(for: document)
+        assert(target.id != sourceID && document.id == sourceID)
+        assert(target.elements.count == 5)
+        try LabelRasterizer.validate(target)
+        let targetPacket = try encoder.nativeCommands(for: target, profile: profile)
+        assert(targetPacket.last == 0x0C)
+        print("EZ-2 raster, long-word wrap, text alignment, calibration target, Q/S and legacy compatibility passed.")
     }
 }
