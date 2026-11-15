@@ -452,6 +452,7 @@
       $("previewError").textContent="";
       $("quickSize").textContent="";
       $("queueQuick").disabled=true;
+      $("testNative").disabled=true;
       $("queueBatch").disabled=true;
       return;
     }
@@ -459,6 +460,7 @@
     const check=compatibility(base);
     $("quickCompatibility").textContent=check.ok?"":("⚠ Несовместим с рулоном. "+check.reason);
     $("queueQuick").disabled=!canPrint(base);
+    $("testNative").disabled=!canPrint(base)||state.running;
     const fields=variableFields(base);
     $("queueBatch").disabled=!canPrint(base)||!fields.length;
     $("quickFields").innerHTML=fields.length?fields.map(f=>
@@ -615,6 +617,40 @@
     state.running=false;state.stopRequested=false;
     await persistQueue();renderQueue();
   }
+  async function testNativeOnce(){
+    if(state.running){note("Сначала завершите текущую передачу",true);return;}
+    if(!state.profile.portPath){note("Выберите последовательный порт в настройках",true);return;}
+    let test;
+    try{
+      const doc=filledDocument();
+      if(!canPrint(doc))throw Error("Макет не подходит к установленному рулону");
+      test=EZ2Native.packet(doc);
+    }catch(error){
+      note("Тест штатной печати: "+error.message,true);
+      return;
+    }
+    if(!window.confirm("Эксперимент: отправить ОДНУ этикетку "+test.description+
+        "? Без автоматической пустой этикетки. Не запускайте тираж до проверки положения ленты."))
+      return;
+    state.running=true;renderQueue();
+    $("testNative").disabled=true;
+    log("ЭКСПЕРИМЕНТ штатной печати: "+test.description+", "+test.size+" байт");
+    try{
+      const result=await native("printJob",{
+        base64:test.base64,nativeTrial:true,copies:1,first:false,
+        port:state.profile.portPath,delay:Number(state.profile.labelIntervalSeconds)
+      });
+      log(result?.output||"Штатный тест передан в порт");
+      note("Штатная команда передана. Проверьте фактическую этикетку до следующей печати.");
+    }catch(error){
+      log("НЕОПРЕДЕЛЁННЫЙ РЕЗУЛЬТАТ штатного теста: "+error.message);
+      note("Печать не подтверждена: "+error.message,true);
+    }finally{
+      state.running=false;renderQueue();
+      if(state.view==="quick")renderQuick();
+    }
+  }
+
   async function stopPrint(){
     if(!state.running)return;
     state.stopRequested=true;
@@ -740,6 +776,7 @@
   });
   $("quickReset").addEventListener("click",()=>{state.quickValues={};renderQuick();});
   $("queueQuick").addEventListener("click",addQuick);
+  $("testNative").addEventListener("click",testNativeOnce);
   $("queueBatch").addEventListener("click",addBatch);
   $("quickFields").addEventListener("input",ev=>{
     const id=ev.target.dataset.field;
