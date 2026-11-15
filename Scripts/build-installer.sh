@@ -50,7 +50,8 @@ print "[LabelDesk] 4/5 Creating and signing the app bundle…"
 mkdir -p "$APP/Contents/Resources"
 cp "$ROOT/LabelDesk/Resources/Info.plist" "$APP/Contents/Info.plist"
 cp "$ROOT/Scripts/install-update.sh" "$APP/Contents/Resources/install-update.sh"
-for file in app.html app.js editor.html barcodes.js raster.js; do
+for file in app.html app.js editor.html barcodes.js native.js raster.js; do
+
   cp "$ROOT/LabelDesk/Resources/$file" "$APP/Contents/Resources/$file"
 done
 cp "$ROOT/Scripts/printer.sh" "$APP/Contents/Resources/printer.sh"
