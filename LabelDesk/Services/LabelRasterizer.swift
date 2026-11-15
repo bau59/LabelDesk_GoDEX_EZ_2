@@ -119,8 +119,8 @@ struct LabelRasterizer {
         defer { NSGraphicsContext.restoreGraphicsState() }
 
         for item in document.elements {
-            let x = CGFloat((item.xMM + profile.xOffsetMM) * EZ2Limits.dotsPerMM)
-            let y = CGFloat((item.yMM + profile.yOffsetMM) * EZ2Limits.dotsPerMM)
+            let x = CGFloat(item.xMM * EZ2Limits.dotsPerMM)
+            let y = CGFloat(item.yMM * EZ2Limits.dotsPerMM)
             let w = CGFloat(item.widthMM * EZ2Limits.dotsPerMM)
             let h = CGFloat(item.heightMM * EZ2Limits.dotsPerMM)
             let rect = CGRect(x: x, y: y, width: w, height: h)
