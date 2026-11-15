@@ -176,5 +176,44 @@
     }
     return {base64:btoa(binary),widthBytes:width,rows:height,size:bytes.length,canvas};
   }
-  root.EZ2Raster={draw,encode};
+  // Physical media in the printer is independent of the template JSON.
+  // Preserve templates of other sizes; only their print eligibility changes.
+  const defaultMedia=Object.freeze({widthMM:58,heightMM:38,gapMM:2});
+  function mediaFromProfile(profile) {
+    const widthMM=Number(profile?.mediaWidthMM ?? defaultMedia.widthMM);
+    const heightMM=Number(profile?.mediaHeightMM ?? defaultMedia.heightMM);
+    const gapMM=Number(profile?.mediaGapMM ?? defaultMedia.gapMM);
+    return {widthMM,heightMM,gapMM};
+  }
+  function validateMedia(media) {
+    const m=mediaFromProfile({
+      mediaWidthMM:media?.widthMM,
+      mediaHeightMM:media?.heightMM,
+      mediaGapMM:media?.gapMM
+    });
+    if (!inRange(m.widthMM,10,60) || !inRange(m.heightMM,10,100) ||
+        !inRange(m.gapMM,0,10) ||
+        !Number.isInteger(m.heightMM) || !Number.isInteger(m.gapMM)) {
+      throw new Error("Рулон: ширина 10–60 мм, высота 10–100 мм, зазор 0–10 мм (высота и зазор целые).");
+    }
+    return m;
+  }
+  function compatibility(label, media) {
+    const m=validateMedia(media);
+    if(!label)return {ok:false,reason:"Шаблон не выбран"};
+    const equal=(a,b)=>Number.isFinite(Number(a)) && Math.abs(Number(a)-Number(b))<0.001;
+    const ok=equal(label.widthMM,m.widthMM)&&equal(label.heightMM,m.heightMM)&&equal(label.gapMM,m.gapMM);
+    return ok?{ok:true,reason:""}:{
+      ok:false,reason:"Размер шаблона "+label.widthMM+"×"+label.heightMM+" мм, зазор "+
+        label.gapMM+" мм; в принтере "+m.widthMM+"×"+m.heightMM+" мм, зазор "+m.gapMM+" мм."
+    };
+  }
+  function transportReady(media) {
+    const m=validateMedia(media);
+    // The actual shell transport is currently hardcoded to q040 and 280 rows.
+    // Reject other stock rather than falsely claiming the media setting
+    // reconfigures the printer hardware. Width is limited separately by G55.
+    return m.heightMM===38 && m.gapMM===2;
+  }
+  root.EZ2Raster={draw,encode,defaultMedia,mediaFromProfile,validateMedia,compatibility,transportReady};
 })(window);
