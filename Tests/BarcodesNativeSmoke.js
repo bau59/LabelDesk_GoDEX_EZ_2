@@ -45,6 +45,8 @@ assert.equal(txt.subarray(0,12).toString("hex"),"1b46301b713034301b4d3031");
 assert.ok(txt.includes(Buffer.from([27,66,27,65,49,49,84,69,83,84,13])));
 assert.equal(txt.subarray(-6).toString("hex"),"1b451b503031");
 assert.throws(()=>native.packet(doc("text",{value:"Привет"})),/ASCII/);
+const cp437=Buffer.from(native.packet(doc("text",{value:"┌─┐"})).base64,"base64");
+assert.ok(cp437.includes(Buffer.from([218,196,191])),"Firmware line glyphs use CP437 bytes, not UTF-8");
 assert.throws(()=>native.packet({...doc("text"),elements:[...doc("text").elements,...doc("text").elements]}),/один блок/);
 const code39=Buffer.from(native.packet(doc("barcode",{value:"1234"})).base64,"base64");
 assert.ok(code39.includes(Buffer.from([27,63,51,27,66,27,65,49,49,27,123,49,50,51,52,125,13])));
