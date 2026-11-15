@@ -151,7 +151,7 @@ final class AppStore: ObservableObject {
             return
         }
         alert = AppAlert(title: "Print a graphics test?",
-                         message: "Sends 24 graphic rows (a small black square outline) using ESC G. It may advance one label. Confirm paper is loaded.",
+                         message: "Sends 40 graphic rows (a small letter L with an isolated upper-right mark) using ESC G. It may advance one label. Confirm paper is loaded.",
                          action: { [weak self] in self?.performRasterProbe(profile: profile) })
     }
 
@@ -178,7 +178,7 @@ final class AppStore: ObservableObject {
     func confirmRasterProbe() {
         guard rasterProbePending else { return }
         alert = AppAlert(title: "Confirm graphics test",
-                         message: "Did the printer produce a small hollow rectangular border, without garbled text or runaway feeding? Confirm only if the output was correct.",
+                         message: "Did the printer produce a black L with a small, separate upper-right mark, without garbled text or runaway feeding? Confirm only if the output was correct.",
                          action: { [weak self] in
             guard let self = self else { return }
             self.rasterVerified = true

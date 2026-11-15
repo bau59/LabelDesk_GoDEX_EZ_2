@@ -31,12 +31,12 @@ The raster uses one ESC Gnn command per row with nn raw monochrome bytes (1 = bl
 
 1. Select your USB serial port under Printer settings and save; old settings migrate from the working TEST app.
 2. Press Print TEST for the already verified text command.
-3. Press Raster TEST, which sends 24 rows of ESC G03 representing a small hollow square. Check the actual paper for a correctly formed square. This graphics command has NOT yet been physically verified on the user's unit.
+3. Press Raster TEST, which sends 40 rows of ESC G05 representing a small black L with a separate upper-right mark. Check the actual paper for a correctly oriented L and upper-right marker. This graphics command has NOT yet been physically verified on the user's unit.
 4. Only if the square is correct, press Raster TEST looks correct and confirm. This locally unlocks printing full layouts.
 5. Create a label, choose a preset, drag objects, edit coordinates or text in the inspector, and save the template.
 6. Add the layout to the queue, choose copies and press Start queue. Jobs send sequentially. Failure states must be inspected before retrying, to avoid duplicate labels.
 
-If the raster test prints gibberish, stays blank or feeds unexpectedly, DO NOT confirm raster mode. Report the observed result before trying a full label.
+If the raster test is reversed, prints gibberish, stays blank or feeds unexpectedly, DO NOT confirm raster mode. Report the observed result before trying a full label.
 
 ## Supported editor features
 

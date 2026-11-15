@@ -16,7 +16,7 @@ struct GodexEZ2Encoder {
         return Data(bytes)
     }
 
-    /// A small 24x24-dot box to verify ESC G's byte order, row advance and positioning.
+    /// An asymmetric 40x40-dot L with a top-right marker to verify bit/row order.
     /// Must be initiated by the user. Does not mark raster output as verified.
     func rasterProbe() -> Data {
         var output: [UInt8] = [
@@ -25,9 +25,15 @@ struct GodexEZ2Encoder {
             esc, 0x44, 0x35,
             esc, 0x4D, 0x31, 0x38
         ]
-        for y in 0..<24 {
-            output += [esc, 0x47, 0x30, 0x33]  // ESC G03: 3 data bytes = 24 pixels
-            output += (y == 0 || y == 23) ? [255, 255, 255] : [128, 0, 1]
+        for y in 0..<40 {
+            output += [esc, 0x47, 0x30, 0x35] // ESC G05: 40 dots
+            if y >= 35 {
+                output += [255, 255, 255, 255, 255] // L bottom stroke
+            } else if y < 5 {
+                output += [192, 0, 0, 0, 3] // L left stroke, isolated right marker
+            } else {
+                output += [192, 0, 0, 0, 0] // L left stroke
+            }
         }
         output.append(0x0C)
         return Data(output)

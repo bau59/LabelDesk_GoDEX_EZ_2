@@ -35,7 +35,7 @@ private struct QueueContent: View {
 
             if !store.rasterVerified {
                 HStack(spacing: 12) {
-                    Text("Full labels use unverified ESC G graphics. First print Raster TEST, inspect the paper, then confirm.")
+                    Text("Full labels use unverified ESC G graphics. First print Raster TEST (a black L with top-right dot), inspect the paper, then confirm.")
                         .font(.caption)
                         .foregroundStyle(.orange)
                     if store.rasterProbePending {
