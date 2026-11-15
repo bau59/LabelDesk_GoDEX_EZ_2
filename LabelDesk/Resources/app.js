@@ -152,14 +152,19 @@
     $("templates").innerHTML=visible.length?visible.map(t=>{
       const check=compatibility(t);
       const base=isBase(t.id);
-      return '<button class="item '+(keySame(t.id,state.selectedID)?'active':'')+
+      const inActiveFolder=!!selectedFolder()&&keySame(t.folderID,state.selectedFolderID);
+      const starred=base?'<span class="row-star selected" title="Базовый шаблон">★</span>':
+        inActiveFolder?'<button class="row-star" title="Назначить базовым шаблоном"'+
+          ' data-library-action="set-base-row" data-template-id="'+esc(t.id)+'">☆</button>':'';
+      return '<div class="template-entry"><button class="item '+
+        (keySame(t.id,state.selectedID)?'active':'')+
         '" data-template="'+esc(t.id)+'" title="'+esc(check.ok?"Подходит к установленному рулону":check.reason)+'">'+
-        '<span class="sidebar-row"><span class="glyph">'+(base?'★':'▤')+'</span>'+
+        '<span class="sidebar-row"><span class="glyph">▤</span>'+
         '<span class="item-content">'+esc(t.name)+
         '<small>'+esc(t.widthMM)+' × '+esc(t.heightMM)+' мм · зазор '+esc(t.gapMM)+' мм</small>'+
         (base?'<small>Базовый макет</small>':'')+
         (check.ok?'':'<small class="media-incompatible">⚠ Несовместим с рулоном</small>')+
-        '</span></span></button>';
+        '</span></span></button>'+starred+'</div>';
     }).join(""):'<p class="empty">Здесь пока нет шаблонов.</p>';
     const folder=selectedFolder();
     if(folder){
@@ -346,8 +351,8 @@
       renderLibrary();note("Папка переименована");
     }catch(e){note("Папка не переименована: "+e.message,true);}
   }
-  async function assignBase(){
-    const folder=selectedFolder(),id=$("baseChoice")?.value;
+  async function assignBase(chosenID){
+    const folder=selectedFolder(),id=chosenID||$("baseChoice")?.value;
     const doc=findTemplate(id);
     if(!folder||!doc){note("Выберите шаблон в папке",true);return;}
     if(!keySame(doc.folderID,folder.id)){
@@ -691,6 +696,7 @@
     if(action){
       const command=action.dataset.libraryAction;
       if(command==="set-base")await assignBase();
+      else if(command==="set-base-row")await assignBase(action.dataset.templateId);
       else if(command==="fill-base")selectView("quick");
       else if(command==="edit-base"){
         const base=selectedFolder()&&findTemplate(selectedFolder().baseTemplateID);
