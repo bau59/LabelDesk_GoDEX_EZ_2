@@ -36,6 +36,16 @@ struct GodexEZ2Encoder {
         Data([0x1B, 0x46, 0x30, 0x1B, 0x71, 0x30, 0x34, 0x30, 0x1B, 0x4D, 0x30, 0x31])
     }
 
+    /// Move one physical label pitch (38 mm label + 2 mm gap) to expose
+    /// a blank label after a completed job. The original EZ-2 manual limits
+    /// ESC fnn to 01...29 mm, so 40 mm must be sent in two commands.
+    /// Unlike a bitmap, this operation does not print or consume serial
+    /// bandwidth proportional to the full label area.
+    func jobTearFeedCommands() -> Data {
+        Data([0x1B, 0x66, 0x32, 0x39,  // ESC f29
+              0x1B, 0x66, 0x31, 0x31]) // ESC f11
+    }
+
     /// Each line has the SAME ESC Gnn width. Choose the smallest width containing
     /// all non-white pixels. Send only down to the last ink row, rounded up to
     /// whole millimeters, with a minimum of 32 rows (the tested short-label case).
