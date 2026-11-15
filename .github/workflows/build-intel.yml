@@ -6,6 +6,7 @@ on:
       - main
       - fix/calibration-parity-0.9.2
       - fix/verified-line-printing
+      - fix/line-feed-and-raster-size-094
   workflow_dispatch:
 
 permissions:
@@ -177,4 +178,4 @@ jobs:
             --repo "$GITHUB_REPOSITORY" \
             --target "$GITHUB_SHA" \
             --title "LabelDesk ${APP_VERSION}" \
-            --notes "Intel macOS 15+. Replace legacy EZ-2 Q calibration, paced serial transfer and probe gates with tested buffered T3 startup and Line Mode G55 x 280 + FF for every print. Add 1.5-second configurable inter-label delay, 58x38mm defaults and safe 35mm raster limit. Existing templates and queue history preserved; physical validation of Swift implementation required. Ad-hoc signed; not notarized."
+            --notes "Intel macOS 15+. Fix label feed regression: repeat F0/q040/M01 at the beginning of the Line Mode stream and keep the serial connection open across the batch, matching the successful terminal print test. Compact short text rasters (Gnn, only occupied rows) instead of unconditionally sending 280 full-width rows. Configurable label interval unchanged. Needs physical verification on the EZ-2 before batch use. Ad-hoc signed; not notarized."
