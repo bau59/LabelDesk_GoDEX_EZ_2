@@ -10,7 +10,11 @@ const uuid = n => "00000000-0000-4000-8000-"+String(n).padStart(12,"0");
 const base = {
   schemaVersion:1,id:uuid(1),folderID:uuid(10),name:"Базовый товар",
   widthMM:58,heightMM:38,gapMM:2,updatedAt:"2026-11-16T12:00:00Z",
-  elements:[{id:uuid(100),kind:"text",xMM:2,yMM:2,widthMM:20,heightMM:5,value:"Старое",isVariable:true,fieldName:"Название"}]
+  elements:[
+    {id:uuid(100),kind:"text",xMM:2,yMM:2,widthMM:20,heightMM:5,value:"Старое",isVariable:true,fieldName:"Название"},
+    {id:uuid(101),kind:"barcode",barcodeType:"CODE128",xMM:0,yMM:12,widthMM:55,heightMM:13,
+      value:"123456",isVariable:true,fieldName:"ШК",showsHumanReadable:true}
+  ]
 };
 const secondary = {...JSON.parse(JSON.stringify(base)),id:uuid(2),name:"Вариант",updatedAt:"2026-11-15T12:00:00Z"};
 const firstFolder = {id:uuid(10),name:"Продукты",baseTemplateID:base.id,createdAt:"2026-11-15T12:00:00Z"};
@@ -221,11 +225,16 @@ function assertExistsName(name){assert.ok(store.templates.some(t=>t.name===name)
   element("quickCopies").value="2";
   const field=unsaved.elements[0].id;
   element("quickFields").fire("input",{target:{dataset:{field},value:"Новый текст"}});
+  const barcodeID=unsaved.elements[1].id;
+  element("quickFields").fire("input",{target:{dataset:{field:barcodeID},value:"654321"}});
   await trigger("queueQuick");
   assert.equal(store.queue.length,1);
   assert.equal(store.queue[0].copies,2);
   assert.equal(store.queue[0].document.elements[0].value,"Новый текст");
+  assert.equal(store.queue[0].document.elements[1].value,"654321");
   assert.equal(store.templates.find(t=>t.id===base.id).elements[0].value,"Старое");
+  assert.equal(store.templates.find(t=>t.id===base.id).elements[1].value,"123456",
+    "Variable barcode quick fill must not change base template");
 
   // 11: Reopen job and verify native serial receives packet without modifying protocol.
   await trigger("printOne");
