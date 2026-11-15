@@ -423,7 +423,7 @@ final class AppStore: ObservableObject {
         }
     }
 
-    func startQueue() {
+    func startQueue(onlyOne: Bool = false) {
         guard rasterVerified else {
             alert = AppAlert(title: "Verify graphics first",
                              message: "Press Raster TEST and verify the small square on paper. Normal labels use ESC G and are disabled until you confirm this test.")
@@ -438,7 +438,7 @@ final class AppStore: ObservableObject {
             alert = AppAlert(title: "Choose serial port", message: "Open printer settings and select the USB–RS232 port.")
             return
         }
-        queue.resume()
+        queue.resume(onlyOne: onlyOne)
         queue.process(profile: settings.profile)
     }
 
