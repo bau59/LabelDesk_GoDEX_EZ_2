@@ -6,10 +6,21 @@
 (function(root){
   "use strict";
   const ESC=27, CR=13;
-  function ascii(s) {
-    if(!/^[\x20-\x7E]+$/.test(s)||s.includes("{")||s.includes("}")||s.includes("|"))
-      throw Error("Штатный шрифт EZ-2: только безопасный ASCII (без кириллицы, фигурных скобок и управляющих символов).");
-    return [...s].map(x=>x.charCodeAt(0));
+  const CP437=Object.freeze({
+    "│":179,"─":196,"┌":218,"┐":191,"└":192,"┘":217,
+    "├":195,"┤":180,"┬":194,"┴":193,"┼":197,"█":219,
+    "░":176,"▒":177,"▓":178,"║":186,"═":205,"╔":201,
+    "╗":187,"╚":200,"╝":188,"╬":206
+  });
+  function ascii(s, allowGraphics=false) {
+    if(!s || s.includes("{")||s.includes("}")||s.includes("|"))
+      throw Error("Штатный шрифт EZ-2: фигурные скобки и управляющие последовательности запрещены.");
+    return [...s].map(char=>{
+      const code=char.charCodeAt(0);
+      if(code>=32&&code<=126)return code;
+      if(allowGraphics&&Object.hasOwn(CP437,char))return CP437[char];
+      throw Error("Штатный шрифт EZ-2: ASCII и символы рамок CP437, без кириллицы: "+char);
+    });
   }
   function bytesFromStrings(...parts) {
     const result=[];
@@ -38,11 +49,11 @@
       const font=e.deviceFont||"A11";
       if(!/^A(?:[1-4][1-8]|0[0-4])$/.test(font))
         throw Error("Неподдерживаемый шрифт EZ-2: "+font);
-      const chars=ascii(String(e.value||""));
+      const chars=ascii(String(e.value||""),true);
       if(chars.length>32)
         throw Error("Не более 32 ASCII-символов в однострочном тесте.");
       result.push(ESC,66, ESC,...bytesFromStrings(font),...chars,CR,ESC,69,ESC,80,48,49);
-      info="EZ-2 "+font+" ASCII";
+      info="EZ-2 "+font+" ASCII/CP437";
     }else if(e.kind==="barcode"){
       if((e.barcodeType||"CODE39")!=="CODE39")
         throw Error("Первый тест штатного штрихкода — только Code 39; другие типы доступны растрово.");
