@@ -1,121 +1,332 @@
 import SwiftUI
 
+private enum SettingsPage: String, CaseIterable, Identifiable {
+    case connection = "Подключение"
+    case quality = "Качество и скорость"
+    case paper = "Материал и подача"
+    case capabilities = "Возможности"
+
+    var id: String { rawValue }
+    var icon: String {
+        switch self {
+        case .connection: "cable.connector"
+        case .quality: "slider.horizontal.3"
+        case .paper: "ruler"
+        case .capabilities: "textformat"
+        }
+    }
+}
+
 struct PrinterSettingsView: View {
     @EnvironmentObject private var store: AppStore
     @Environment(\.dismiss) private var dismiss
     @State private var ports = SerialPortService.availablePorts()
     @State private var draft = PrinterProfile()
+    @State private var page: SettingsPage = .connection
 
     var body: some View {
-        VStack(alignment: .leading, spacing: 12) {
-            Text("Настройки GoDEX EZ-2").font(.title2).fontWeight(.semibold)
-
-            TabView {
-                Form {
-                    Section("USB–RS232") {
-                        Picker("Последовательный порт", selection: $draft.portPath) {
-                            Text("Не выбран").tag("")
-                            if !draft.portPath.isEmpty && !ports.contains(draft.portPath) {
-                                Text(draft.portPath + " (ранее выбран)").tag(draft.portPath)
-                            }
-                            ForEach(ports, id: \.self) { Text($0).tag($0) }
-                        }
-                        Button("Обновить список портов") {
-                            ports = SerialPortService.availablePorts()
-                        }
-                        LabeledContent("Скорость интерфейса", value: "9600 бод")
-                        LabeledContent("Формат", value: "8 бит · без чётности · 1 стоп-бит")
-                        Picker("Управление потоком", selection: $draft.flowControl) {
-                            ForEach(FlowControl.allCases) { mode in
-                                Text(mode.rawValue).tag(mode)
-                            }
-                        }
-                    }
-                    Section {
-                        Text("Это настройки последовательной передачи, не скорости движения бумаги. Для RTS/CTS требуется соответствующая распайка кабеля.")
-                            .font(.caption).foregroundStyle(.secondary)
-                    }
+        VStack(spacing: 0) {
+            HStack(spacing: 13) {
+                Image(systemName: "printer.fill")
+                    .font(.system(size: 18))
+                    .foregroundStyle(DeskPalette.accent)
+                    .frame(width: 41, height: 41)
+                    .background(DeskPalette.paleBlue, in: RoundedRectangle(cornerRadius: 11))
+                VStack(alignment: .leading, spacing: 4) {
+                    Text("Настройки принтера")
+                        .font(.system(size: 21, weight: .bold))
+                        .foregroundStyle(DeskPalette.ink)
+                    Text("GoDEX EZ-2 · USB–RS232 · 203 dpi")
+                        .font(.system(size: 12))
+                        .foregroundStyle(DeskPalette.secondary)
                 }
-                .tabItem { Label("Подключение", systemImage: "cable.connector") }
-
-                Form {
-                    Section("Термопечать") {
-                        Picker("Скорость механизма", selection: $draft.printSpeed) {
-                            ForEach(EZ2PrintSpeed.allCases) { speed in
-                                Text(speed.title).tag(speed)
-                            }
-                        }
-                        Stepper("Плотность: \(draft.density) / 7", value: $draft.density, in: 0...7)
-                        Stepper("Порог монохромного растра: \(draft.rasterThreshold)",
-                                value: $draft.rasterThreshold, in: 64...192, step: 8)
-                    }
-                    Section("Аппаратные ограничения") {
-                        LabeledContent("Разрешение", value: "203 dpi (8 точек/мм)")
-                        LabeledContent("Ширина головки", value: "56 мм")
-                        LabeledContent("Максимум растра ESC G", value: "55 мм (440 точек)")
-                        Text("Плотность D0–D7 влияет на нагрев, порог растра — на толщину сглаженных линий. Скорость S0/S1 задаёт движение бумаги, но не ускоряет канал RS-232 9600 бод.")
-                            .font(.caption).foregroundStyle(.secondary)
-                    }
-                }
-                .tabItem { Label("Качество и скорость", systemImage: "speedometer") }
-
-                Form {
-                    Section("Датчик материала") {
-                        Picker("Тип датчика", selection: $draft.sensorMode) {
-                            ForEach(EZ2SensorMode.allCases) { mode in
-                                Text(mode.title).tag(mode)
-                            }
-                        }
-                        Text("Изменяйте датчик только при соответствующем типе этикеток. По умолчанию существующие настройки принтера не трогаются.")
-                            .font(.caption).foregroundStyle(.secondary)
-                    }
-                    Section("Позиционирование") {
-                        Stepper("ESC Q: \(draft.topOfFormDots) точек", value: $draft.topOfFormDots,
-                                in: 4...999, step: 8)
-                        NumberField(title: "Горизонтальная поправка", value: $draft.xOffsetMM, suffix: "мм")
-                        NumberField(title: "Вертикальная поправка", value: $draft.yOffsetMM, suffix: "мм")
-                        Text("По умолчанию Q176 — проверенная настройка теста. Значение Q зависит от материала; после изменения проверьте Feed TEST на одной этикетке. Размер и зазор задаются в редакторе.")
-                            .font(.caption).foregroundStyle(.secondary)
-                    }
-                    Section("Тестовый текст") {
-                        NumberField(title: "Поле для Print TEST", value: $draft.leftMarginMM, suffix: "мм")
-                        Text("Для растровых макетов применяется фиксированное M01; текстовое поле относится только к первоначальному TEST.")
-                            .font(.caption).foregroundStyle(.secondary)
-                    }
-                }
-                .tabItem { Label("Материал", systemImage: "ruler") }
-
-                VStack(alignment: .leading, spacing: 15) {
-                    Text("Встроенные шрифты EZ-2").font(.headline)
-                    Text("Документированы ASCII 8×10 точек (ESC A00) и 16×26 точек (ESC A11), увеличение и стандартные штрихкоды. Кириллицы в списке кодовых страниц нет.")
-                        .fixedSize(horizontal: false, vertical: true)
-                    Text("Для обычных русских текстов остаётся растровый вывод. Отдельная печать встроенного ASCII-текста намного компактнее. Гибридная печать возможна только после испытания расположения текстовых и графических строк.")
-                        .fixedSize(horizontal: false, vertical: true)
-                    Text("В главном окне доступна кнопка «Font TEST»: она печатает одну пробную этикетку двумя встроенными шрифтами. Пока тест не выполнен, режим смешанной печати не включается.")
-                        .fixedSize(horizontal: false, vertical: true)
-                    Spacer()
-                }
-                .padding(18)
-                .tabItem { Label("Возможности", systemImage: "textformat") }
-            }
-            .frame(minHeight: 455)
-
-            HStack {
-                Button("Отмена") { dismiss() }
                 Spacer()
-                Button("Сохранить настройки") {
+            }
+            .padding(21)
+
+            DeskPalette.border.frame(height: 1)
+
+            HStack(spacing: 0) {
+                VStack(alignment: .leading, spacing: 5) {
+                    ForEach(SettingsPage.allCases) { option in
+                        Button {
+                            page = option
+                        } label: {
+                            HStack(spacing: 10) {
+                                Image(systemName: option.icon)
+                                    .frame(width: 19)
+                                Text(option.rawValue)
+                                    .font(.system(size: 12, weight: page == option ? .semibold : .medium))
+                                Spacer(minLength: 0)
+                            }
+                            .foregroundStyle(page == option ? DeskPalette.accent : DeskPalette.ink)
+                            .padding(.horizontal, 12)
+                            .padding(.vertical, 11)
+                            .background(page == option ? DeskPalette.paleBlue : Color.clear,
+                                        in: RoundedRectangle(cornerRadius: 9))
+                        }
+                        .buttonStyle(.plain)
+                    }
+                    Spacer()
+                    Text("Параметры сохраняются только по кнопке «Применить».")
+                        .font(.system(size: 11))
+                        .foregroundStyle(DeskPalette.secondary)
+                        .fixedSize(horizontal: false, vertical: true)
+                        .padding(.horizontal, 10)
+                }
+                .padding(14)
+                .frame(width: 202)
+                .background(DeskPalette.background)
+
+                DeskPalette.border.frame(width: 1)
+
+                ScrollView {
+                    VStack(alignment: .leading, spacing: 18) {
+                        switch page {
+                        case .connection:
+                            connectionContent
+                        case .quality:
+                            qualityContent
+                        case .paper:
+                            paperContent
+                        case .capabilities:
+                            capabilitiesContent
+                        }
+                    }
+                    .frame(maxWidth: .infinity, alignment: .topLeading)
+                    .padding(25)
+                }
+                .background(Color.white)
+            }
+
+            DeskPalette.border.frame(height: 1)
+
+            HStack(spacing: 10) {
+                Label("Изменение датчика или ESC Q потребует повторного Feed TEST.",
+                      systemImage: "info.circle")
+                    .font(.system(size: 11))
+                    .foregroundStyle(DeskPalette.secondary)
+                Spacer()
+                Button("Отмена") { dismiss() }
+                    .buttonStyle(.bordered)
+                Button("Применить настройки") {
                     store.settings.profile = draft
                     store.saveSettings()
                     dismiss()
                 }
                 .buttonStyle(.borderedProminent)
+                .tint(DeskPalette.accent)
             }
+            .padding(17)
         }
-        .padding(18)
-        .frame(width: 680, height: 560)
+        .frame(width: 790, height: 600)
+        .background(.white)
         .onAppear {
             draft = store.settings.profile
             ports = SerialPortService.availablePorts()
         }
+    }
+
+    private var connectionContent: some View {
+        VStack(alignment: .leading, spacing: 16) {
+            pageHeading("Подключение", subtitle: "Настройки последовательного интерфейса USB–RS232")
+            sectionCard {
+                field("Порт принтера") {
+                    HStack(spacing: 9) {
+                        Picker("Порт принтера", selection: $draft.portPath) {
+                            Text("Выберите порт").tag("")
+                            if !draft.portPath.isEmpty && !ports.contains(draft.portPath) {
+                                Text(draft.portPath + " (сохранён)").tag(draft.portPath)
+                            }
+                            ForEach(ports, id: \.self) { Text($0).tag($0) }
+                        }
+                        .labelsHidden()
+                        .frame(maxWidth: .infinity)
+                        Button {
+                            ports = SerialPortService.availablePorts()
+                        } label: {
+                            Image(systemName: "arrow.clockwise")
+                        }
+                        .buttonStyle(.bordered)
+                        .help("Обновить доступные порты")
+                    }
+                }
+                Divider()
+                HStack {
+                    infoValue("Скорость", "9600 бод")
+                    Spacer()
+                    infoValue("Формат", "8N1")
+                }
+                Divider()
+                field("Управление потоком") {
+                    Picker("Управление потоком", selection: $draft.flowControl) {
+                        ForEach(FlowControl.allCases) { mode in
+                            Text(mode.rawValue).tag(mode)
+                        }
+                    }
+                    .labelsHidden()
+                    .frame(maxWidth: 260, alignment: .leading)
+                }
+            }
+            tip("На EZ-2 заводские параметры: 9600 бод, 8 бит, без чётности, 1 стоп-бит. XON/XOFF и RTS/CTS — разные режимы управления потоком; правильный режим зависит от фактического кабеля и настроек принтера. При непечатающих заданиях проверьте журнал передачи.")
+        }
+    }
+
+    private var qualityContent: some View {
+        VStack(alignment: .leading, spacing: 16) {
+            pageHeading("Качество и скорость", subtitle: "Параметры механизма и подготовка монохромного изображения")
+            sectionCard {
+                field("Механическая скорость") {
+                    Picker("Скорость", selection: $draft.printSpeed) {
+                        ForEach(EZ2PrintSpeed.allCases) { speed in
+                            Text(speed.title).tag(speed)
+                        }
+                    }
+                    .labelsHidden()
+                    .frame(maxWidth: 310, alignment: .leading)
+                }
+                Divider()
+                field("Плотность нагрева: \(draft.density) / 7") {
+                    HStack(spacing: 14) {
+                        Slider(value: Binding(
+                            get: { Double(draft.density) },
+                            set: { draft.density = Int($0.rounded()) }
+                        ), in: 0...7, step: 1)
+                        Text("\(draft.density)")
+                            .monospacedDigit()
+                            .frame(width: 26)
+                    }
+                }
+                Divider()
+                field("Порог растра: \(draft.rasterThreshold)") {
+                    HStack(spacing: 14) {
+                        Slider(value: Binding(
+                            get: { Double(draft.rasterThreshold) },
+                            set: { draft.rasterThreshold = Int(($0 / 8).rounded()) * 8 }
+                        ), in: 64...192, step: 8)
+                        Text("\(draft.rasterThreshold)")
+                            .monospacedDigit()
+                            .frame(width: 34)
+                    }
+                }
+            }
+            HStack(spacing: 11) {
+                spec("203 dpi", "Разрешение")
+                spec("56 мм", "Печатная головка")
+                spec("55 мм", "Ширина растра")
+            }
+            tip("Скорость S0/S1 управляет движением бумаги, но не увеличивает пропускную способность RS-232. На 9600 бод большие растровые макеты передаются медленно.")
+        }
+    }
+
+    private var paperContent: some View {
+        VStack(alignment: .leading, spacing: 16) {
+            pageHeading("Материал и подача", subtitle: "Датчик этикетки и положение начала печати")
+            sectionCard {
+                field("Датчик материала") {
+                    Picker("Датчик", selection: $draft.sensorMode) {
+                        ForEach(EZ2SensorMode.allCases) { mode in
+                            Text(mode.title).tag(mode)
+                        }
+                    }
+                    .labelsHidden()
+                    .frame(maxWidth: .infinity)
+                }
+                Divider()
+                field("ESC Q: \(draft.topOfFormDots) точек") {
+                    Stepper(value: $draft.topOfFormDots, in: 4...999, step: 8) {
+                        Text("\(draft.topOfFormDots)")
+                            .monospacedDigit()
+                    }
+                    .frame(maxWidth: 180, alignment: .leading)
+                }
+                Divider()
+                HStack(spacing: 20) {
+                    NumberField(title: "X", value: $draft.xOffsetMM, suffix: "мм")
+                    NumberField(title: "Y", value: $draft.yOffsetMM, suffix: "мм")
+                }
+                Divider()
+                NumberField(title: "Отступ Print TEST", value: $draft.leftMarginMM, suffix: "мм")
+            }
+            tip("По умолчанию сохранено ESC Q176. Не меняйте датчик или Q без необходимости: ошибка приведёт к неправильной протяжке. После изменения выполните Feed TEST на одной этикетке.")
+        }
+    }
+
+    private var capabilitiesContent: some View {
+        VStack(alignment: .leading, spacing: 17) {
+            pageHeading("Возможности EZ-2", subtitle: "Что поддерживает именно этот старый принтер")
+            sectionCard {
+                infoValue("Встроенный шрифт 1", "ASCII 8×10 точек")
+                Divider()
+                infoValue("Встроенный шрифт 2", "ASCII 16×26 точек")
+                Divider()
+                infoValue("Графика", "ESC G, монохром, до 55 мм")
+                Divider()
+                infoValue("Штрихкоды", "Встроенные команды и программный Code 39")
+            }
+            tip("Кириллица выводится растром. Встроенный ASCII-текст печатается намного компактнее, но полноценный гибридный режим пока не включён без дополнительного физического тестирования.")
+        }
+    }
+
+    private func pageHeading(_ title: String, subtitle: String) -> some View {
+        VStack(alignment: .leading, spacing: 7) {
+            Text(title)
+                .font(.system(size: 19, weight: .semibold))
+                .foregroundStyle(DeskPalette.ink)
+            Text(subtitle)
+                .font(.system(size: 12))
+                .foregroundStyle(DeskPalette.secondary)
+        }
+    }
+
+    private func sectionCard<Content: View>(@ViewBuilder _ content: () -> Content) -> some View {
+        VStack(alignment: .leading, spacing: 16, content: content)
+            .deskSurface(padding: 19)
+    }
+
+    private func field<Content: View>(_ title: String, @ViewBuilder _ content: () -> Content) -> some View {
+        VStack(alignment: .leading, spacing: 8) {
+            Text(title)
+                .font(.system(size: 12, weight: .semibold))
+                .foregroundStyle(DeskPalette.ink)
+            content()
+        }
+    }
+
+    private func infoValue(_ label: String, _ value: String) -> some View {
+        VStack(alignment: .leading, spacing: 5) {
+            Text(label)
+                .font(.system(size: 11))
+                .foregroundStyle(DeskPalette.secondary)
+            Text(value)
+                .font(.system(size: 13, weight: .semibold))
+                .foregroundStyle(DeskPalette.ink)
+        }
+    }
+
+    private func spec(_ value: String, _ label: String) -> some View {
+        VStack(alignment: .leading, spacing: 6) {
+            Text(value)
+                .font(.system(size: 16, weight: .semibold))
+                .foregroundStyle(DeskPalette.ink)
+            Text(label)
+                .font(.system(size: 11))
+                .foregroundStyle(DeskPalette.secondary)
+        }
+        .frame(maxWidth: .infinity, alignment: .leading)
+        .deskSurface(padding: 14)
+    }
+
+    private func tip(_ text: String) -> some View {
+        HStack(alignment: .top, spacing: 10) {
+            Image(systemName: "info.circle")
+                .foregroundStyle(DeskPalette.accent)
+            Text(text)
+                .foregroundStyle(DeskPalette.secondary)
+                .fixedSize(horizontal: false, vertical: true)
+        }
+        .font(.system(size: 12))
+        .padding(14)
+        .background(DeskPalette.background, in: RoundedRectangle(cornerRadius: 11))
     }
 }
