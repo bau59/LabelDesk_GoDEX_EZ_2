@@ -117,6 +117,17 @@ struct TemplateLibraryView: View {
                             Menu {
                                 Button("Открыть в редакторе") { store.load(template) }
                                 Button("Создать копию") { store.duplicateTemplate(template) }
+                                Menu("Переместить в…") {
+                                    Button("Без папки") {
+                                        store.moveTemplate(template, to: nil)
+                                    }
+                                    ForEach(store.folders) { folder in
+                                        Button(folder.name) {
+                                            store.moveTemplate(template, to: folder.id)
+                                        }
+                                    }
+                                }
+                                .disabled(store.folders.contains(where: { $0.baseTemplateID == template.id }))
                                 if store.activeFolder != nil {
                                     Button("Сделать базовым") { store.makeBaseTemplate(template) }
                                 }
