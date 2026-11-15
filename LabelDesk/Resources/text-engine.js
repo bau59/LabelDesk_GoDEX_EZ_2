@@ -86,7 +86,7 @@
     root.EZ2Barcodes.layout(type,bars.display,printWidth*8);
     return {bars,selector:type==="CODE39"?"3":type==="CODE128"?"1":"E"};
   }
-  function plan(doc){
+  function plan(doc, options={}){
     if(!doc || doc.printMode!=="text")throw Error("Этот макет не является строковым");
     if(Math.abs(Number(doc.heightMM)-38)>0.001||Math.abs(Number(doc.gapMM)-2)>0.001)
       throw Error("Штатный драйвер подтверждён для высоты 38 мм, зазора 2 мм");
@@ -110,6 +110,9 @@
       }
       if(el.kind!=="text" && el.kind!=="line")
         throw Error("Форма «"+el.kind+"» требует растровой печати");
+      if(doc.starterPack==="food-v1" && !options.allowPlaceholders &&
+          /\[[^\]]+\]/.test(String(el.value??"")))
+        throw Error("Заполните поле «"+(el.fieldName||"Строка")+"» перед печатью");
       const code=el.kind==="line"?"A00":(el.deviceFont||"A00");
       const f=font(code);
       const requestedWidth=Math.min(55,Math.max(1,Number(el.widthMM||55)));
