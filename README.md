@@ -27,6 +27,19 @@ Download the latest Intel DMG from https://github.com/bau59/LabelDesk_GoDEX_EZ_2
 
 The raster uses one ESC Gnn command per row with nn raw monochrome bytes (1 = black), a 1 mm left-margin command, ESC q with the full label height plus gap, and FF. ESC Q176 is the previously tested default top-of-form value for text and raster, now adjustable for raster jobs. ESC Q and ESC q are different instructions. A 55 mm raster is *not* the same as a 60 mm printable area.
 
+## Version 0.9.2 — FEED and calibration use identical serial behavior
+
+The physical EZ-2's FEED button only advances a short amount on the user's machine. The v0.9.1 assumption that five presses must move five complete labels was wrong. This release removes that requirement and UI gate, and does not treat small mechanical FEED movement as evidence of sensor failure.
+
+**Source-level discrepancy in v0.9.1:** FEED TEST used the legacy continuous serial write, while the calibration frame used the configured raster transport (normally paced 64-byte bursts). The two outcomes could therefore not be directly compared.
+
+- FEED TEXT, TOP, BOTTOM and FRAME now share one performRasterDiagnostic method and a single encoder. All use the same effective Q/q/S/M packet header, label width/height, 8-dot/mm line count, serial port and configured pacing/flow control. Only the raster content and total bytes differ.
+- A diagnosticRunning guard prevents parallel FEED/calibration transmissions and the normal queue pauses before each diagnostic.
+- Each attempt is logged with type, physical profile, byte count, transport mode, hardware headers and stage timings. No label text is logged.
+- The wizard offers **FEED: текст** (short word), **Начало** (upper stroke), **Конец** (lower stroke), **Рамка** (full frame/ruler). Keep Q, gap, dimensions, X/Y, transport and sensor unchanged between them.
+- If FEED and top look correct but bottom crosses the label gap, investigate vertical registration rather than X/Y origin. If bottom is correct and frame fails, compare the volume and shape of the graphic stream.
+- The original verified short PRINT TEST and FONT TEST, queue, template format and updater are unchanged. No unverified printer reset/auto-calibration command was added.
+
 ## Version 0.9.1 — physical media width vs. printable raster; stable paper sensor first
 
 The EZ-2 has three different widths: **60 mm maximum media**, **56 mm physical thermal head**, and **55 bytes/row (440 dots = 55 mm) for the documented ESC G protocol**. Previously the entire label editor was limited to 55 mm. v0.9.1 removes this incorrect media restriction while retaining the verified protocol limit.
@@ -36,16 +49,11 @@ The EZ-2 has three different widths: **60 mm maximum media**, **56 mm physical t
 - No undocumented `ESC G56` packet is sent, since the original EZ-2 manual lists **55 bytes maximum per graphic row**. Testing the physical head and the original transport limit must be separated; the spec does not guarantee an extended packet can be decoded.
 - The single-label calibration pattern uses a safe ruler with guide marks every 5 mm, and the last printed marks help measure the usable width from actual paper. A 60-mm label will intentionally leave at least 5 mm outside the protocol print window.
 
-### Correct order when a frame crosses gaps between stickers
+### Calibration correction (superseded by 0.9.2)
 
-1. Stop sending multiple print jobs. Load the correct stock and ensure that the gap passes under the printer's physical transmissive sensor.
-2. Use the printer's **physical FEED button** five times in succession. Each feed must advance one sticker and stop in the same relative position. This tests the sensor without changes to LabelDesk commands.
-3. If the stops differ or the printer skips stickers, inspect/clean the sensor, media backing and guides. On the original EZ-2 sensor sensitivity is adjusted by an internal VR potentiometer; follow the EZ-2 manual, do not blindly change Q or software X/Y offsets. The wizard asks for manual confirmation of stable feed before enabling **Печать рамки**.
-4. Only after five consistent physical feeds: save the measured label height/gap, run Feed TEST and confirm the correct stop, then print one calibration ruler. X/Y offsets adjust **ink only**; they cannot repair a randomly detecting gap sensor.
+The earlier v0.9.1 guidance requiring a full-label advance from every mechanical FEED press is withdrawn. On the tested EZ-2, the button advances only a short distance. Use the 0.9.2 FEED/top/bottom/frame comparisons before attributing problems to the sensor.
 
-The supported ESC q value includes label height + inter-label gap. ESC Q controls the stop-registration parameter. Both are per the original EZ-2 command reference. No new serial protocol or printer firmware commands are required by 0.9.1.
 
-References: https://www.manualslib.com/manual/302891/Godex-Ez-2.html and https://scancode.ru/upload/iblock/998/bzb2_ez2_esc_programing_user_manual.pdf.
 ## Version 0.9.0 — multiline labels, alignment and guided EZ-2 calibration
 
 ### Multiline quick fill and text positioning
