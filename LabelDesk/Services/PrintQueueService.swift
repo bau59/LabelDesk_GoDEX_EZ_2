@@ -91,7 +91,7 @@ final class PrintQueueService: ObservableObject {
         let job = jobs[index]
         let diagnostics = self.diagnostics
         diagnostics.record("encode begin", jobID: job.id,
-            details: "port=\(profile.portPath) baud=\(profile.baudRate) flow=\(profile.flowControl.rawValue) Q=\(profile.topOfFormDots) speed=\(profile.printSpeed.rawValue) darkness=\(profile.density) sensor=\(profile.sensorMode.rawValue) copies=\(job.copies)")
+            details: "port=\(profile.portPath) baud=\(profile.baudRate) flow=\(profile.flowControl.rawValue) Q=\(GodexEZ2Encoder.effectiveQ(for: job.document, profile: profile)) autoQ=\(profile.automaticTopOfForm) speed=S\(profile.printSpeed.rawValue + 1) rasterTx=\(profile.rasterTransport.rawValue) darkness=\(profile.density) sensor=\(profile.sensorMode.rawValue) copies=\(job.copies)")
 
         Task.detached { [port, encoder, diagnostics] in
             let data: Data
@@ -115,7 +115,7 @@ final class PrintQueueService: ObservableObject {
                 await diagnostics.record("serial begin", jobID: job.id,
                     details: "copy=\(copy)/\(job.copies), port=\(profile.portPath)")
                 do {
-                    try port.write(data, profile: profile) { stage in
+                    try port.write(data, profile: profile, rasterTransport: profile.rasterTransport) { stage in
                         Task { @MainActor in
                             diagnostics.record("serial", jobID: job.id, details: "copy=\(copy) \(stage)")
                         }
