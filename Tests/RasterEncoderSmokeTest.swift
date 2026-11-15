@@ -122,14 +122,12 @@ struct RasterEncoderSmokeTest {
         assert(fontPacket.range(of: Data([0x1B, 0x41, 0x31, 0x31])) != nil, "Large ASCII font")
         assert(fontPacket.last == 0x0C)
 
-        var oversized = document
-        oversized.widthMM = 56
-        do {
-            try LabelRasterizer.validate(oversized)
-            fatalError("56mm raster must be rejected")
-        } catch LabelRenderError.invalidSize {
-            // Expected: 56mm head width is not 55-byte ESC G width.
-        }
+        var widerMedia = document
+        widerMedia.widthMM = 56
+        try LabelRasterizer.validate(widerMedia)
+        let safeRaster = try LabelRasterizer().rasterize(widerMedia, profile: profile)
+        assert(safeRaster.bytesPerLine == 55 && safeRaster.widthDots == 440,
+               "56mm media is valid, but ESC G graphics remain limited to 55 bytes")
 
         // A long variable field must produce more than one raster text line,
         // including unbroken words, while never painting outside its box.
@@ -203,7 +201,7 @@ struct RasterEncoderSmokeTest {
         assert(wideRaster.widthDots == 440 && wideRaster.bytesPerLine == 55)
         let widePacket = [UInt8](try encoder.nativeCommands(for: wide, profile: profile))
         var wideOffset = header.count
-        for row in 0..<wideRaster.heightDots {
+        for _ in 0..<wideRaster.heightDots {
             assert(widePacket[wideOffset] == 0x1B && widePacket[wideOffset + 1] == 0x47)
             let n = Int(String(decoding: widePacket[(wideOffset+2)..<(wideOffset+4)], as: UTF8.self))!
             assert((1...55).contains(n), "Never send undocumented ESC G56")
