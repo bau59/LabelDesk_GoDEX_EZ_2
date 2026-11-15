@@ -41,6 +41,7 @@ swiftc \
   -parse-as-library \
   -framework SwiftUI \
   -framework AppKit \
+  -framework WebKit \
   "${SOURCE_FILES[@]}" \
   -o "$MACOS_DIR/LabelDesk"
 print "[LabelDesk] Compilation completed in $(( SECONDS - START_TIME )) seconds."
@@ -49,6 +50,7 @@ print "[LabelDesk] 4/5 Creating and signing the app bundle…"
 mkdir -p "$APP/Contents/Resources"
 cp "$ROOT/LabelDesk/Resources/Info.plist" "$APP/Contents/Info.plist"
 cp "$ROOT/Scripts/install-update.sh" "$APP/Contents/Resources/install-update.sh"
+cp "$ROOT/LabelDesk/Resources/editor.html" "$APP/Contents/Resources/editor.html"
 codesign --force --deep --sign - "$APP"
 print "[LabelDesk] 5/5 Creating the disk image…"
 hdiutil create -volname LabelDesk -srcfolder "$APP" -ov -format UDZO "$DMG"
