@@ -135,15 +135,24 @@ struct LabelRasterizer {
                     ? NSFont.boldSystemFont(ofSize: fontPoints)
                     : NSFont.systemFont(ofSize: fontPoints)
                 let paragraph = NSMutableParagraphStyle()
-                paragraph.lineBreakMode = .byClipping
+                // The previous byClipping forced the whole variable value onto
+                // one line. Wrap even long words, and clip ONLY inside the box.
+                paragraph.lineBreakMode = .byCharWrapping
+                switch item.effectiveTextAlignment {
+                case .left: paragraph.alignment = .left
+                case .center: paragraph.alignment = .center
+                case .right: paragraph.alignment = .right
+                }
                 if item.rotation != 0 {
                     cg.translateBy(x: x + w / 2, y: y + h / 2)
                     cg.rotate(by: CGFloat(item.rotation) * .pi / 180)
                     let centered = CGRect(x: -w / 2, y: -h / 2, width: w, height: h)
+                    cg.clip(to: centered)
                     (item.value as NSString).draw(in: centered, withAttributes: [
                         .font: font, .foregroundColor: NSColor.black, .paragraphStyle: paragraph
                     ])
                 } else {
+                    cg.clip(to: rect)
                     (item.value as NSString).draw(in: rect, withAttributes: [
                         .font: font, .foregroundColor: NSColor.black, .paragraphStyle: paragraph
                     ])
