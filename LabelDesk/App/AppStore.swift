@@ -210,6 +210,45 @@ final class AppStore: ObservableObject {
         }
     }
 
+    func moveTemplate(_ template: LabelDocument, to folderID: UUID?) {
+        guard folderID == nil || folders.contains(where: { $0.id == folderID }) else { return }
+        guard !folders.contains(where: { $0.baseTemplateID == template.id }) else {
+            alert = AppAlert(title: "Базовый шаблон", message: "Сначала назначьте другой базовый шаблон.")
+            return
+        }
+        var updated = template
+        updated.folderID = folderID
+        updated.updatedAt = Date()
+        do {
+            try storage.saveDocument(updated)
+            templates = storage.listDocuments()
+            if document.id == updated.id { document.folderID = folderID }
+            status = "Шаблон перемещён"
+        } catch {
+            alert = AppAlert(title: "Не удалось переместить", message: error.localizedDescription)
+        }
+    }
+
+    func saveQuickVariant(named rawName: String) {
+        let name = rawName.trimmingCharacters(in: .whitespacesAndNewlines)
+        guard !name.isEmpty, name.count <= 80, var copy = quickDocument else {
+            alert = AppAlert(title: "Название варианта", message: "Введите название от 1 до 80 символов.")
+            return
+        }
+        copy.id = UUID()
+        copy.folderID = selectedFolderID
+        copy.name = name
+        copy.updatedAt = Date()
+        do {
+            try LabelRasterizer.validate(copy)
+            try storage.saveDocument(copy)
+            templates = storage.listDocuments()
+            status = "Вариант «\(name)» сохранён в папке"
+        } catch {
+            alert = AppAlert(title: "Не удалось сохранить вариант", message: error.localizedDescription)
+        }
+    }
+
     func deleteTemplate(_ template: LabelDocument) {
         guard !folders.contains(where: { $0.baseTemplateID == template.id }) else {
             alert = AppAlert(title: "Базовый шаблон", message: "Сначала назначьте другой базовый шаблон для этой папки.")
