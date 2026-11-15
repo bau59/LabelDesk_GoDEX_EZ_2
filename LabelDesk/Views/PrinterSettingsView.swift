@@ -13,7 +13,7 @@ struct PrinterSettingsView: View {
                 VStack(alignment: .leading, spacing: 5) {
                     Text("Настройки принтера")
                         .font(.system(size: 22, weight: .bold))
-                    Text("GoDEX EZ-2 · RS-232 · проверенный построчный режим")
+                    Text("GoDEX EZ-2 · RS-232 · Line Mode")
                         .font(.system(size: 12))
                         .foregroundStyle(DeskPalette.secondary)
                 }
@@ -45,7 +45,7 @@ struct PrinterSettingsView: View {
                     Text(String(format: "%.1f с", draft.labelIntervalSeconds))
                         .monospacedDigit()
                 }
-                Text("Проверено: 1,5 с. Пауза начинается после передачи FF и завершения вывода данных из драйвера RS-232. Между растровыми строками пауз нет.")
+                Text("Проверено: 1,5 с. Пауза начинается после передачи FF и завершения вывода из RS-232. Между строками пауз нет. Порт остаётся открытым на всю серию.")
                     .font(.system(size: 12))
                     .foregroundStyle(DeskPalette.secondary)
             }
@@ -61,7 +61,7 @@ struct PrinterSettingsView: View {
                     Text("\(draft.rasterThreshold)")
                         .monospacedDigit()
                 }
-                Text("Материал 58 × 38 мм · зазор 2 мм · шаг 40 мм. Область печати: 55 × 35 мм (440 × 280 точек). Стартовая этикетка T3 печатается автоматически при запуске очереди.")
+                Text("Материал 58 × 38 мм · зазор 2 мм · шаг 40 мм. Область печати: 55 × 35 мм (440 × 280 точек). Стартовая этикетка T3 печатается автоматически при запуске очереди. Для коротких текстов пустые строки и байты не передаются.")
                     .font(.system(size: 12))
                     .foregroundStyle(DeskPalette.secondary)
             }

@@ -71,6 +71,9 @@ final class PrintQueueService: ObservableObject {
 
     func pause() {
         isPaused = true
+        if !jobs.contains(where: { $0.state == .sending }) {
+            port.endSeries()
+        }
         diagnostics.record("queue paused", details: "currently sending job may finish")
     }
 
@@ -92,7 +95,7 @@ final class PrintQueueService: ObservableObject {
         let job = jobs[index]
         let diagnostics = self.diagnostics
         diagnostics.record("encode begin", jobID: job.id,
-            details: "port=\(profile.portPath) 9600-8N1 G55 rows=280 interval=\(profile.labelIntervalSeconds)s copies=\(job.copies)")
+            details: "port=\(profile.portPath) 9600-8N1 adaptive Gnn interval=\(profile.labelIntervalSeconds)s copies=\(job.copies)")
 
         Task.detached { [port, encoder, diagnostics] in
             let data: Data
@@ -116,7 +119,8 @@ final class PrintQueueService: ObservableObject {
                 await diagnostics.record("serial begin", jobID: job.id,
                     details: "copy=\(copy)/\(job.copies), port=\(profile.portPath)")
                 do {
-                    try port.sendLabel(data, startup: encoder.startupCommands(), profile: profile) { stage in
+                    try port.sendLabel(data, startup: encoder.startupCommands(),
+                                       lineSetup: encoder.lineModeSetup(), profile: profile) { stage in
                         Task { @MainActor in
                             diagnostics.record("serial", jobID: job.id, details: "copy=\(copy) \(stage)")
                         }
@@ -143,13 +147,18 @@ final class PrintQueueService: ObservableObject {
         jobs[index].state = state
         jobs[index].errorMessage = error
         persist()
-        if state != .sent || stopAfterCurrent {
+
+        let hasNext = jobs.contains(where: { $0.state == .pending })
+        if state == .sent && !stopAfterCurrent && !isPaused && hasNext {
+            process(profile: profile)
+        } else {
+            // End the persistent Line Mode connection only after the last label
+            // (or after the operator stopped the batch).
+            port.endSeries()
             isPaused = true
             stopAfterCurrent = false
             diagnostics.record("queue stopped", jobID: id,
-                details: state == .sent ? "one-job diagnostic completed; inspect actual label" : "error: no automatic retry")
-        } else {
-            process(profile: profile)
+                details: state == .sent ? "batch complete or paused" : "error: no automatic retry")
         }
     }
 
