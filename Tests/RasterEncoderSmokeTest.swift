@@ -42,7 +42,7 @@ struct RasterEncoderSmokeTest {
         let header: [UInt8] = [
             0x1B, 0x51, 0x31, 0x37, 0x36,
             0x1B, 0x71, 0x30, 0x33, 0x33,
-            0x1B, 0x53, 0x32,
+            0x1B, 0x53, 0x31,
             0x1B, 0x44, 0x35,
             0x1B, 0x4D, 0x30, 0x31
         ]
@@ -69,6 +69,35 @@ struct RasterEncoderSmokeTest {
         let compact = try encoder.nativeCommands(for: blank, profile: profile)
         assert(compact.count < 1500, "Blank 55x30mm label should use G01 rows")
 
+        // Legacy settings from 0.5 must migrate without losing their port.
+        let legacy = #"{"portPath":"/dev/cu.usbserial-1430","baudRate":9600,"flowControl":"None","density":6,"leftMarginMM":18,"topOffsetDots":0,"xOffsetMM":1,"yOffsetMM":0,"materialGapMM":3}"#
+        let migrated = try JSONDecoder().decode(PrinterProfile.self, from: Data(legacy.utf8))
+        assert(migrated.portPath == "/dev/cu.usbserial-1430")
+        assert(migrated.density == 6 && migrated.printSpeed == .normal)
+        assert(migrated.topOfFormDots == 176 && migrated.rasterThreshold == 128)
+        assert(migrated.sensorMode == .unchanged)
+
+        var tuned = profile
+        tuned.printSpeed = .slow
+        tuned.density = 7
+        tuned.sensorMode = .gap
+        tuned.topOfFormDots = 144
+        let tunedPacket = [UInt8](try encoder.nativeCommands(for: document, profile: tuned))
+        let tunedHeader: [UInt8] = [
+            0x1B, 0x51, 0x31, 0x34, 0x34, // Q144
+            0x1B, 0x71, 0x30, 0x33, 0x33, // q033
+            0x1B, 0x53, 0x30,             // S0 (1 ips)
+            0x1B, 0x46, 0x30,             // F0 transmissive
+            0x1B, 0x44, 0x37,             // D7
+            0x1B, 0x4D, 0x30, 0x31        // M01
+        ]
+        assert(Array(tunedPacket.prefix(tunedHeader.count)) == tunedHeader)
+
+        let fontPacket = encoder.nativeFontProbe(profile: profile)
+        assert(fontPacket.range(of: Data([0x1B, 0x41, 0x30, 0x30])) != nil, "Small ASCII font")
+        assert(fontPacket.range(of: Data([0x1B, 0x41, 0x31, 0x31])) != nil, "Large ASCII font")
+        assert(fontPacket.last == 0x0C)
+
         var oversized = document
         oversized.widthMM = 56
         do {
@@ -78,6 +107,6 @@ struct RasterEncoderSmokeTest {
             // Expected: 56mm head width is not 55-byte ESC G width.
         }
 
-        print("EZ-2 raster smoke tests passed (440×240, Code39, Cyrillic, binary rows).")
+        print("EZ-2 raster, profiles, speed, sensor and ASCII-font commands passed.")
     }
 }
