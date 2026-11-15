@@ -8,6 +8,7 @@ on:
       - fix/verified-line-printing
       - fix/line-feed-and-raster-size-094
       - fix/ez2-job-tear-feed-095
+      - rewrite/web-shell-driver
   workflow_dispatch:
 
 permissions:
@@ -55,6 +56,10 @@ jobs:
           zsh Scripts/build-installer.sh
           test -f build/LabelDesk.app/Contents/Resources/install-update.sh
           test -f build/LabelDesk.app/Contents/Resources/editor.html
+          test -f build/LabelDesk.app/Contents/Resources/app.html
+          test -f build/LabelDesk.app/Contents/Resources/app.js
+          test -f build/LabelDesk.app/Contents/Resources/raster.js
+          test -f build/LabelDesk.app/Contents/Resources/printer.sh
           BIN="build/LabelDesk.app/Contents/MacOS/LabelDesk"
           test -f "$BIN"
           test "$(lipo -archs "$BIN")" = "x86_64"
@@ -113,6 +118,9 @@ jobs:
           set -euo pipefail
           python3 -c "import pathlib,re; s=pathlib.Path('LabelDesk/Resources/editor.html').read_text(); m=re.search(r'<script>(.*?)</script>',s,re.S); assert m; pathlib.Path('/tmp/label-editor.js').write_text(m.group(1))"
           node --check /tmp/label-editor.js
+          node --check LabelDesk/Resources/raster.js
+          node --check LabelDesk/Resources/app.js
+          zsh -n Scripts/printer.sh
 
       - name: Test selected-layer resize geometry
         shell: bash
