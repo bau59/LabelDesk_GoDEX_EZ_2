@@ -129,6 +129,14 @@ struct MainView: View {
             .fixedSize()
 
             Button {
+                store.showCalibration = true
+            } label: {
+                Label("Калибровка", systemImage: "scope")
+            }
+            .buttonStyle(.bordered)
+            .help("Мастер настройки ленты, начала печати и ширины")
+
+            Button {
                 store.showSettings = true
             } label: {
                 Label("Настройки", systemImage: "gearshape")
