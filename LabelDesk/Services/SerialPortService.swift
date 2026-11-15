@@ -30,6 +30,12 @@ final class SerialPortService {
         guard descriptor >= 0 else { throw SerialPortError.openFailed(String(cString: strerror(errno))) }
         defer { close(descriptor) }
         try configure(descriptor, profile: profile)
+        // The original Phase 1 test was tiny; raster jobs can exceed the
+        // kernel's nonblocking TX buffer. Keep the port blocking after setup.
+        let flags = fcntl(descriptor, F_GETFL)
+        guard flags >= 0, fcntl(descriptor, F_SETFL, flags & ~O_NONBLOCK) == 0 else {
+            throw SerialPortError.configurationFailed("Cannot enable blocking serial writes.")
+        }
 
         try data.withUnsafeBytes { rawBuffer in
             guard var pointer = rawBuffer.baseAddress else { return }
@@ -45,7 +51,9 @@ final class SerialPortService {
                 pointer = pointer.advanced(by: count)
             }
         }
-        _ = tcdrain(descriptor)
+        guard tcdrain(descriptor) == 0 else {
+            throw SerialPortError.writeFailed(String(cString: strerror(errno)))
+        }
     }
 
     private func configure(_ descriptor: Int32, profile: PrinterProfile) throws {
