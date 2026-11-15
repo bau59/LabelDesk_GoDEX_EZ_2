@@ -90,6 +90,7 @@
     state.view=view;
     document.querySelectorAll("nav [data-view]").forEach(b=>b.classList.toggle("active",b.dataset.view===view));
     document.querySelectorAll("main .view").forEach(v=>v.classList.toggle("active",v.id===view+"View"));
+    $("saveTemplate").disabled=view!=="editor";
     if(view==="editor"){syncEditor();renderEditorCompatibility();}
     if(view==="quick")renderQuick();
     if(view==="queue")renderQueue();
@@ -106,6 +107,12 @@
   function renderEditorCompatibility(){
     const doc=state.current;
     const check=compatibility(doc);
+    const folder=findFolder(doc?.folderID);
+    $("editorContext").textContent=doc?
+      (folder?folder.name+"  /  ":"")+"Макет: "+doc.name+" · "+
+      doc.widthMM+"×"+doc.heightMM+" мм"+
+      (state.dirty?" · Не сохранён":" · Сохранён"):
+      "Базовый макет не найден. Выберите шаблон или создайте новый.";
     $("editorCompatibility").textContent=check.ok ? "" :
       "Несовместим с установленным рулоном. " + check.reason +
       " Макет сохранится без изменения размеров.";
