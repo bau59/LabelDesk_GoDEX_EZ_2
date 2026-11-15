@@ -1,5 +1,5 @@
 /* LabelDesk: browser Canvas -> original EZ-2 binary ESC Gnn raster.
-   No Node, Python, server, or external libraries. 8 dots/mm, 55 bytes maximum. */
+   No Node, Python, server, or external libraries. Fixed 280 rows, adaptive width <=55 bytes. */
 (function (root) {
   "use strict";
   const DOTS = 8, MAX_DOTS = 440, PRINT_ROWS = 280, GAP = 2;
@@ -146,7 +146,9 @@
         lastByte=Math.max(lastByte,Math.floor(x/8));
       }
     }
-    const height=Math.min(rows,Math.max(32,Math.ceil((lastRow+1)/8)*8));
+    // Keep the full tested 280-line mechanical step even for short text.
+    // Only the number of bytes per row is compressed.
+    const height=PRINT_ROWS;
     const width=Math.min(55,Math.max(10,lastByte+1));
     const bytes=new Uint8Array(height*(4+width)+1);
     let out=0;
