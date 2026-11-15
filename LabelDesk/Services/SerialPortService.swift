@@ -127,10 +127,12 @@ final class SerialPortService {
         }
     }
 
-    /// After the LAST copy of a queue job, advance exactly one blank-label
-    /// pitch. This is intentionally separate from per-copy FF.
-    /// ESC fnn (01...29 mm) is documented on the original 2002 EZ-2.
+    /// After all copies of a job, run the confirmed blank buffered label.
+    /// Keep Line Mode on a single port while printing copies; switch to
+    /// buffered mode only after the prior FF has drained and the configured
+    /// interval has elapsed. Closing/reopening isolates the two modes.
     func advanceAfterJob(_ commands: Data, intervalSeconds: Double,
+                         profile: PrinterProfile,
                          onProgress: ((String) -> Void)? = nil) throws {
         lock.lock()
         defer { lock.unlock() }
@@ -138,26 +140,38 @@ final class SerialPortService {
         guard seriesInitialized, linePort >= 0 else {
             throw SerialPortError.noActiveSeries
         }
-        // Never send an arbitrary motor command or more than one pitch.
-        guard Array(commands) == [0x1B, 0x66, 0x32, 0x39,
-                                  0x1B, 0x66, 0x31, 0x31] else {
-            throw SerialPortError.writeFailed("Неверная команда протяжки.")
+        guard commands == GodexEZ2Encoder().blankSeparatorCommands() else {
+            throw SerialPortError.writeFailed("Неверный пакет пустой этикетки.")
         }
 
         do {
             if let previous = previousLabelSentAt {
                 let remaining = intervalSeconds - Date().timeIntervalSince(previous)
                 if remaining > 0 {
-                    onProgress?("waiting before tear feed \(String(format: "%.2f", remaining))s")
+                    onProgress?("waiting before blank label \(String(format: "%.2f", remaining))s")
                     Thread.sleep(forTimeInterval: remaining)
                 }
             }
 
-            onProgress?("tear feed: ESC f29 + ESC f11 = 40mm (one blank label)")
-            try sendBytes(commands, to: linePort, chunkSize: 4)
-            try drain(linePort)
+            // Serial drain has completed in sendLabel. Close the Line Mode
+            // connection before sending the confirmed buffered P01 job.
+            close(linePort)
+            linePort = -1
+
+            onProgress?("blank separator: buffered F0 q040 M01 B A11 [space] CR E P01")
+            let fd = try openConfiguredPort(profile.portPath)
+            do {
+                try sendBytes(commands, to: fd, chunkSize: commands.count)
+                try drain(fd)
+            } catch {
+                close(fd)
+                throw error
+            }
+            close(fd)
             previousLabelSentAt = Date()
-            onProgress?("tear feed transmitted; physical paper position NOT confirmed")
+            // The next job reopens Line Mode and sends its F0/q040/M01 setup;
+            // T3 startup must NOT repeat within the same queue run.
+            onProgress?("blank label command sent; next label position unconfirmed")
         } catch {
             resetLocked()
             throw error
