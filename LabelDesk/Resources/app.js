@@ -426,9 +426,9 @@
   }
   function variableFields(template){
     let index=0;
-    return (template?.elements||[]).filter(e=>e.kind==="text"&&e.isVariable!==false).map(e=>{
+    return (template?.elements||[]).filter(e=>(e.kind==="text"||e.kind==="barcode")&&e.isVariable!==false).map(e=>{
       index++;
-      return {id:e.id,name:e.fieldName?.trim()||"Текст "+index,value:String(e.value||"")};
+      return {id:e.id,name:e.fieldName?.trim()||(e.kind==="barcode"?"Штрихкод ":"Текст ")+index,value:String(e.value||"")};
     });
   }
   function filledDocument(){
@@ -436,7 +436,7 @@
     if(!template)throw Error("Нет шаблона");
     const doc=clone(template);
     for(const e of doc.elements){
-      if(e.kind==="text" && e.isVariable!==false &&
+      if((e.kind==="text"||e.kind==="barcode") && e.isVariable!==false &&
          Object.hasOwn(state.quickValues,e.id))e.value=state.quickValues[e.id];
     }
     return doc;
