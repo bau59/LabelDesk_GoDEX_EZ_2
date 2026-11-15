@@ -86,10 +86,11 @@ struct CalibrationView: View {
                     .disabled(!hasChanges)
 
                     Button("Feed TEST") { store.sendFeedTest() }
-                        .disabled(hasChanges)
+                        .disabled(hasChanges || !mechanicalFeedStable)
+                        .help("Сначала подтвердите одинаковую подачу физической кнопкой Feed")
                     if store.feedTestPending {
                         Button("Подтвердить подачу") { store.confirmFeedTest() }
-                            .disabled(hasChanges)
+                            .disabled(hasChanges || !mechanicalFeedStable)
                     }
                     Spacer()
                     Button("Печать рамки", systemImage: "square.dashed") {
