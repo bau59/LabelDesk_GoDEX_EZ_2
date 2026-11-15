@@ -60,6 +60,7 @@ struct MainView: View {
 
 private struct UpdateBar: View {
     @EnvironmentObject private var updater: UpdateManager
+    @EnvironmentObject private var store: AppStore
 
     var body: some View {
         HStack(spacing: 10) {
@@ -77,12 +78,17 @@ private struct UpdateBar: View {
         }
         .task { await updater.checkOnLaunch() }
         .alert("Update available", isPresented: $updater.showUpdatePrompt) {
-            Button("Download installer") {
-                Task { await updater.downloadInstaller() }
+            Button("Install and restart") {
+                if store.queue.jobs.contains(where: { $0.state == .sending }) {
+                    updater.infoMessage = "A print job is being transmitted. Finish printing before updating."
+                    updater.showInfo = true
+                } else {
+                    Task { await updater.installUpdate() }
+                }
             }
             Button("Later", role: .cancel) { }
         } message: {
-            Text("LabelDesk \(updater.latestVersion) is available. Download and open the Intel DMG; drag LabelDesk.app into Applications.")
+            Text("LabelDesk \(updater.latestVersion) is available. Save unsaved edits before updating. LabelDesk will close, replace itself and reopen.")
         }
         .alert("LabelDesk updates", isPresented: $updater.showInfo) {
             Button("OK", role: .cancel) { }
