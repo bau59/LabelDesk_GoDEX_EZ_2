@@ -82,8 +82,10 @@ barcodeLabel.elements=[{kind:"barcode",barcodeType:"CODE128",value:"1234567890",
 const barcodePacket=bytes(encode(barcodeLabel));
 assert.equal(barcodePacket[barcodePacket.length-1],12);
 assert.ok(barcodePacket.length>280*14,"Barcode must be transmitted in image rows");
-assert.ok(barcodePacket.subarray(4+25*14).some(x=>x!==0),
-  "Code128 bars must appear in the printed bitmap");
+const bwidth=(barcodePacket[2]-48)*10+(barcodePacket[3]-48);
+const bstride=4+bwidth;
+assert.ok(barcodePacket.subarray(25*bstride+4,25*bstride+4+bwidth).some(x=>x!==0),
+  "Code128 bars must appear at the correct 3mm vertical position in real printed bytes");
 const eanLabel=blank();
 eanLabel.elements=[{kind:"barcode",barcodeType:"EAN13",value:"590123412345",
   showsHumanReadable:false,xMM:0,yMM:3,widthMM:55,heightMM:12}];
