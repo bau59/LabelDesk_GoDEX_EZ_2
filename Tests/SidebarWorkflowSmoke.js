@@ -108,10 +108,10 @@ const context={window,document,crypto,EZ2Raster,Date,console,Number,String,Objec
   setTimeout,Uint8Array,Math};
 vm.runInNewContext(source,context,{filename:"LabelDesk/Resources/app.js"});
 async function settle(){await new Promise(resolve=>setTimeout(resolve,0));}
-function click(kind,value){
+function click(kind,value,extra={}){
   const attr="[data-"+kind+"]";
   const key=kind.replace(/-([a-z])/g,(_m,ch)=>ch.toUpperCase());
-  const target={closest:selector=>selector===attr?{dataset:{[key]:value}}:null};
+  const target={closest:selector=>selector===attr?{dataset:{[key]:value,...extra}}:null};
   return bodyListeners.get("click")({target});
 }
 function trigger(id,type="click",event){return element(id).fire(type,event);}
@@ -158,6 +158,13 @@ function assertExistsName(name){assert.ok(store.templates.some(t=>t.name===name)
   assert.equal(store.folders.find(f=>f.id===folder.id).baseTemplateID,newVariant.id);
   assert.match(element("quickTemplateName").textContent,/Новая этикетка/);
   assert.ok(store.templates.some(t=>t.id===createdBase.id),"Old base must remain saved");
+
+  // A second, direct one-click star in the list can also change the base.
+  await click("library-action","set-base-row",{templateId:createdBase.id});
+  assert.equal(store.folders.find(f=>f.id===folder.id).baseTemplateID,createdBase.id);
+  element("baseChoice").value=newVariant.id;
+  await click("library-action","set-base");
+  assert.equal(store.folders.find(f=>f.id===folder.id).baseTemplateID,newVariant.id);
 
   // 5: Move old base to unfiled; current base cannot move.
   await click("template",createdBase.id);
