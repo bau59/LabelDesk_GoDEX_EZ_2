@@ -69,7 +69,7 @@ If the raster test is reversed, prints gibberish, stays blank or feeds unexpecte
 - Density and flow control settings; X/Y raster correction, material gap, manual calibration instructions.
 - App update checks from versioned GitHub Releases.
 
-The preview is generated from the same black/white bitmap that is used for ESC G output, rather than a simulated barcode. Printing is intentionally gated until the raster test is visually accepted.
+The **HTML editor canvas** is an interactive layout preview; actual output is rasterized separately in Swift/CoreGraphics at 8 dots/mm, so typography may differ slightly due to font metrics. Printing is guarded by the raster and new feed-alignment tests.
 
 ## Limitations
 
