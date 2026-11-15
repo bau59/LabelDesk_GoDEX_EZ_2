@@ -51,7 +51,7 @@
     ctx.textBaseline="top";
     const anchor=align==="left"?x:align==="right"?x+w:x+w/2;
     const paint=()=> {
-      const lines=wrap(ctx,item.value||"",w);
+      const lines=wrap(ctx,String(item.prefix||"")+String(item.value||""),w);
       lines.forEach((line,i)=> {
         if ((i*lineHeight) >= h) return;
         ctx.fillText(line,anchor,y+i*lineHeight);
@@ -82,6 +82,29 @@
     if(!ctx)throw new Error("Canvas недоступен");
     ctx.fillStyle="#fff";ctx.fillRect(0,0,canvas.width,canvas.height);
     ctx.fillStyle="#000";ctx.strokeStyle="#000";
+    // A preview of the printer's sequential buffered layout. It is only a
+    // visual approximation: resident glyph bitmaps remain inside firmware.
+    if(label.printMode==="text"){
+      if(!root.EZ2Text)throw Error("Компилятор текста не загружен");
+      const compiled=root.EZ2Text.plan(label,{allowPlaceholders:true});
+      let rowY=0;
+      for(const row of compiled.rows){
+        if(row.kind==="barcode"){
+          const barcodeItem={...row.element,value:row.data};
+          barcode(ctx,barcodeItem,8,rowY,440,110);
+          rowY+=120;
+        }else{
+          const f=row.font;
+          ctx.save();
+          ctx.font=Math.max(8,Math.floor(f.heightDots*0.85))+'px Menlo,monospace';
+          ctx.fillStyle="#000";ctx.textBaseline="top";ctx.textAlign="left";
+          ctx.fillText(row.text,Math.round(row.margin*DOTS),rowY);
+          ctx.restore();
+          rowY+=f.heightDots;
+        }
+      }
+      return canvas;
+    }
     for(const e of label.elements) {
       const x=e.xMM*DOTS,y=e.yMM*DOTS,w=e.widthMM*DOTS,h=e.heightMM*DOTS;
       ctx.save();
