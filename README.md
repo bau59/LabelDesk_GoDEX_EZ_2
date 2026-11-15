@@ -33,12 +33,12 @@ On installation/update, bundled runtime files overwrite the local version **only
 - Physically tested label stock: **58 × 38 mm, 2 mm gap**, one pitch 40 mm.
 - Start of batch: a buffered `T3` alignment job once.
 - Actual label: `ESC F0`, `ESC q040`, `ESC M01`, then binary `ESC Gnn` rows and `FF`.
-- Canvas raster uses 8 dots/mm, maximum width 55 bytes (440 dots), 280 verified rows (35 mm). It trims unused right-side bytes and trailing white rows for short text.
+- Canvas raster uses 8 dots/mm, maximum width 55 bytes (440 dots) and **always 280 rows** for the verified mechanical page length (35 mm). It trims unused bytes on the right for shorter text but never shortens the page height.
 - Copies share one open RS-232 port. Each label waits the configured interval (default **1.5 seconds**).
-- After **each job, not each copy**: close Line Mode, open a separate connection and send the **physically verified buffered blank label** (`F0 q040 M01 B A11 SPACE CR E P01`). This is intended to expose a blank label for tearing, and to position the next job.
-- `ESC f29/f11`, automatic reverse, Q calibration and silent retry have been removed.
+- After **each job, not each copy**: remain in Line Mode and send 280 blank `ESC G10` rows followed by `FF` to expose a blank label for tearing. This replaces the 0.9.5 procedure that mixed modes and failed on the real printer. The new same-mode separator is **not yet physically verified**.
+- `ESC f29/f11`, buffered `P01` after raster, automatic reverse, Q calibration and silent retry have been removed.
 
-The stand-alone blank label and earlier raster tests were physically verified separately. **The combined application printing sequence still needs on-printer validation.** The adapter does not provide an acknowledgement of actual paper output. On a command failure or cancellation, the queued job becomes `uncertain`; it must only be retried after the operator inspects the paper.
+Earlier Python tests confirmed G55 × 280 full-page raster printing and a standalone buffered blank label. The 0.9.5 attempt to use the blank buffered command after Line Mode **failed**. The rewrite therefore uses a fixed full-page Line Mode raster for both printed and blank separator labels. **This combined sequence still needs on-printer validation.** The adapter does not provide an acknowledgement of actual paper output. On a command failure or cancellation, the queued job becomes `uncertain`; it must only be retried after the operator inspects the paper.
 
 ## Existing files and migration
 
