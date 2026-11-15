@@ -29,7 +29,7 @@ struct EditorView: View {
             HStack {
                 Label("203 dpi · 8 dots/mm · 56 mm head · 55 mm graphics", systemImage: "info.circle")
                 Spacer()
-                if let issue = try? validateIssue {
+                if let issue = validateIssue {
                     Text(issue).foregroundStyle(.orange)
                 }
             }
@@ -56,8 +56,8 @@ private struct LabelCanvas: View {
 
     var body: some View {
         let doc = store.document
-        let width = CGFloat(max(10, doc.widthMM) * scale)
-        let height = CGFloat(max(10, doc.heightMM) * scale)
+        let width = CGFloat(min(55, max(10, doc.widthMM)) * scale)
+        let height = CGFloat(min(100, max(10, doc.heightMM)) * scale)
         let preview = try? LabelRasterizer().rasterize(doc, profile: store.settings.profile)
 
         ZStack(alignment: .topLeading) {

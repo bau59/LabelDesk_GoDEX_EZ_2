@@ -22,7 +22,7 @@ enum LabelRenderError: LocalizedError {
     var errorDescription: String? {
         switch self {
         case .invalidSize:
-            return "Label must be 10–55 mm wide and 10–100 mm high, with a 0–10 mm gap. Graphics are limited to 55 bytes per line."
+            return "Label must be 10–55 mm wide, 10–100 mm high (whole millimeters), with a 0–10 mm gap (whole millimeters). Graphics are limited to 55 bytes per line."
         case .invalidElement(let detail):
             return "Item exceeds the printable label area: \(detail)"
         case .invalidBarcode(let detail):
@@ -61,6 +61,8 @@ struct LabelRasterizer {
               (10...EZ2Limits.maxRasterWidthMM).contains(document.widthMM),
               (10...EZ2Limits.maxRasterHeightMM).contains(document.heightMM),
               (0...10).contains(document.gapMM),
+              abs(document.heightMM.rounded() - document.heightMM) < 0.001,
+              abs(document.gapMM.rounded() - document.gapMM) < 0.001,
               document.heightMM + document.gapMM <= 999 else { throw LabelRenderError.invalidSize }
 
         for item in document.elements {
