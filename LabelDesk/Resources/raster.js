@@ -23,9 +23,8 @@
       throw new Error("Размеры материала должны быть 10–60 × 10–100 мм, зазор 0–10 мм.");
     }
     if (Math.abs(label.heightMM - Math.round(label.heightMM)) > 0.001 ||
-        Math.abs(label.gapMM - Math.round(label.gapMM)) > 0.001 ||
-        Math.abs(label.heightMM - 38) > 0.001 || Math.abs(label.gapMM - GAP) > 0.001) {
-      throw new Error("Сейчас проверен только рулон 58×38 мм, зазор 2 мм. Изменять шаг запрещено.");
+        Math.abs(label.gapMM - Math.round(label.gapMM)) > 0.001) {
+      throw new Error("Высота шаблона и зазор должны быть целыми миллиметрами.");
     }
     for (const item of label.elements) {
       const { xMM:x, yMM:y, widthMM:w, heightMM:h } = item;
@@ -130,6 +129,11 @@
   }
 
   function encode(label, threshold=128) {
+    // Preview works for any valid template. The real transport is deliberately
+    // restricted to the verified 280-row / q040 geometry.
+    if(Math.abs(label.heightMM-38)>0.001 || Math.abs(label.gapMM-GAP)>0.001){
+      throw new Error("Для печати проверена только высота 38 мм и зазор 2 мм.");
+    }
     const canvas=draw(label);
     const image=canvas.getContext("2d").getImageData(0,0,canvas.width,canvas.height);
     const pixels=image.data;
