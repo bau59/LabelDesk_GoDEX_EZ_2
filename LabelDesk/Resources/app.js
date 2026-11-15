@@ -225,61 +225,190 @@
     selectView("quick");
     note("Папка: "+folder.name+(base?"":" · назначьте базовый макет"));
   }
+  async function saveTemplateDocument(doc){
+    await native("saveTemplate",{document:JSON.stringify(doc)});
+    const index=state.templates.findIndex(t=>keySame(t.id,doc.id));
+    if(index<0)state.templates.push(clone(doc));
+    else state.templates[index]=clone(doc);
+  }
+  async function saveFolderList(folders){
+    await native("saveData",{key:"folders",json:JSON.stringify(folders)});
+    state.folders=folders;
+  }
   async function saveCurrent(){
-    if(!state.current)return;
-    state.current.updatedAt=stamp();
+    if(!state.current){note("Сначала выберите или создайте макет",true);return false;}
+    const saved=clone(state.current);
+    saved.updatedAt=stamp();
     try{
-      await native("saveTemplate",{document:JSON.stringify(state.current)});
-      const index=state.templates.findIndex(t=>keySame(t.id,state.current.id));
-      if(index<0)state.templates.unshift(clone(state.current));
-      else state.templates[index]=clone(state.current);
-      state.selectedID=state.current.id;state.dirty=false;
-      renderLibrary();renderEditorCompatibility();note("Макет сохранён: "+state.current.name);
-    }catch(e){note("Не удалось сохранить: "+e.message,true);}
+      await saveTemplateDocument(saved);
+      if(state.current && keySame(saved.id,state.current.id)){
+        state.current=clone(saved);
+        state.selectedID=saved.id;
+        state.dirty=false;
+      }
+      renderLibrary();renderEditorCompatibility();
+      note("Макет сохранён: "+saved.name);
+      return true;
+    }catch(e){note("Ошибка сохранения макета: "+e.message,true);return false;}
   }
   function makeCurrent(){
-    if(state.dirty && !window.confirm("Отменить несохранённые изменения?"))return;
-    state.current=newDocument();
-    state.current.folderID=state.selectedFolderID||null;
-    state.selectedID=state.current.id;state.quickValues={};state.dirty=true;
-    renderLibrary();syncEditor();renderEditorCompatibility();selectView("editor");
+    if(!confirmDiscard())return;
+    const doc=newDocument();
+    doc.folderID=state.selectedFolderID||null;
+    state.current=doc;
+    state.selectedID=doc.id;
+    state.quickValues={};state.dirty=true;
+    renderLibrary();selectView("editor");
+    note("Новый макет: размеры из настроек рулона");
   }
   async function duplicateCurrent(){
-    if(!state.current)return;
-    const copy=clone(state.current);
-    copy.id=uuid();copy.name+=" — копия";copy.updatedAt=stamp();
-    state.current=copy;state.selectedID=copy.id;state.dirty=true;
-    await saveCurrent();syncEditor();selectView("editor");
+    const original=findTemplate(state.selectedID)||state.current;
+    if(!original){note("Выберите шаблон для копирования",true);return;}
+    if(state.dirty && !confirmDiscard())return;
+    const copy=clone(original);
+    copy.id=uuid();
+    copy.name=original.name+" — копия";
+    copy.updatedAt=stamp();
+    try{
+      await saveTemplateDocument(copy);
+      state.current=clone(copy);
+      state.selectedID=copy.id;state.dirty=false;state.quickValues={};
+      renderLibrary();selectView("editor");
+      note("Копия сохранена: "+copy.name);
+    }catch(e){note("Копия не создана: "+e.message,true);}
   }
   async function deleteCurrent(){
-    const doc=state.current;if(!doc || !findTemplate(doc.id))return;
-    if(state.folders.some(f=>keySame(f.baseTemplateID,doc.id))){
-      note("Сначала смените базовый шаблон папки.",true);return;
-    }
-    if(!window.confirm('Удалить шаблон «'+doc.name+'»?'))return;
+    const doc=findTemplate(state.selectedID);
+    if(!doc){note("Выберите сохранённый шаблон",true);return;}
+    if(isBase(doc.id)){note("Этот шаблон базовый. Сначала назначьте другой базовый макет папки.",true);return;}
+    if(state.dirty&&!confirmDiscard())return;
+    if(!window.confirm("Удалить шаблон «"+doc.name+"»? Это действие нельзя отменить."))return;
     try{
       await native("deleteTemplate",{id:doc.id});
       state.templates=state.templates.filter(t=>!keySame(t.id,doc.id));
-      state.current=state.templates[0]?clone(state.templates[0]):newDocument();
-      state.selectedID=state.current.id;state.selectedFolderID=state.current.folderID||null;
-      state.quickValues={};state.dirty=false;
-      renderLibrary();syncEditor();note("Шаблон удалён");
-    }catch(e){note(e.message,true);}
+      const next=visibleTemplates()[0]||state.templates[0];
+      state.current=next?clone(next):newDocument();
+      state.selectedID=state.current.id;
+      state.dirty=false;state.quickValues={};
+      renderLibrary();selectView("editor");
+      note("Шаблон удалён: "+doc.name);
+    }catch(e){note("Не удалось удалить: "+e.message,true);}
   }
   async function addFolder(){
-    const name=window.prompt("Название новой папки:","Товары")?.trim();
+    const name=window.prompt("Название новой папки","Новая папка")?.trim();
     if(!name)return;
-    if(!state.current)return;
-    if(!findTemplate(state.current.id))await saveCurrent();
-    const folder={id:uuid(),name,baseTemplateID:state.current.id,createdAt:stamp()};
+    if(name.length>60){note("Название папки — максимум 60 символов",true);return;}
+    if(state.folders.some(f=>keySame(f.name,name))){
+      note("Папка с таким названием уже есть",true);return;
+    }
+    if(state.dirty&&!window.confirm("Несохранённые изменения будут скопированы в базовый макет новой папки. Продолжить?"))return;
+    const source=state.current||newDocument();
+    const folderID=uuid(),base=clone(source);
+    base.id=uuid();base.folderID=folderID;base.name="Базовый макет";
+    base.updatedAt=stamp();
+    const folder={id:folderID,name,baseTemplateID:base.id,createdAt:stamp()};
+    let baseCreated=false;
     try{
-      await native("saveData",{key:"folders",json:JSON.stringify([...state.folders,folder])});
-      state.folders.push(folder);
-      state.current.folderID=folder.id;state.selectedFolderID=folder.id;
-      await saveCurrent();renderLibrary();note("Папка создана: "+name);
-    }catch(e){note(e.message,true);}
+      // Original source remains where it was. The new folder gets its own copy.
+      await native("saveTemplate",{document:JSON.stringify(base)});
+      baseCreated=true;
+      await saveFolderList([...state.folders,folder]);
+      state.templates.push(clone(base));
+      state.folderFilter=folderID;state.selectedFolderID=folderID;
+      state.current=clone(base);state.selectedID=base.id;
+      state.dirty=false;state.quickValues={};
+      renderLibrary();selectView("quick");
+      note("Создана папка «"+name+"» с независимым базовым шаблоном");
+    }catch(e){
+      if(baseCreated){
+        try{await native("deleteTemplate",{id:base.id});}
+        catch(rollback){note("Ошибка отката базового макета: "+rollback.message,true);}
+      }
+      note("Не удалось создать папку: "+e.message,true);
+    }
   }
-
+  async function renameFolder(){
+    const folder=selectedFolder();if(!folder)return;
+    const name=window.prompt("Новое название папки",folder.name)?.trim();
+    if(!name||name===folder.name)return;
+    if(name.length>60 || state.folders.some(f=>!keySame(f.id,folder.id)&&keySame(f.name,name))){
+      note("Название пустое, слишком длинное или уже используется.",true);return;
+    }
+    try{
+      await saveFolderList(state.folders.map(f=>keySame(f.id,folder.id)?{...f,name}:f));
+      renderLibrary();note("Папка переименована");
+    }catch(e){note("Папка не переименована: "+e.message,true);}
+  }
+  async function assignBase(){
+    const folder=selectedFolder(),id=$("baseChoice")?.value;
+    const doc=findTemplate(id);
+    if(!folder||!doc){note("Выберите шаблон в папке",true);return;}
+    if(!keySame(doc.folderID,folder.id)){
+      note("Базовым можно назначить только шаблон из этой папки",true);return;
+    }
+    if(state.dirty&&!confirmDiscard())return;
+    try{
+      await saveFolderList(state.folders.map(f=>
+        keySame(f.id,folder.id)?{...f,baseTemplateID:doc.id}:f));
+      state.current=clone(doc);
+      state.selectedID=doc.id;state.dirty=false;state.quickValues={};
+      renderLibrary();selectView("quick");
+      note("Базовый макет папки «"+folder.name+"»: "+doc.name);
+    }catch(e){note("Не удалось назначить базовый макет: "+e.message,true);}
+  }
+  async function moveSelected(){
+    const doc=findTemplate(state.selectedID),target=$("moveTarget")?.value;
+    if(!doc||!target)return;
+    if(isBase(doc.id)){note("Сначала переназначьте базовый шаблон папки",true);return;}
+    const folderID=target==="unfiled"?null:findFolder(target)?.id;
+    if(target!=="unfiled"&&!folderID){note("Папка назначения не найдена",true);return;}
+    if(keySame(doc.folderID,folderID))return;
+    if(state.dirty&&!confirmDiscard())return;
+    const moved={...clone(doc),folderID,updatedAt:stamp()};
+    try{
+      await saveTemplateDocument(moved);
+      state.folderFilter=folderID||"unfiled";
+      state.selectedFolderID=folderID;
+      state.current=clone(moved);
+      state.selectedID=moved.id;state.dirty=false;state.quickValues={};
+      renderLibrary();selectView("editor");
+      note("Шаблон перемещён в "+(findFolder(folderID)?.name||"«Без папки»"));
+    }catch(e){note("Не удалось переместить шаблон: "+e.message,true);}
+  }
+  async function deleteFolder(){
+    const folder=selectedFolder();
+    if(!folder)return;
+    if(state.dirty&&!confirmDiscard())return;
+    if(!window.confirm("Удалить папку «"+folder.name+"»? Все её шаблоны останутся в разделе «Без папки»."))return;
+    const members=state.templates.filter(t=>keySame(t.folderID,folder.id));
+    const moved=[];
+    try{
+      for(const doc of members){
+        const orphan={...clone(doc),folderID:null,updatedAt:stamp()};
+        await native("saveTemplate",{document:JSON.stringify(orphan)});
+        moved.push(clone(doc));
+      }
+      await saveFolderList(state.folders.filter(f=>!keySame(f.id,folder.id)));
+      for(const old of members){
+        const idx=state.templates.findIndex(t=>keySame(t.id,old.id));
+        if(idx>=0)state.templates[idx]={...clone(old),folderID:null,updatedAt:stamp()};
+      }
+      state.folderFilter="unfiled";state.selectedFolderID=null;
+      const next=members[0]||state.templates[0];
+      state.current=next?clone(findTemplate(next.id)):newDocument();
+      state.selectedID=state.current.id;state.dirty=false;state.quickValues={};
+      renderLibrary();selectView("editor");
+      note("Папка удалена. Шаблоны сохранены в «Без папки».");
+    }catch(e){
+      let rollbackErrors=[];
+      for(const previous of moved){
+        try{await native("saveTemplate",{document:JSON.stringify(previous)});}
+        catch(error){rollbackErrors.push(error.message);}
+      }
+      note("Удаление отменено: "+e.message+
+        (rollbackErrors.length?"; не удалось восстановить часть файлов: "+rollbackErrors.join(", "):""),true);
+    }
+  }
   function variableFields(template){
     let index=0;
     return (template?.elements||[]).filter(e=>e.kind==="text"&&e.isVariable!==false).map(e=>{
