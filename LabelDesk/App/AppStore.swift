@@ -457,6 +457,64 @@ final class AppStore: ObservableObject {
 
     func pauseQueue() { queue.pause() }
 
+    /// Apply media dimensions and a printer profile together. The current
+    /// template is explicitly saved only after the new dimensions validate.
+    @discardableResult
+    func applyCalibration(widthMM: Double, heightMM: Double, gapMM: Double,
+                          profile: PrinterProfile) -> Bool {
+        var updated = document
+        updated.widthMM = widthMM
+        updated.heightMM = heightMM
+        updated.gapMM = gapMM
+        do {
+            try LabelRasterizer.validate(updated)
+            guard (-8...8).contains(profile.xOffsetMM),
+                  (-8...8).contains(profile.yOffsetMM) else {
+                throw LabelRenderError.invalidElement("Поправки X/Y должны быть в пределах −8…+8 мм")
+            }
+            let previousDocument = document
+            var nextSettings = settings
+            nextSettings.profile = profile
+            try storage.saveDocument(updated)
+            do {
+                try storage.saveSettings(nextSettings)
+            } catch {
+                try? storage.saveDocument(previousDocument)
+                throw error
+            }
+
+            let oldProfile = settings.profile
+            let mediaChanged = document.widthMM != widthMM
+                || document.heightMM != heightMM || document.gapMM != gapMM
+            let feedChanged = mediaChanged
+                || oldProfile.topOfFormDots != profile.topOfFormDots
+                || oldProfile.automaticTopOfForm != profile.automaticTopOfForm
+                || oldProfile.sensorMode != profile.sensorMode
+
+            document = updated
+            settings = nextSettings
+            templates = storage.listDocuments()
+            if activeFolder?.baseTemplateID == document.id { prepareQuickValues() }
+
+            if feedChanged {
+                registrationVerified = false
+                feedTestPending = false
+                UserDefaults.standard.set(false, forKey: "ez2V05FeedConfirmed")
+                UserDefaults.standard.set(false, forKey: "ez2V082AutoQConfirmed")
+            }
+            queue.pause()
+            queue.diagnostics.record("calibration saved", details:
+                "size=\(widthMM)x\(heightMM) gap=\(gapMM) x=\(profile.xOffsetMM) y=\(profile.yOffsetMM) autoQ=\(profile.automaticTopOfForm) Q=\(GodexEZ2Encoder.effectiveQ(for: updated, profile: profile))")
+            status = feedChanged ? "Параметры сохранены — требуется Feed TEST" :
+                "Поправки сохранены — проверьте калибровочную рамку"
+            return true
+        } catch {
+            alert = AppAlert(title: "Не удалось сохранить калибровку",
+                             message: error.localizedDescription)
+            return false
+        }
+    }
+
     /// Explicit single-label calibration test. Uses the SAME raster encoder
     /// and transport as the regular queue; leaves user templates untouched.
     func sendCalibrationPattern() {
