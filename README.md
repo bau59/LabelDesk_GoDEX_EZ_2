@@ -2,20 +2,25 @@
 
 Native macOS application for preparing and sending label jobs to a GoDEX EZ-2 over a USB–RS232 adapter. It uses SwiftUI, Foundation and POSIX only; it does not use a printer driver, browser, server or external dependencies.
 
-## Current build: Phase 1
+## Current build: Phase 1 with update checking
 
 - detection and selection of `/dev/cu.*` serial devices;
 - saved port selection;
 - exclusive 9600 8N1 serial writes outside the UI thread;
-- a user-confirmed `TEST` print using the exact command sequence already verified with the printer.
+- a user-confirmed `TEST` print using the exact command sequence already verified with the printer;
+- automatic daily check for versioned GitHub Releases, a manual **Check for Updates** button, SHA-256 verification when GitHub supplies an asset digest, and DMG download/opening after approval.
 
 The physical printer protocol has deliberately not been extended beyond the documented and already verified text test. The editor, print queue, raster (`ESC G`) output and calibration remain as future source-code scaffolding, but are not compiled into this phase. Validate raster bit order, line framing and media motion with hardware before enabling them.
 
 ## Download an Intel macOS build
 
-Open the [Build Intel macOS workflow](https://github.com/bau59/LabelDesk_GoDEX_EZ_2/actions/workflows/build-intel.yml), select the latest successful run, and download the `LabelDesk-0.1.0-macOS-Intel` artifact. It contains an `x86_64` app ZIP and a DMG for macOS 15 or later. The workflow runs on the `macos-15-intel` GitHub-hosted runner when `main` changes and can be started manually using **Run workflow**.
+Open [GitHub Releases](https://github.com/bau59/LabelDesk_GoDEX_EZ_2/releases/latest) to download the latest versioned Intel DMG. The [Build Intel macOS workflow](https://github.com/bau59/LabelDesk_GoDEX_EZ_2/actions/workflows/build-intel.yml) also keeps a downloadable artifact for each successful run. The workflow runs on `macos-15-intel`.
 
-The build is ad-hoc signed, not Apple Developer ID notarized. macOS Gatekeeper may show a warning for files downloaded from GitHub; use Control-click → Open if you trust this build. Only the Phase 1 TEST-print app is compiled into these packages.
+When a successful push to `main` contains a *new* `CFBundleShortVersionString`, the workflow automatically publishes that version in GitHub Releases; pushes without a version bump do not alter a published release.
+
+The app checks for updates at most once a day and has a **Check for Updates** button. A newer release is downloaded only after user confirmation, its SHA-256 is checked when GitHub provides an asset digest, and the DMG is opened. **Drag LabelDesk.app into Applications to finish installing.** There is no background replacement of running app files, and no updater in the previously installed v0.1.0, so v0.2.0 must be installed manually once.
+
+The build is ad-hoc signed, not Apple Developer ID notarized. macOS Gatekeeper may show a warning for files downloaded from GitHub; use Control-click → Open if you trust this build. Only the Phase 1 TEST-print app and update checker are compiled into these packages.
 
 ## Build locally
 
@@ -27,7 +32,7 @@ zsh Scripts/build-installer.sh
 
 The script is invoked with `zsh` because its Git file mode is not executable.
 
-The script creates `build/LabelDesk.app` and `build/LabelDesk-0.1.0.dmg`. The app is ad-hoc signed for local installation; macOS may require opening it with Control-click → Open on first launch. It targets Intel (`x86_64`) Macs running macOS 15 or later.
+The script creates `build/LabelDesk.app` and `build/LabelDesk-<version>.dmg`. The app is ad-hoc signed for local installation; macOS may require opening it with Control-click → Open on first launch. It targets Intel (`x86_64`) Macs running macOS 15 or later.
 
 If a build fails, repeat it in diagnostic mode:
 
