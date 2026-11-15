@@ -82,7 +82,7 @@ final class WebLabelDeskBridge: NSObject, WKScriptMessageHandler, WKNavigationDe
         let message: [String: Any] = [
             "id": id,
             "result": result,
-            "error": error ?? NSNull()
+            "error": (error as Any?) ?? NSNull()
         ]
         guard let data = try? JSONSerialization.data(withJSONObject: message,
                                                      options: [.fragmentsAllowed]),
