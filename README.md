@@ -27,6 +27,28 @@ Download the latest Intel DMG from https://github.com/bau59/LabelDesk_GoDEX_EZ_2
 
 The raster uses one ESC Gnn command per row with nn raw monochrome bytes (1 = black), a 1 mm left-margin command, ESC q with the full label height plus gap, and FF. ESC Q176 is the previously tested default top-of-form value for text and raster, now adjustable for raster jobs. ESC Q and ESC q are different instructions. A 55 mm raster is *not* the same as a 60 mm printable area.
 
+## Version 0.9.0 — multiline labels, alignment and guided EZ-2 calibration
+
+### Multiline quick fill and text positioning
+
+- Variable-text fields in **Заполнение** now use real multiline text editors. Enter inserts a line break. Replacements are stored in the queued label snapshot without modifying its base template.
+- The Swift/CoreGraphics printer raster uses **character wrapping** rather than `byClipping`, including long words without spaces, and clips to the original layer rectangle. This matches the HTML editor's intent; overflow below the rectangle is not printed.
+- In **Редактор**, each text layer exposes left, center and right horizontal text alignment. These options are saved as optional JSON `textAlignment` to retain compatibility with all previous templates. Blocks also have explicit **Блок по центру X / Y** positioning actions.
+- The same text renderer is used for quick-preview, normal queued print jobs and the full label editor's raster output. The HTML canvas provides visual guidance, and the Swift raster preview remains the exact print reference.
+
+### Calibration procedure
+
+Open **Калибровка** from the top toolbar. Nothing is printed automatically.
+
+1. **Материал** — measure and enter actual label width (10–55 mm), height (10–100 mm) and gap (0–10 mm), and verify the correct gap/black-mark sensor. The old EZ-2's physical gap sensor and VR sensitivity are adjusted manually on the printer.
+2. **Подача ленты** — normally keep automatic ESC Q lookup by height and verify ESC q = height + gap. For a persistent early/late stop, use manual Q only after checking the sensor. Press **Сохранить параметры**, then **Feed TEST**, inspect where the NEXT label begins and explicitly confirm the feed if correct.
+3. **Положение печати** — adjust global X/Y offsets at 0.125 mm (one dot) steps: positive X shifts artwork right; positive Y shifts artwork down within the label. Press **Сохранить параметры**, then **Печать рамки**. A single calibration print has a frame 2 mm from the nominal edges and central axes. Compare its real printed left/right/top/bottom margins; repeat with small corrections.
+
+Calibration updates the selected label's media dimensions and saved printer profile together only after validating that the label's existing elements fit. It preserves templates other than the currently selected label. Changes in dimensions/Q/sensor invalidate previous feed registration. The print queue is paused while changing calibration.
+
+Important distinction: X/Y only moves **ink** in the raster. Label stopping and next-label advance depend on media dimensions, gap sensor and ESC Q, and require physical verification. Horizontal printable head width remains 55 mm for raster; software cannot widen the EZ-2 hardware.
+
+Calibration pattern test and Feed TEST use the existing 0.8.2 paced raster path and persistent `~/Library/Application Support/LabelDesk/logs/print.log`. A test that is only *transmitted* is not considered physically printed; there is no EZ-2 paper-output acknowledgement. The known-good ASCII Print TEST is left byte-for-byte unchanged.
 ## Version 0.8.1 — actual print diagnostics and mouse interaction
 
 The previous queue called a job 'sent' after `write` + `tcdrain` succeeded. The EZ-2 has no application-level acknowledgement here, so 'sent' was misleading if paper had not moved. The corrected UI says **В порт передано** and explicitly warns that physical output remains unconfirmed.
