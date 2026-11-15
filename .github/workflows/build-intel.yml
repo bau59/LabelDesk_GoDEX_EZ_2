@@ -9,6 +9,7 @@ on:
       - fix/line-feed-and-raster-size-094
       - fix/ez2-job-tear-feed-095
       - rewrite/web-shell-driver
+      - fix/media-settings-template-compatibility-102
   workflow_dispatch:
 
 permissions:
@@ -121,6 +122,7 @@ jobs:
           node --check LabelDesk/Resources/raster.js
           node --check LabelDesk/Resources/app.js
           node Tests/WebRasterSmoke.js
+          node Tests/MediaCompatibilitySmoke.js
           zsh -n Scripts/printer.sh
 
       - name: Test selected-layer resize geometry
