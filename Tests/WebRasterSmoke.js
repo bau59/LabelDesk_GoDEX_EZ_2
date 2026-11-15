@@ -27,12 +27,13 @@ class FakeContext {
       }
     }
   }
-  save(){} restore(){} beginPath(){} rect(){} clip(){} strokeRect(){}
+  save(){} restore(){} beginPath(){} rect(){} clip(){} strokeRect(){} fillText(){}
 }
 const window = {};
 const context = { window, document: {createElement: type=>{
   assert.equal(type,"canvas");return new FakeCanvas();
 }}, btoa: str=>Buffer.from(str,"binary").toString("base64") };
+vm.runInNewContext(fs.readFileSync("LabelDesk/Resources/barcodes.js","utf8"),context);
 vm.runInNewContext(fs.readFileSync("LabelDesk/Resources/raster.js","utf8"),context);
 const {encode}=window.EZ2Raster;
 const blank = ()=>({id:"test",name:"Test",widthMM:58,heightMM:38,gapMM:2,elements:[]});
@@ -74,4 +75,18 @@ const shorter=blank();shorter.heightMM=30;
 assert.doesNotThrow(()=>window.EZ2Raster.draw(shorter));
 assert.throws(()=>encode(shorter),/проверена только/);
 
-console.log("Web raster passed: G10x280 blank, compact ink, G55x280, edge guards, FF.");
+// The same shared generator must also drive actual ESC Gnn bitmap rows.
+const barcodeLabel=blank();
+barcodeLabel.elements=[{kind:"barcode",barcodeType:"CODE128",value:"1234567890",
+  showsHumanReadable:false,xMM:0,yMM:3,widthMM:55,heightMM:12}];
+const barcodePacket=bytes(encode(barcodeLabel));
+assert.equal(barcodePacket[barcodePacket.length-1],12);
+assert.ok(barcodePacket.length>280*14,"Barcode must be transmitted in image rows");
+assert.ok(barcodePacket.subarray(4+25*14).some(x=>x!==0),
+  "Code128 bars must appear in the printed bitmap");
+const eanLabel=blank();
+eanLabel.elements=[{kind:"barcode",barcodeType:"EAN13",value:"590123412345",
+  showsHumanReadable:false,xMM:0,yMM:3,widthMM:55,heightMM:12}];
+assert.doesNotThrow(()=>encode(eanLabel),"EAN13 barcode should render into real raster");
+
+console.log("Web raster passed: Gnn+FF, full-height rows, Code128/EAN13 bitmap generation.");
