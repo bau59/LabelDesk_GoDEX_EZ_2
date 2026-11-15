@@ -4,7 +4,7 @@ on:
   push:
     branches:
       - main
-      - fix/ez2-raster-transfer-0.8.2
+      - feature/text-wrap-calibration-0.9
   workflow_dispatch:
 
 permissions:
@@ -176,4 +176,4 @@ jobs:
             --repo "$GITHUB_REPOSITORY" \
             --target "$GITHUB_SHA" \
             --title "LabelDesk ${APP_VERSION}" \
-            --notes "Intel macOS 15+. GoDEX EZ-2 raster reliability experiment: paced 64-byte 9600-baud writes with bidirectional XON/XOFF, optional legacy transport, correct S1/S2 and automatic Q table (30mm=Q144). Print TEST packet remains unchanged; new Feed TEST required before batch output. Diagnostics keep millisecond stage times. Hardware print needs confirmation. Ad-hoc signed; not notarized."
+            --notes "Intel macOS 15+. Multiline quick-fill, block-clipped raster text with left/center/right alignment, center block controls, and 3-step EZ-2 calibration of media/gap, Q/feed and X/Y origin. One-label bounded calibration pattern with diagnostics; preserves verified test commands, print queue and existing templates. Physical calibration must be confirmed on paper. Ad-hoc signed; not notarized."
