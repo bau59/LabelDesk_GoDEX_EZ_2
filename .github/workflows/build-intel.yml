@@ -75,6 +75,10 @@ jobs:
             -o build/raster-smoke
           ./build/raster-smoke
 
+      - name: Verify automatic update replacement and rollback
+        shell: bash
+        run: zsh Tests/UpdaterSmoke.sh
+
       - name: Upload Intel packages
         uses: actions/upload-artifact@v4
         with:
