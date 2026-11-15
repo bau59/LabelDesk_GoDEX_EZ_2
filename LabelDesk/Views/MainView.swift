@@ -69,7 +69,6 @@ struct MainView: View {
         .onChange(of: store.selectedFolderID) { _, _ in showQueue = false }
         .onChange(of: store.mode) { _, _ in showQueue = false }
         .sheet(isPresented: $store.showSettings) { PrinterSettingsView() }
-        .sheet(isPresented: $store.showCalibration) { CalibrationView() }
         .alert(store.alert?.title ?? "", isPresented: Binding(
             get: { store.alert != nil },
             set: { if !$0 { store.alert = nil } }
@@ -113,28 +112,6 @@ struct MainView: View {
             .background(DeskPalette.background, in: RoundedRectangle(cornerRadius: 11))
 
             Spacer(minLength: 8)
-
-            Menu {
-                Button("Проверка текста", systemImage: "textformat") { store.sendTest() }
-                Button("Проверка растра", systemImage: "square.dashed") { store.sendRasterProbe() }
-                Button("Проверка подачи", systemImage: "arrow.down.to.line") { store.sendFeedTest() }
-                Button("Встроенные шрифты", systemImage: "textformat.abc") { store.sendFontTest() }
-                Divider()
-                Button("Калибровка материала", systemImage: "scope") { store.showCalibration = true }
-            } label: {
-                Label("Проверки", systemImage: "wrench.adjustable")
-                    .foregroundStyle(DeskPalette.ink)
-            }
-            .menuStyle(.borderlessButton)
-            .fixedSize()
-
-            Button {
-                store.showCalibration = true
-            } label: {
-                Label("Калибровка", systemImage: "scope")
-            }
-            .buttonStyle(.bordered)
-            .help("Мастер настройки ленты, начала печати и ширины")
 
             Button {
                 store.showSettings = true
@@ -190,13 +167,8 @@ struct MainView: View {
             )
             .foregroundStyle(store.settings.profile.portPath.isEmpty ? DeskPalette.amber : DeskPalette.ink)
 
-            if store.rasterVerified && store.registrationVerified {
-                Label("Тесты печати подтверждены", systemImage: "checkmark.circle.fill")
-                    .foregroundStyle(DeskPalette.green)
-            } else {
-                Label("Требуется проверка печати", systemImage: "exclamationmark.circle")
-                    .foregroundStyle(DeskPalette.amber)
-            }
+            Label("Построчная печать G55 · FF", systemImage: "checkmark.circle")
+                .foregroundStyle(DeskPalette.green)
 
             Spacer(minLength: 10)
 
