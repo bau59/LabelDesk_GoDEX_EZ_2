@@ -27,6 +27,19 @@ Download the latest Intel DMG from https://github.com/bau59/LabelDesk_GoDEX_EZ_2
 
 The raster uses one ESC Gnn command per row with nn raw monochrome bytes (1 = black), a 1 mm left-margin command, ESC q with the full label height plus gap, and FF. ESC Q176 is the previously tested default top-of-form value for text and raster, now adjustable for raster jobs. ESC Q and ESC q are different instructions. A 55 mm raster is *not* the same as a 60 mm printable area.
 
+## Version 0.8.0 — focused, light interface
+
+The application interface has been reorganized around the actual operator workflow rather than showing all printer controls at once:
+
+- **Заполнение**: clear named variable fields, live monochrome print preview, copies, simple one-label / list switch, and a single prominent Add to Queue action. The saved base template remains protected.
+- **Редактор**: a light offline HTML workspace with a distinct layer list, visible selection, four resize handles, white preview canvas, readable properties inspector and keyboard shortcuts. The actual print renderer and saved JSON formats are unchanged.
+- **Очередь**: its own full-size page with pending/sent counts, status explanations, start/pause, retry, cancel, and separate safety checks for raster and feed alignment. The bottom of the editor is no longer consumed by a cramped job list.
+- **Библиотека**: visible folder count and search, selected folder highlight, template sizes, base-template star, contextual actions and a persistent New Label action.
+- **Принтер**: settings and infrequent TEST commands move into dedicated menus. The bottom bar displays the chosen port, verification status, current operation and update check.
+
+The app intentionally uses a light macOS appearance and a consistent quiet blue accent; no new frameworks, remote web assets, cloud services or browser dependencies were added. GoDEX EZ-2 print commands, serial configuration, templates, jobs, automatic update verification and GitHub release packaging are unchanged. Existing saved folders/templates are reused.
+
+Validation: Intel Swift build, Xcode project, JavaScript syntax and selected-layer geometry, raster packet tests, folder storage and real ZIP updater installation tests. Physical mouse interaction and printing should still be checked on the actual iMac.
 ## Version 0.7.0 — folders, base templates and quick print
 
 LabelDesk now separates designing a template from operating the printer:

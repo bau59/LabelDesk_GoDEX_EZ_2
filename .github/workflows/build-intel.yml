@@ -4,7 +4,7 @@ on:
   push:
     branches:
       - main
-      - fix/updater-lipo-0.7.1
+      - feature/ui-refresh-0.8
   workflow_dispatch:
 
 permissions:
@@ -164,4 +164,4 @@ jobs:
             --repo "$GITHUB_REPOSITORY" \
             --target "$GITHUB_SHA" \
             --title "LabelDesk ${APP_VERSION}" \
-            --notes "Intel macOS 15+. Fix updater architecture verification for thin Intel binaries. Test real ZIP extraction, signature, Intel architecture and checksum, preserving folders and printing. Ad-hoc signed; not notarized."
+            --notes "Intel macOS 15+. UI redesign: light workspace, focused quick print, redesigned template library and full queue page. Printer protocol, templates and updater unchanged. Ad-hoc signed; not notarized."
