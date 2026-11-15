@@ -136,3 +136,30 @@ struct GodexEZ2Encoder {
         return Data(bytes)
     }
 }
+
+
+/// A single bounded label used to measure horizontal/vertical print origin
+/// and the available width. Deliberately not persisted as a user template.
+enum EZ2CalibrationPattern {
+    static func make(for source: LabelDocument) -> LabelDocument {
+        var sample = source
+        sample.id = UUID()
+        sample.name = "CALIBRATION"
+        sample.elements = [
+            // The border should be 2 mm from each physical label edge.
+            LabelElement(kind: .rectangle, xMM: 2, yMM: 2,
+                         widthMM: source.widthMM - 4, heightMM: source.heightMM - 4,
+                         value: ""),
+            // The upper-left corner is asymmetrical, to establish feed direction.
+            LabelElement(kind: .line, xMM: 2, yMM: 2,
+                         widthMM: min(7, source.widthMM - 4), heightMM: 0.6, value: ""),
+            LabelElement(kind: .line, xMM: 2, yMM: 2,
+                         widthMM: 0.6, heightMM: min(7, source.heightMM - 4), value: ""),
+            LabelElement(kind: .line, xMM: source.widthMM / 2 - 0.15, yMM: 2,
+                         widthMM: 0.3, heightMM: source.heightMM - 4, value: ""),
+            LabelElement(kind: .line, xMM: 2, yMM: source.heightMM / 2 - 0.15,
+                         widthMM: source.widthMM - 4, heightMM: 0.3, value: "")
+        ]
+        return sample
+    }
+}
