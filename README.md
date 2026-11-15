@@ -1,56 +1,68 @@
-# LabelDesk
+# LabelDesk — GoDEX EZ-2 on Intel macOS
 
-Native macOS application for preparing and sending label jobs to a GoDEX EZ-2 over a USB–RS232 adapter. It uses SwiftUI, Foundation and POSIX only; it does not use a printer driver, browser, server or external dependencies.
+Native SwiftUI label editor, local queue and serial ESC printing. Requires macOS 15+, Intel x86_64. No Go, server, CUPS or printer driver.
 
-## Current build: Phase 1 with update checking
+## Install and updates
 
-- detection and selection of `/dev/cu.*` serial devices;
-- saved port selection;
-- exclusive 9600 8N1 serial writes outside the UI thread;
-- a user-confirmed `TEST` print using the exact command sequence already verified with the printer;
-- automatic daily check for versioned GitHub Releases, a manual **Check for Updates** button, SHA-256 verification when GitHub supplies an asset digest, and DMG download/opening after approval.
+Download the latest Intel DMG from https://github.com/bau59/LabelDesk_GoDEX_EZ_2/releases/latest. Install by copying LabelDesk.app into Applications. The app checks GitHub Releases daily and by button, and downloads an update after confirmation. Replacing the app remains a visible manual step. Builds are ad-hoc signed, not notarized.
 
-The physical printer protocol has deliberately not been extended beyond the documented and already verified text test. The editor, print queue, raster (`ESC G`) output and calibration remain as future source-code scaffolding, but are not compiled into this phase. Validate raster bit order, line framing and media motion with hardware before enabling them.
+## Verified hardware
 
-## Download an Intel macOS build
+- GoDEX EZ-2 (original 2002 ESC command set; NOT modern EZPL).
+- USB–RS232 Prolific PL2303, USB IDs 067b:2303, device path typically /dev/cu.usbserial-1430.
+- RS-232: 9600 baud, 8 data bits, no parity, 1 stop bit; None was used for the successful short TEST. XON/XOFF and RTS/CTS are available in settings.
+- Print TEST retains the original physically verified ESC command sequence. The printer printed TEST and advanced the paper.
 
-Open [GitHub Releases](https://github.com/bau59/LabelDesk_GoDEX_EZ_2/releases/latest) to download the latest versioned Intel DMG. The [Build Intel macOS workflow](https://github.com/bau59/LabelDesk_GoDEX_EZ_2/actions/workflows/build-intel.yml) also keeps a downloadable artifact for each successful run. The workflow runs on `macos-15-intel`.
+## Printhead and raster constraints
 
-When a successful push to `main` contains a *new* `CFBundleShortVersionString`, the workflow automatically publishes that version in GitHub Releases; pushes without a version bump do not alter a published release.
+| Setting | Limit |
+|---|---|
+| Maximum material width | 60 mm |
+| Physical printhead | 56 mm = 448 dots |
+| Resolution | 203 dpi = 8 dots/mm |
+| Maximum ESC G row | 55 bytes = 440 dots = 55 mm |
+| Editor label width | 10–55 mm |
+| Editor label height | 10–100 mm (conservative initial software cap) |
+| Gap | 0–10 mm, whole millimeters |
 
-The app checks for updates at most once a day and has a **Check for Updates** button. A newer release is downloaded only after user confirmation, its SHA-256 is checked when GitHub provides an asset digest, and the DMG is opened. **Drag LabelDesk.app into Applications to finish installing.** There is no background replacement of running app files, and no updater in the previously installed v0.1.0, so v0.2.0 must be installed manually once.
+The raster uses one ESC Gnn command per row with nn raw monochrome bytes (1 = black), a 1 mm left-margin command, ESC q with the full label height plus gap, and FF. The original ESC Q176 is used for the verified TEST only. ESC Q and ESC q are different instructions. A 55 mm raster is *not* the same as a 60 mm printable area.
 
-The build is ad-hoc signed, not Apple Developer ID notarized. macOS Gatekeeper may show a warning for files downloaded from GitHub; use Control-click → Open if you trust this build. Only the Phase 1 TEST-print app and update checker are compiled into these packages.
+## How to test version 0.3.0
 
-## Build locally
+1. Select your USB serial port under Printer settings and save; old settings migrate from the working TEST app.
+2. Press Print TEST for the already verified text command.
+3. Press Raster TEST, which sends 24 rows of ESC G03 representing a small hollow square. Check the actual paper for a correctly formed square. This graphics command has NOT yet been physically verified on the user's unit.
+4. Only if the square is correct, press Raster TEST looks correct and confirm. This locally unlocks printing full layouts.
+5. Create a label, choose a preset, drag objects, edit coordinates or text in the inspector, and save the template.
+6. Add the layout to the queue, choose copies and press Start queue. Jobs send sequentially. Failure states must be inspected before retrying, to avoid duplicate labels.
 
-The macOS SDK and Swift compiler are required. From the repository root, run:
+If the raster test prints gibberish, stays blank or feeds unexpectedly, DO NOT confirm raster mode. Report the observed result before trying a full label.
 
-```sh
-zsh Scripts/build-installer.sh
-```
+## Supported editor features
 
-The script is invoked with `zsh` because its Git file mode is not executable.
+- Text, including Cyrillic rasterized with macOS fonts.
+- Actual Code 39 narrow/wide bars and human-readable captions, subject to minimum 2-dot bar width.
+- Lines and rectangles, physical mm dimensions, presets, custom sizes, zoom, grid and object dragging.
+- Local JSON templates and persisted print queue.
+- Density and flow control settings; X/Y raster correction, material gap, manual calibration instructions.
+- App update checks from versioned GitHub Releases.
 
-The script creates `build/LabelDesk.app` and `build/LabelDesk-<version>.dmg`. The app is ad-hoc signed for local installation; macOS may require opening it with Control-click → Open on first launch. It targets Intel (`x86_64`) Macs running macOS 15 or later.
+The preview is generated from the same black/white bitmap that is used for ESC G output, rather than a simulated barcode. Printing is intentionally gated until the raster test is visually accepted.
 
-If a build fails, repeat it in diagnostic mode:
+## Limitations
 
-```sh
-LABELDESK_DEBUG=1 zsh Scripts/build-installer.sh
-```
+- ESC G printing and alignment still need validation on physical EZ-2 hardware. The command structure follows the original 2002 manual, but the real printer may need corrections.
+- The printer has a mechanical label-gap sensor adjustment (VR). LabelDesk does not claim automatic electronic calibration.
+- A successful serial write is not a printer acknowledgement: Sent means the bytes were transmitted, not that paper output was confirmed.
+- For large raster transfers use XON/XOFF if the device responds correctly, or the supported wired hardware flow-control mode.
+- No imported images, QR, database integration or automatic silent updater in version 0.3.0.
 
-The script compiles only the Phase 1 app and keeps the system-module cache in `.build/module-cache`, making repeat builds faster.
+## Build
 
-## Hardware check
+Run: zsh Scripts/build-installer.sh
 
-1. Connect and power on the USB–RS232 adapter and printer.
-2. Open **Printer settings**, choose the detected `/dev/cu.*` device, and save.
-3. Return to the main screen and use **Print TEST**. Confirm the dialog only when paper is loaded.
-4. The UI says **Sent to serial port**, not "printed", because EZ-2 does not provide a reliable completion acknowledgement here.
+GitHub Actions builds for macos-15-intel and runs an encoder smoke test before releasing new versions. Build output includes a DMG and an Intel app ZIP.
 
-No print is sent at launch, on save, or during a build.
+## Original reference
 
-## Project layout
-
-`LabelDesk.xcodeproj` is available for editing in Xcode, but the installer script compiles the Swift sources directly. Application data is saved under `~/Library/Application Support/LabelDesk`.
+GoDEX EZ-2/4 User Manual (April 2002): https://www.manualslib.com/manual/302891/Godex-Ez-2.html
