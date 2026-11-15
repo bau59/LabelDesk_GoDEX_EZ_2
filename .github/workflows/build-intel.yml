@@ -60,6 +60,16 @@ jobs:
           test -f "build/LabelDesk-${APP_VERSION}.dmg"
           ditto -c -k --keepParent build/LabelDesk.app "build/LabelDesk-${APP_VERSION}-intel.zip"
 
+      - name: Validate Xcode project configuration
+        shell: bash
+        run: |
+          set -euo pipefail
+          plutil -lint LabelDesk.xcodeproj/project.pbxproj
+          xcodebuild -list -project LabelDesk.xcodeproj > /tmp/labeldesk-xcode-list.log 2>&1 || {
+            tail -n 100 /tmp/labeldesk-xcode-list.log
+            exit 1
+          }
+
       - name: Verify ESC graphics packet and raster size
         shell: bash
         run: |
@@ -128,4 +138,4 @@ jobs:
             --repo "$GITHUB_REPOSITORY" \
             --target "$GITHUB_SHA" \
             --title "LabelDesk ${APP_VERSION}" \
-            --notes "Intel macOS 15+. Editor, exact monochrome preview, Code 39, persistent queue, graphical ESC G test, and GitHub release update checking. Verify raster mode physically before printing layouts. Ad-hoc signed; not notarized."
+            --notes "Intel macOS 15+. Offline WebKit layer editor, text properties, corrected ESC Q176 plus q label feed, compact ESC G raster transfer, verified test, persistent queue and updater. Run Feed TEST before batch printing. Ad-hoc signed; not notarized."
