@@ -190,8 +190,37 @@ struct RasterEncoderSmokeTest {
         let sourceID = document.id
         let target = EZ2CalibrationPattern.make(for: document)
         assert(target.id != sourceID && document.id == sourceID)
-        assert(target.elements.count == 5)
+        assert(target.elements.count >= 10, "Calibration target must include horizontal 5mm ruler marks")
         try LabelRasterizer.validate(target)
+        // A 60-mm label is a valid physical medium, but outgoing ESC G rows
+        // must never exceed the original EZ-2 protocol limit of 55 bytes.
+        var wide = document
+        wide.widthMM = 60
+        try LabelRasterizer.validate(wide)
+        let wideRaster = try LabelRasterizer().rasterize(wide, profile: profile)
+        assert(wide.printableWidthMM == 55)
+        assert(wide.unprintableRightMM == 5)
+        assert(wideRaster.widthDots == 440 && wideRaster.bytesPerLine == 55)
+        let widePacket = [UInt8](try encoder.nativeCommands(for: wide, profile: profile))
+        var wideOffset = header.count
+        for row in 0..<wideRaster.heightDots {
+            assert(widePacket[wideOffset] == 0x1B && widePacket[wideOffset + 1] == 0x47)
+            let n = Int(String(decoding: widePacket[(wideOffset+2)..<(wideOffset+4)], as: UTF8.self))!
+            assert((1...55).contains(n), "Never send undocumented ESC G56")
+            wideOffset += 4 + n
+        }
+        var invalidWidth = wide
+        invalidWidth.widthMM = 61
+        do {
+            try LabelRasterizer.validate(invalidWidth)
+            fatalError("Media width > 60mm should be rejected")
+        } catch LabelRenderError.invalidSize {}
+
+        let wideCalibration = EZ2CalibrationPattern.make(for: wide)
+        try LabelRasterizer.validate(wideCalibration)
+        assert(wideCalibration.elements.allSatisfy { $0.xMM + $0.widthMM <= 55.001 })
+        assert(wideCalibration.elements.count > target.elements.count,
+               "60mm media uses the 55mm full-width ruler for test")
         let targetPacket = try encoder.nativeCommands(for: target, profile: profile)
         assert(targetPacket.last == 0x0C)
         print("EZ-2 raster, long-word wrap, text alignment, calibration target, Q/S and legacy compatibility passed.")
