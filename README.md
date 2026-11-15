@@ -27,6 +27,22 @@ Download the latest Intel DMG from https://github.com/bau59/LabelDesk_GoDEX_EZ_2
 
 The raster uses one ESC Gnn command per row with nn raw monochrome bytes (1 = black), a 1 mm left-margin command, ESC q with the full label height plus gap, and FF. ESC Q176 is the previously tested default top-of-form value for text and raster, now adjustable for raster jobs. ESC Q and ESC q are different instructions. A 55 mm raster is *not* the same as a 60 mm printable area.
 
+## Version 0.7.0 — folders, base templates and quick print
+
+LabelDesk now separates designing a template from operating the printer:
+
+1. Create or open a label in **Редактор**. For each text layer that should change, check **Менять при печати** and optionally give it a clear field name, such as `Цена`, `Товар` or `Размер`. Text layers marked static stay locked in quick mode.
+2. Click the new-folder button in the left **Библиотека**, enter a folder name. LabelDesk saves an **independent copy of the currently open layout** as that folder's base template.
+3. Select a folder. **Заполнение** shows only variable text fields, number of copies and a true CoreGraphics monochrome print preview. The font, geometry, barcode, constant text and base file cannot be modified here.
+4. Click **Добавить этикетку** to queue the filled label. Start the queue separately, after the established raster and feed verification gates. The queued job contains its own snapshot of the filled label.
+5. For a list of product names, paste one name per line into **Пакетная печать списком**, choose the field to replace, and queue up to 200 labels at once. The other fields retain their current quick-form values. This is a single-column workflow, **not yet a full CSV/Excel importer**.
+6. **Сохранить как вариант** creates a separate saved filled template without overwriting the base. In the folder's templates menu, you can duplicate, move, set as base, edit or delete non-base templates.
+
+Folders are logical records in `~/Library/Application Support/LabelDesk/folders.json`, referenced by UUID in saved template JSON files under `templates/`. This avoids breaking the existing v0.1–v0.6 file library. Existing templates without a folder ID appear under **Без папки**. Deleting a folder **never deletes its templates**: they become ungrouped. A folder's active base template cannot be deleted until another base has been assigned.
+
+All source templates remain unchanged by quick printing. Serial transfer settings, original Print TEST, font/raster/feed tests, queued-print safeguards, HTML designer and self-updater are retained from 0.6.0.
+
+Planned separately after real-printer feedback: CSV/Numbers import, serial counters, date fields, recently printed templates and hybrid native ASCII/raster printing. These are not claimed as part of 0.7.0.
 ## Version 0.6.0 — persistent selected layer, resize handles and EZ-2 settings
 
 - Layer selection is explicit: choose a layer on the left. Canvas clicks on other layers never automatically change selection. Adding an object selects the new layer.
