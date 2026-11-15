@@ -2,14 +2,48 @@ import AppKit
 import SwiftUI
 import WebKit
 
-/// Native macOS shell: the label editor, settings, queue and raster renderer
-/// live in plain HTML/JS. Only filesystem and Process APIs remain in Swift.
+/// Native macOS shell: editor, queue, raster and printer commands remain in
+/// editable HTML/JavaScript/zsh. The built-in updater installs new releases.
 @main
 struct LabelDeskApp: App {
+    @StateObject private var updater = UpdateManager()
+
     var body: some Scene {
         WindowGroup {
-            WebLabelDeskView()
-                .frame(minWidth: 1020, minHeight: 680)
+            VStack(spacing: 0) {
+                HStack(spacing: 12) {
+                    Text("LabelDesk v\(updater.currentVersion)")
+                        .font(.system(size: 12, weight: .medium))
+                    Spacer()
+                    Text(updater.status)
+                        .font(.system(size: 11))
+                        .foregroundStyle(.secondary)
+                        .lineLimit(1)
+                    Button("Проверить обновления") {
+                        Task { await updater.check(silent: false) }
+                    }
+                    .disabled(updater.isChecking || updater.isDownloading)
+                    if updater.showUpdatePrompt {
+                        Button("Установить v\(updater.latestVersion)") {
+                            Task { await updater.installUpdate() }
+                        }
+                        .buttonStyle(.borderedProminent)
+                        .disabled(updater.isChecking || updater.isDownloading)
+                    }
+                }
+                .padding(.horizontal, 16)
+                .padding(.vertical, 7)
+                .background(Color(nsColor: .windowBackgroundColor))
+
+                WebLabelDeskView()
+            }
+            .frame(minWidth: 1020, minHeight: 680)
+            .task { await updater.checkOnLaunch() }
+            .alert("Обновление LabelDesk", isPresented: $updater.showInfo) {
+                Button("OK", role: .cancel) {}
+            } message: {
+                Text(updater.infoMessage)
+            }
         }
         .defaultSize(width: 1250, height: 800)
     }
