@@ -10,9 +10,9 @@ enum SerialPortError: LocalizedError {
     var errorDescription: String? {
         switch self {
         case .noPortSelected: "Choose a serial port in Printer settings."
-        case .openFailed(let detail): "Cannot open serial port: \\(detail)"
-        case .configurationFailed(let detail): "Cannot configure serial port: \\(detail)"
-        case .writeFailed(let detail): "Serial write failed: \\(detail)"
+        case .openFailed(let detail): "Cannot open serial port: \(detail)"
+        case .configurationFailed(let detail): "Cannot configure serial port: \(detail)"
+        case .writeFailed(let detail): "Serial write failed: \(detail)"
         }
     }
 }

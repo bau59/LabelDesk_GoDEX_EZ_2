@@ -27,7 +27,7 @@ struct LabelElement: Codable, Identifiable, Equatable {
     var isBold = false
 
     var isValidCode39: Bool {
-        value.unicodeScalars.allSatisfy { "ABCDEFGHIJKLMNOPQRSTUVWXYZ0123456789-. $/+%".unicodeScalars.contains($0) }
+        !value.isEmpty && value.unicodeScalars.allSatisfy { "ABCDEFGHIJKLMNOPQRSTUVWXYZ0123456789-. $/+%".unicodeScalars.contains($0) }
     }
 
     static func text() -> LabelElement {

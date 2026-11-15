@@ -22,9 +22,12 @@ final class AppStore: ObservableObject {
 
     init() {
         settings = storage.loadSettings()
+        if settings.profile.portPath.isEmpty {
+            settings.profile.portPath = UserDefaults.standard.string(forKey: "serialPort") ?? ""
+        }
         templates = storage.listDocuments()
         queue = PrintQueueService(storage: storage)
-        if !settings.profile.portPath.isEmpty { status = "Ready: \\(settings.profile.portPath)" }
+        if !settings.profile.portPath.isEmpty { status = "Ready: \(settings.profile.portPath)" }
     }
 
     var selectedElement: LabelElement? { document.elements.first { $0.id == selectedElementID } }
@@ -52,14 +55,14 @@ final class AppStore: ObservableObject {
         do {
             try storage.saveDocument(document)
             templates = storage.listDocuments()
-            status = "Saved \\(document.name)"
+            status = "Saved \(document.name)"
         } catch { alert = AppAlert(title: "Could not save", message: error.localizedDescription) }
     }
 
     func saveSettings() {
         do {
             try storage.saveSettings(settings)
-            status = settings.profile.portPath.isEmpty ? "No serial port selected" : "Ready: \\(settings.profile.portPath)"
+            status = settings.profile.portPath.isEmpty ? "No serial port selected" : "Ready: \(settings.profile.portPath)"
         } catch { alert = AppAlert(title: "Could not save settings", message: error.localizedDescription) }
     }
 
@@ -117,7 +120,7 @@ final class AppStore: ObservableObject {
             alert = AppAlert(title: "Select a port first", message: "Open Printer settings and choose the USB–RS232 device.")
             return
         }
-        alert = AppAlert(title: "Print TEST?", message: "This sends the verified TEST command to \\(profile.portPath). Ensure paper is loaded.", action: { [weak self] in
+        alert = AppAlert(title: "Print TEST?", message: "This sends the verified TEST command to \(profile.portPath). Ensure paper is loaded.", action: { [weak self] in
             self?.performTest(profile: profile)
         })
     }

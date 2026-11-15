@@ -18,7 +18,7 @@ private struct QueueContent: View {
                 Label(store.status, systemImage: store.status.hasPrefix("Ready") ? "checkmark.circle" : "circle")
                     .foregroundStyle(store.status.hasPrefix("TEST failed") ? .red : .secondary)
                 Spacer()
-                Stepper("Copies: \\(store.copies)", value: $store.copies, in: 1...999).frame(width: 135)
+                Stepper("Copies: \(store.copies)", value: $store.copies, in: 1...999).frame(width: 135)
                 Button("Add to queue") { queue.enqueue(document: store.document, copies: store.copies) }
                 Button(queue.isPaused ? "Resume" : "Start") { queue.togglePause(); queue.process(profile: store.settings.profile) }
                 Button("Clear completed") { queue.clearCompleted() }

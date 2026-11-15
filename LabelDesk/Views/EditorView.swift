@@ -11,7 +11,7 @@ struct EditorView: View {
                     .textFieldStyle(.roundedBorder)
                     .frame(maxWidth: 230)
                 Spacer()
-                Text("\\(Int(store.document.widthMM)) × \\(Int(store.document.heightMM)) mm")
+                Text("\(Int(store.document.widthMM)) × \(Int(store.document.heightMM)) mm")
                     .foregroundStyle(.secondary)
                 Slider(value: $zoom, in: 2...10) { Text("Zoom") }.frame(width: 130)
             }

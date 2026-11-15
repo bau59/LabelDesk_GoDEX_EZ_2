@@ -32,7 +32,7 @@ final class StorageService {
     }
 
     func saveDocument(_ document: LabelDocument) throws {
-        try save(document, to: templates.appendingPathComponent("\\(document.id.uuidString).json"))
+        try save(document, to: templates.appendingPathComponent("\(document.id.uuidString).json"))
     }
 
     private func load<T: Decodable>(_ type: T.Type, from url: URL) -> T? {

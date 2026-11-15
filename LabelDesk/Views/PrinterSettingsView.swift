@@ -21,7 +21,7 @@ struct PrinterSettingsView: View {
                     }
                 }
                 Section("Print profile") {
-                    Stepper("Density: \\(store.settings.profile.density)", value: $store.settings.profile.density, in: 0...7)
+                    Stepper("Density: \(store.settings.profile.density)", value: $store.settings.profile.density, in: 0...7)
                     NumberField(title: "Left margin", value: $store.settings.profile.leftMarginMM, suffix: "mm")
                     NumberField(title: "X offset", value: $store.settings.profile.xOffsetMM, suffix: "mm")
                     NumberField(title: "Y offset", value: $store.settings.profile.yOffsetMM, suffix: "mm")
