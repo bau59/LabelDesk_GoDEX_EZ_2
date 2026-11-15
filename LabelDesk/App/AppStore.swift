@@ -23,10 +23,11 @@ final class AppStore: ObservableObject {
     let queue: PrintQueueService
 
     init() {
-        settings = storage.loadSettings()
-        if settings.profile.portPath.isEmpty {
-            settings.profile.portPath = UserDefaults.standard.string(forKey: "serialPort") ?? ""
+        var loadedSettings = storage.loadSettings()
+        if loadedSettings.profile.portPath.isEmpty {
+            loadedSettings.profile.portPath = UserDefaults.standard.string(forKey: "serialPort") ?? ""
         }
+        settings = loadedSettings
         templates = storage.listDocuments()
         queue = PrintQueueService(storage: storage)
         if !settings.profile.portPath.isEmpty { status = "Ready: \(settings.profile.portPath)" }
