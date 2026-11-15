@@ -24,12 +24,19 @@ struct RasterEncoderSmokeTest {
             0x1B, 0x4D, 0x30, 0x31
         ], "Line Mode header must match the successful Python batch")
 
-        // One blank-label advance is 40 mm. The original ESC fnn command
-        // accepts only 01...29 mm, so split the pitch into two safe feeds.
-        assert(Array(encoder.jobTearFeedCommands()) == [
-            0x1B, 0x66, 0x32, 0x39, // ESC f29
-            0x1B, 0x66, 0x31, 0x31  // ESC f11
-        ], "Tear feed must skip exactly one 40mm pitch")
+        // Verified physically as a standalone blank label in buffered mode.
+        // The separator must be identical to the successful Python packet,
+        // not a fixed-distance motor feed.
+        assert(Array(encoder.blankSeparatorCommands()) == [
+            0x1B, 0x46, 0x30,              // ESC F0
+            0x1B, 0x71, 0x30, 0x34, 0x30,  // ESC q040
+            0x1B, 0x4D, 0x30, 0x31,        // ESC M01
+            0x1B, 0x42,                    // ESC B
+            0x1B, 0x41, 0x31, 0x31,        // ESC A11
+            0x20, 0x0D,                    // ASCII space + CR
+            0x1B, 0x45,                    // ESC E
+            0x1B, 0x50, 0x30, 0x31         // ESC P01
+        ], "Blank separator must exactly match physical test")
 
 
         func checkPacket(_ data: Data, rows expectedRows: Int,
@@ -117,6 +124,6 @@ struct RasterEncoderSmokeTest {
                                                 from: JSONEncoder().encode(tuned))
         assert(decoded.labelIntervalSeconds == 0.8)
 
-        print("EZ-2 startup, Gnn/FF and single 40mm job-end tear feed passed.")
+        print("EZ-2 startup, Gnn/FF and buffered blank P01 separator passed.")
     }
 }
