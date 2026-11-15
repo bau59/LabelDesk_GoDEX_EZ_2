@@ -51,7 +51,7 @@ private struct ContentView: View {
             Button("Send") { printer.sendTest() }
             Button("Cancel", role: .cancel) { }
         } message: {
-            Text("Ensure paper is loaded. The app will send data to \\(printer.selectedPort).")
+            Text("Ensure paper is loaded. The app will send data to \(printer.selectedPort).")
         }
     }
 }
@@ -71,13 +71,13 @@ private final class PrinterModel: ObservableObject {
     func refreshPorts() {
         let devices = ((try? FileManager.default.contentsOfDirectory(atPath: "/dev")) ?? [])
             .filter { $0.hasPrefix("cu.") }
-            .map { "/dev/\\($0)" }
+            .map { "/dev/\($0)" }
             .sorted()
         ports = devices
         if !devices.contains(selectedPort) {
             selectedPort = devices.first(where: { $0.contains("usbserial") }) ?? devices.first ?? ""
         }
-        status = selectedPort.isEmpty ? "No serial ports found" : "Ready: \\(selectedPort)"
+        status = selectedPort.isEmpty ? "No serial ports found" : "Ready: \(selectedPort)"
     }
 
     func sendTest() {
@@ -91,7 +91,7 @@ private final class PrinterModel: ObservableObject {
                 self.isSending = false
                 switch result {
                 case .success: self.status = "Sent to serial port (physical print not confirmed)"
-                case .failure(let error): self.status = "Error: \\(error.localizedDescription)"
+                case .failure(let error): self.status = "Error: \(error.localizedDescription)"
                 }
             }
         }
@@ -99,7 +99,7 @@ private final class PrinterModel: ObservableObject {
 
     private static func writeTest(to path: String) -> Result<Void, Error> {
         let descriptor = open(path, O_WRONLY | O_NOCTTY | O_NONBLOCK | O_EXLOCK)
-        guard descriptor >= 0 else { return .failure(SerialError("Cannot open port: \\(String(cString: strerror(errno)))")) }
+        guard descriptor >= 0 else { return .failure(SerialError("Cannot open port: \(String(cString: strerror(errno)))")) }
         defer { close(descriptor) }
         var settings = termios()
         guard tcgetattr(descriptor, &settings) == 0 else { return .failure(SerialError("Cannot read port settings")) }
@@ -110,14 +110,14 @@ private final class PrinterModel: ObservableObject {
         guard cfsetispeed(&settings, speed_t(B9600)) == 0,
               cfsetospeed(&settings, speed_t(B9600)) == 0,
               tcsetattr(descriptor, TCSANOW, &settings) == 0 else {
-            return .failure(SerialError("Cannot configure port: \\(String(cString: strerror(errno)))"))
+            return .failure(SerialError("Cannot configure port: \(String(cString: strerror(errno)))"))
         }
         let bytes: [UInt8] = [0x1B, 0x51, 0x31, 0x37, 0x36, 0x1B, 0x53, 0x32, 0x1B, 0x44, 0x35, 0x1B, 0x4D, 0x31, 0x38, 0x1B, 0x41, 0x31, 0x31, 0x54, 0x45, 0x53, 0x54, 0x0D, 0x0C]
         let sent = bytes.withUnsafeBytes { buffer -> Int in
             guard let address = buffer.baseAddress else { return -1 }
             return write(descriptor, address, bytes.count)
         }
-        guard sent == bytes.count else { return .failure(SerialError("Write failed: \\(String(cString: strerror(errno)))")) }
+        guard sent == bytes.count else { return .failure(SerialError("Write failed: \(String(cString: strerror(errno)))")) }
         _ = tcdrain(descriptor)
         return .success(())
     }
