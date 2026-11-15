@@ -28,7 +28,10 @@ equal(resize(original,99,99,"move",40,30,1,1),
       {xMM:30,yMM:22,widthMM:10,heightMM:8},"Clamp moved object");
 equal(resize(original,-99,-99,"se",40,30,1,1),
       {xMM:3,yMM:4,widthMM:1,heightMM:1},"Minimum dimensions");
-assert.match(html, /selected!==id\)return;/, "Only selected layer may move");
+assert.match(html, /if\(selected!==id\)\{\s*selected=id;/, "Canvas click explicitly selects its layer");
+assert.match(html, /\.obj:not\(\.sel\):hover/, "Hover gives visible object target");
+assert.match(html, /zoomMode==="fit"/, "Responsive fit zoom should exist");
+assert.match(html, /ArrowLeft.*ArrowRight.*ArrowUp.*ArrowDown/, "Arrow keys should nudge objects");
 assert.match(html, /for\(const corner of \["nw","ne","sw","se"\]\)/, "Four actual handles expected");
 assert.match(html, /previousSelected=selected\?\.toLowerCase\(\)/, "Selection must survive save/reload");
-console.log("Editor geometry smoke test passed: selection and four-corner resizing.");
+console.log("Editor geometry smoke test passed: click selection, hover, fit zoom, keyboard and four-corner resizing.");

@@ -27,6 +27,27 @@ Download the latest Intel DMG from https://github.com/bau59/LabelDesk_GoDEX_EZ_2
 
 The raster uses one ESC Gnn command per row with nn raw monochrome bytes (1 = black), a 1 mm left-margin command, ESC q with the full label height plus gap, and FF. ESC Q176 is the previously tested default top-of-form value for text and raster, now adjustable for raster jobs. ESC Q and ESC q are different instructions. A 55 mm raster is *not* the same as a 60 mm printable area.
 
+## Version 0.8.1 — actual print diagnostics and mouse interaction
+
+The previous queue called a job 'sent' after `write` + `tcdrain` succeeded. The EZ-2 has no application-level acknowledgement here, so 'sent' was misleading if paper had not moved. The corrected UI says **В порт передано** and explicitly warns that physical output remains unconfirmed.
+
+### Diagnosing a silent printer
+
+1. Open **Очередь → Журнал передачи**. The journal is persisted at `~/Library/Application Support/LabelDesk/logs/print.log` (rotated to `print.previous.log` when it grows). Use **Скопировать журнал** or **Показать файл в Finder** to share it.
+2. It records a job ID, current serial port, baud, XON/XOFF/RTS-CTS/none flow control, label dimensions, graphic packet length and SHA-256, approximate 9600-baud transfer duration, port open/configure events, bytes accepted, `tcdrain` completion and errors. It does not record raw label content.
+3. **Проверить одно задание** sends only the first pending *job* and pauses (the job may contain multiple copies). Once you inspect the physical label, **Отправить всю очередь** requires explicit batch confirmation.
+4. The verified native **Print TEST**, **Raster TEST**, **Font TEST** and **Feed TEST** also write transmission stages to the same log, so you can compare working probes to failing full labels.
+5. A job marked **В порт передано** may be explicitly requeued from history, but requires a warning/confirmation because the printer might have printed it despite no software acknowledgement.
+
+On EZ-2 the factory serial interface is 9600 8N1 and supports XON/XOFF or RTS/CTS (depending on cable wiring). If a job is marked sent with no paper movement, check printer sensor/LED, material and cable flow mode; do not blindly retry a full batch. The program cannot detect paper output with the current serial protocol.
+
+### Designer and Settings fixes
+
+Clicking a visible object in the HTML canvas now explicitly selects it. Drag directly, resize with real NW/NE/SW/SE handles and use arrow keys for fine adjustment. Unselected objects show a pointer/hover outline instead of silently ignoring the mouse. The default zoom fits the label to the available workspace.
+
+The large mostly empty native printer settings modal is replaced by a compact left navigation and consistently aligned controls; existing saved settings are not reset. This release leaves `ESC Q`, `ESC q`, `ESC G`, the successful printer test commands and the existing raster packet encoder unchanged until the actual hardware log identifies what failed.
+
+**Limitations:** The old v0.8.0 had no persistent transmission log, so earlier sent jobs cannot be retrospectively diagnosed. Automated macOS tests verify code and packet handling but physical printing still needs a test on the user's EZ-2.
 ## Version 0.8.0 — focused, light interface
 
 The application interface has been reorganized around the actual operator workflow rather than showing all printer controls at once:

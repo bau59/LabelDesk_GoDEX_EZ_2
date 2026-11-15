@@ -423,7 +423,7 @@ final class AppStore: ObservableObject {
         }
     }
 
-    func startQueue() {
+    func startQueue(onlyOne: Bool = false) {
         guard rasterVerified else {
             alert = AppAlert(title: "Verify graphics first",
                              message: "Press Raster TEST and verify the small square on paper. Normal labels use ESC G and are disabled until you confirm this test.")
@@ -438,7 +438,7 @@ final class AppStore: ObservableObject {
             alert = AppAlert(title: "Choose serial port", message: "Open printer settings and select the USB–RS232 port.")
             return
         }
-        queue.resume()
+        queue.resume(onlyOne: onlyOne)
         queue.process(profile: settings.profile)
     }
 
@@ -474,14 +474,20 @@ final class AppStore: ObservableObject {
     private func performFeedTest(data: Data, profile: PrinterProfile) {
         feedTestPending = false
         status = "Sending one Feed TEST…"
-        Task.detached { [serialPort] in
+        let diagnostics = queue.diagnostics
+        diagnostics.record("test begin", details: "type=FEED TEST port=\(profile.portPath) flow=\(profile.flowControl.rawValue) bytes=\(data.count)")
+        Task.detached { [serialPort, diagnostics] in
             do {
-                try serialPort.write(data, profile: profile)
+                try serialPort.write(data, profile: profile) { stage in
+                    Task { @MainActor in diagnostics.record("test serial", details: "type=FEED TEST \(stage)") }
+                }
+                await diagnostics.record("test sent to port", details: "type=FEED TEST bytes=\(data.count); physical output not confirmed")
                 await MainActor.run {
                     self.feedTestPending = true
                     self.status = "FEED sent; verify next-label registration"
                 }
             } catch {
+                await diagnostics.record("test FAILED", details: "type=FEED TEST \(error.localizedDescription)")
                 await MainActor.run {
                     self.status = "Feed test failed"
                     self.alert = AppAlert(title: "Feed TEST failed", message: error.localizedDescription)
@@ -520,14 +526,20 @@ final class AppStore: ObservableObject {
         status = "Sending raster probe…"
         rasterProbePending = false
         let data = encoder.rasterProbe()
-        Task.detached { [serialPort] in
+        let diagnostics = queue.diagnostics
+        diagnostics.record("test begin", details: "type=RASTER TEST port=\(profile.portPath) flow=\(profile.flowControl.rawValue) bytes=\(data.count)")
+        Task.detached { [serialPort, diagnostics] in
             do {
-                try serialPort.write(data, profile: profile)
+                try serialPort.write(data, profile: profile) { stage in
+                    Task { @MainActor in diagnostics.record("test serial", details: "type=RASTER TEST \(stage)") }
+                }
+                await diagnostics.record("test sent to port", details: "type=RASTER TEST bytes=\(data.count); physical output not confirmed")
                 await MainActor.run {
                     self.rasterProbePending = true
                     self.status = "Raster probe sent; confirm paper result"
                 }
             } catch {
+                await diagnostics.record("test FAILED", details: "type=RASTER TEST \(error.localizedDescription)")
                 await MainActor.run {
                     self.status = "Raster probe failed"
                     self.alert = AppAlert(title: "Could not send graphics test", message: error.localizedDescription)
@@ -565,13 +577,19 @@ final class AppStore: ObservableObject {
     private func performFontTest(profile: PrinterProfile) {
         status = "Sending built-in font test…"
         let data = encoder.nativeFontProbe(profile: profile)
-        Task.detached { [serialPort] in
+        let diagnostics = queue.diagnostics
+        diagnostics.record("test begin", details: "type=FONT TEST port=\(profile.portPath) flow=\(profile.flowControl.rawValue) bytes=\(data.count)")
+        Task.detached { [serialPort, diagnostics] in
             do {
-                try serialPort.write(data, profile: profile)
+                try serialPort.write(data, profile: profile) { stage in
+                    Task { @MainActor in diagnostics.record("test serial", details: "type=FONT TEST \(stage)") }
+                }
+                await diagnostics.record("test sent to port", details: "type=FONT TEST bytes=\(data.count); physical output not confirmed")
                 await MainActor.run {
                     self.status = "Native font TEST sent — inspect the printed label"
                 }
             } catch {
+                await diagnostics.record("test FAILED", details: "type=FONT TEST \(error.localizedDescription)")
                 await MainActor.run {
                     self.status = "Native font TEST failed"
                     self.alert = AppAlert(title: "Font test could not be sent", message: error.localizedDescription)
@@ -594,11 +612,17 @@ final class AppStore: ObservableObject {
     private func performTest(profile: PrinterProfile) {
         status = "Sending TEST…"
         let data = encoder.testLabel(profile: profile)
-        Task.detached { [serialPort] in
+        let diagnostics = queue.diagnostics
+        diagnostics.record("test begin", details: "type=PRINT TEST port=\(profile.portPath) flow=\(profile.flowControl.rawValue) bytes=\(data.count)")
+        Task.detached { [serialPort, diagnostics] in
             do {
-                try serialPort.write(data, profile: profile)
+                try serialPort.write(data, profile: profile) { stage in
+                    Task { @MainActor in diagnostics.record("test serial", details: "type=PRINT TEST \(stage)") }
+                }
+                await diagnostics.record("test sent to port", details: "type=PRINT TEST bytes=\(data.count); physical output not confirmed")
                 await MainActor.run { self.status = "TEST sent to serial port (physical print not confirmed)" }
             } catch {
+                await diagnostics.record("test FAILED", details: "type=PRINT TEST \(error.localizedDescription)")
                 await MainActor.run { self.status = "TEST failed"; self.alert = AppAlert(title: "TEST was not sent", message: error.localizedDescription) }
             }
         }

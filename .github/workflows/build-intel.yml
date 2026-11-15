@@ -4,7 +4,7 @@ on:
   push:
     branches:
       - main
-      - feature/ui-refresh-0.8
+      - fix/print-diagnostics-mouse-0.8.1
   workflow_dispatch:
 
 permissions:
@@ -123,6 +123,18 @@ jobs:
           swiftc -target x86_64-apple-macosx15.0 -sdk "$SDK_PATH"             -parse-as-library             LabelDesk/Models/LabelDocument.swift             LabelDesk/Models/LabelElement.swift             LabelDesk/Models/PrinterProfile.swift             LabelDesk/Models/PrintJob.swift             LabelDesk/Services/StorageService.swift             Tests/QuickPrintSmokeTest.swift             -o build/quickprint-smoke
           ./build/quickprint-smoke
 
+      - name: Verify persistent print diagnostic log
+        shell: bash
+        run: |
+          set -euo pipefail
+          SDK_PATH="$(xcrun --sdk macosx --show-sdk-path)"
+          swiftc -target x86_64-apple-macosx15.0 -sdk "$SDK_PATH" \
+            -parse-as-library -framework Combine \
+            LabelDesk/Services/PrintDiagnostics.swift \
+            Tests/PrintDiagnosticsSmokeTest.swift \
+            -o build/print-diagnostics-smoke
+          ./build/print-diagnostics-smoke
+
       - name: Upload Intel packages
         uses: actions/upload-artifact@v4
         with:
@@ -164,4 +176,4 @@ jobs:
             --repo "$GITHUB_REPOSITORY" \
             --target "$GITHUB_SHA" \
             --title "LabelDesk ${APP_VERSION}" \
-            --notes "Intel macOS 15+. UI redesign: light workspace, focused quick print, redesigned template library and full queue page. Printer protocol, templates and updater unchanged. Ad-hoc signed; not notarized."
+            --notes "Intel macOS 15+. Print diagnostics with persistent RS-232 stages, encoded-byte stats, and honest port-only status; single-job print test and guarded batch resend. Canvas mouse selection/hover/zoom fixed, printer settings layout rebuilt. No EZ-2 protocol changes. Ad-hoc signed; not notarized."
