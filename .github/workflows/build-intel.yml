@@ -12,6 +12,7 @@ on:
       - fix/media-settings-template-compatibility-102
       - fix/sidebar-workflow-and-ui-103
       - feat/ez2-native-fonts-barcodes-editor
+      - feat/native-cp866-food-presets-105
   workflow_dispatch:
 
 permissions:
@@ -64,6 +65,9 @@ jobs:
           test -f build/LabelDesk.app/Contents/Resources/raster.js
           test -f build/LabelDesk.app/Contents/Resources/barcodes.js
           test -f build/LabelDesk.app/Contents/Resources/native.js
+          test -f build/LabelDesk.app/Contents/Resources/text-engine.js
+          test -f build/LabelDesk.app/Contents/Resources/food-presets.js
+          test -f build/LabelDesk.app/Contents/Resources/printer-text.sh
           test -f build/LabelDesk.app/Contents/Resources/printer-native.sh
           test -f build/LabelDesk.app/Contents/Resources/printer.sh
           BIN="build/LabelDesk.app/Contents/MacOS/LabelDesk"
@@ -126,14 +130,18 @@ jobs:
           node --check /tmp/label-editor.js
           node --check LabelDesk/Resources/barcodes.js
           node --check LabelDesk/Resources/native.js
+          node --check LabelDesk/Resources/text-engine.js
+          node --check LabelDesk/Resources/food-presets.js
           node --check LabelDesk/Resources/raster.js
           node --check LabelDesk/Resources/app.js
           node Tests/WebRasterSmoke.js
           node Tests/MediaCompatibilitySmoke.js
           node Tests/SidebarWorkflowSmoke.js
           node Tests/BarcodesNativeSmoke.js
+          node Tests/CP866FoodSmoke.js
           zsh -n Scripts/printer.sh
           zsh -n Scripts/printer-native.sh
+          zsh -n Scripts/printer-text.sh
 
       - name: Test selected-layer resize geometry
         shell: bash
