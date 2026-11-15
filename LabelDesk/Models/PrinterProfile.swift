@@ -12,6 +12,19 @@ enum EZ2PrintSpeed: Int, Codable, CaseIterable, Identifiable {
     var title: String { self == .slow ? "1 inch/s (25.4 mm/s)" : "2 inches/s (50.8 mm/s)" }
 }
 
+/// The old printer has very little input buffering. Long graphic packets
+/// can overrun it even when USB-RS232 accepted the whole write.
+enum EZ2RasterTransport: String, Codable, CaseIterable, Identifiable {
+    case paced, legacy
+    var id: String { rawValue }
+    var title: String {
+        switch self {
+        case .paced: "Совместимость EZ-2 — блоками по 64 байта"
+        case .legacy: "Старый режим — непрерывная передача"
+        }
+    }
+}
+
 enum EZ2SensorMode: String, Codable, CaseIterable, Identifiable {
     case unchanged, gap, blackMark
     var id: String { rawValue }
@@ -30,6 +43,8 @@ struct PrinterProfile: Codable, Equatable {
     var flowControl: FlowControl = .none
     var density = 5
     var printSpeed: EZ2PrintSpeed = .normal
+    var rasterTransport: EZ2RasterTransport = .paced
+    var automaticTopOfForm = true
     var rasterThreshold = 128
     var sensorMode: EZ2SensorMode = .unchanged
     var topOfFormDots = 176
@@ -45,6 +60,7 @@ struct PrinterProfile: Codable, Equatable {
     // Synthesized Decodable would throw on missing new keys and discard settings.
     enum CodingKeys: String, CodingKey {
         case portPath, baudRate, flowControl, density, printSpeed, rasterThreshold
+        case rasterTransport, automaticTopOfForm
         case sensorMode, topOfFormDots, leftMarginMM, topOffsetDots
         case xOffsetMM, yOffsetMM, materialGapMM
     }
@@ -56,6 +72,8 @@ struct PrinterProfile: Codable, Equatable {
         flowControl = try keys.decodeIfPresent(FlowControl.self, forKey: .flowControl) ?? .none
         density = min(7, max(0, try keys.decodeIfPresent(Int.self, forKey: .density) ?? 5))
         printSpeed = try keys.decodeIfPresent(EZ2PrintSpeed.self, forKey: .printSpeed) ?? .normal
+        rasterTransport = try keys.decodeIfPresent(EZ2RasterTransport.self, forKey: .rasterTransport) ?? .paced
+        automaticTopOfForm = try keys.decodeIfPresent(Bool.self, forKey: .automaticTopOfForm) ?? true
         rasterThreshold = min(192, max(64, try keys.decodeIfPresent(Int.self, forKey: .rasterThreshold) ?? 128))
         sensorMode = try keys.decodeIfPresent(EZ2SensorMode.self, forKey: .sensorMode) ?? .unchanged
         topOfFormDots = min(999, max(4, try keys.decodeIfPresent(Int.self, forKey: .topOfFormDots) ?? 176))
