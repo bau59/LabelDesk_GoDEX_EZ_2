@@ -40,6 +40,7 @@ struct RasterEncoderSmokeTest {
 
         let packet = [UInt8](try encoder.nativeCommands(for: document, profile: profile))
         let header: [UInt8] = [
+            0x1B, 0x51, 0x31, 0x37, 0x36,
             0x1B, 0x71, 0x30, 0x33, 0x33,
             0x1B, 0x53, 0x32,
             0x1B, 0x44, 0x35,
@@ -48,15 +49,25 @@ struct RasterEncoderSmokeTest {
         assert(Array(packet.prefix(header.count)) == header)
         var offset = header.count
         for row in 0..<raster.heightDots {
-            assert(Array(packet[offset..<(offset + 4)]) == [0x1B, 0x47, 0x35, 0x35],
-                   "Row \(row) must begin with ESC G55")
+            assert(packet[offset] == 0x1B && packet[offset + 1] == 0x47,
+                   "Row \(row) must begin with ESC G")
+            let countString = String(decoding: packet[(offset + 2)..<(offset + 4)], as: UTF8.self)
+            let count = Int(countString) ?? 0
+            assert((1...55).contains(count))
             offset += 4
-            assert(Array(packet[offset..<(offset + 55)]) ==
-                   Array(raster.rows[(row * 55)..<((row + 1) * 55)]),
-                   "Graphics data mismatch at row \(row)")
-            offset += 55
+            let fullRow = Array(raster.rows[(row * 55)..<((row + 1) * 55)])
+            assert(Array(packet[offset..<(offset + count)]) == Array(fullRow.prefix(count)),
+                   "Raster data mismatch at row \(row)")
+            assert(fullRow.dropFirst(count).allSatisfy { $0 == 0 },
+                   "Trimming must only remove trailing white bytes")
+            offset += count
         }
         assert(packet.count == offset + 1 && packet.last == 0x0C)
+        // All-white image must not send 55 bytes per row at 9600 baud.
+        var blank = document
+        blank.elements = []
+        let compact = try encoder.nativeCommands(for: blank, profile: profile)
+        assert(compact.count < 1500, "Blank 55x30mm label should use G01 rows")
 
         var oversized = document
         oversized.widthMM = 56

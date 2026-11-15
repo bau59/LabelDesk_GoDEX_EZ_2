@@ -8,9 +8,8 @@ struct MainView: View {
             toolbar
             Divider()
             HSplitView {
-                TemplateLibraryView().frame(minWidth: 165, idealWidth: 190, maxWidth: 235)
-                EditorView().frame(minWidth: 460, maxWidth: .infinity)
-                InspectorView().frame(minWidth: 230, idealWidth: 265, maxWidth: 310)
+                TemplateLibraryView().frame(minWidth: 150, idealWidth: 178, maxWidth: 220)
+                EditorView().frame(minWidth: 740, maxWidth: .infinity)
             }
             Divider()
             PrintQueueView()
@@ -40,18 +39,12 @@ struct MainView: View {
             Button("New", systemImage: "doc.badge.plus") { store.newDocument() }
             Button("Save", systemImage: "square.and.arrow.down") { store.saveDocument() }
             Divider().frame(height: 20)
-            Button("Text", systemImage: "textformat") { store.add(.text()) }
-            Button("Code 39", systemImage: "barcode") { store.add(.barcode()) }
-            Button("Line", systemImage: "minus") { store.add(.line()) }
-            Button("Box", systemImage: "rectangle") { store.add(.rectangle()) }
-            Divider().frame(height: 20)
-            Button("Undo", systemImage: "arrow.uturn.backward") { store.undo() }.disabled(store.undoStack.isEmpty)
-            Button("Redo", systemImage: "arrow.uturn.forward") { store.redo() }.disabled(store.redoStack.isEmpty)
             Spacer(minLength: 6)
             Button("Settings", systemImage: "gearshape") { store.showSettings = true }
             Button("Calibration", systemImage: "scope") { store.showCalibration = true }
             Button("Print TEST", systemImage: "bolt.fill") { store.sendTest() }
             Button("Raster TEST", systemImage: "square.dashed") { store.sendRasterProbe() }
+            Button("Feed TEST", systemImage: "arrow.down.to.line") { store.sendFeedTest() }
                 .buttonStyle(.borderedProminent)
         }
         .padding(10)

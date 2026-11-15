@@ -1,0 +1,288 @@
+<!doctype html>
+<html lang="ru">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>LabelDesk Editor</title>
+<style>
+:root { color-scheme:dark; --bg:#252526; --panel:#2d2d30; --surface:#38383b; --line:#48484c; --fg:#e9e9ec; --muted:#aaaab1; --accent:#559bff; --warning:#f0b24b; font:13px -apple-system,BlinkMacSystemFont,"Helvetica Neue",sans-serif }
+* {box-sizing:border-box}
+html,body{height:100%;margin:0;overflow:hidden;background:var(--bg);color:var(--fg);user-select:none}
+button, input,textarea,select{font:inherit}
+button{border:1px solid #55565b;border-radius:6px;background:#414144;color:var(--fg);padding:6px 9px;cursor:pointer;white-space:nowrap}
+button:hover{background:#505056}button:active{background:#616169}
+button:disabled{opacity:.4;cursor:default}
+button.primary{background:#276cc1;border-color:#4388d9;color:#fff}
+input,textarea,select{background:#232326;color:#f4f4f4;border:1px solid #56565b;border-radius:5px;padding:6px;min-width:0}
+input:focus,textarea:focus,select:focus{outline:1px solid var(--accent);border-color:var(--accent)}
+textarea{resize:vertical;min-height:78px;user-select:text;white-space:pre-wrap}
+input{user-select:text}
+.layout{display:grid;grid-template-columns:185px minmax(260px,1fr) 250px;height:100%}
+.panel{background:var(--panel);min-height:0;display:flex;flex-direction:column}
+.panel.left{border-right:1px solid var(--line)}
+.panel.right{border-left:1px solid var(--line)}
+.panelhead{height:43px;padding:13px 12px 9px;font-weight:650;border-bottom:1px solid var(--line)}
+.smallmuted{font-size:11px;color:var(--muted);font-weight:400}
+#layers{overflow:auto;flex:1;padding:7px}
+.layer{width:100%;border:1px solid transparent;background:none;display:flex;gap:7px;align-items:center;text-align:left;padding:9px 7px;border-radius:6px;margin:2px 0;white-space:normal}
+.layer:hover{background:#3d3d41}
+.layer.selected{background:#264563;border-color:#477aaa}
+.layer .label{overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
+.layer .glyph{color:#8cbcff;font-size:12px;width:22px;text-align:center}
+.layerbottom{border-top:1px solid var(--line);padding:8px;display:flex;gap:5px;justify-content:space-evenly}
+.work{min-width:0;display:flex;flex-direction:column;position:relative;background:#262628}
+.tools{display:flex;align-items:center;flex-wrap:wrap;gap:5px;padding:7px 9px;border-bottom:1px solid var(--line);background:var(--panel)}
+.tools .divider{width:1px;height:22px;background:var(--line);margin:0 3px}
+.tools label{margin-left:auto;white-space:nowrap;display:flex;align-items:center;gap:5px;color:var(--muted)}
+.tools select{width:74px;padding:5px}
+#desk{flex:1;min-height:0;overflow:auto;display:flex;justify-content:center;align-items:flex-start;padding:45px 32px 60px;background:radial-gradient(circle at center,#363639 0%,#272729 75%)}
+#label{position:relative;flex-shrink:0;background:#fff;color:#000;border:1px solid #aaa;box-shadow:0 10px 28px #0008;overflow:hidden}
+#grid{position:absolute;inset:0;pointer-events:none;z-index:1}
+.obj{position:absolute;z-index:2;cursor:move;overflow:visible;touch-action:none}
+.obj .visual{width:100%;height:100%;overflow:hidden;pointer-events:none;white-space:pre-wrap;overflow-wrap:anywhere}
+.obj.sel{outline:2px solid #3189ff;outline-offset:0}
+.obj.sel:after{content:"";position:absolute;right:-5px;bottom:-5px;width:8px;height:8px;border:1px solid #fff;background:#3189ff}
+.obj .visual.text{line-height:1.04;color:#000;word-break:break-word}
+.obj .visual.line{background:#000}
+.obj .visual.rectangle{border:1.4px solid black}
+.obj .visual.barcode{display:flex;align-items:flex-start;flex-direction:column;overflow:hidden}
+.obj .visual.barcode svg{display:block;max-width:100%;flex:1;min-height:0}
+.obj .visual.barcode .digits{width:100%;text-align:center;font-family:monospace;line-height:1}
+.obj .visual.invalid{outline:2px dashed #e83f3f}
+#foot{height:34px;padding:9px 12px;border-top:1px solid var(--line);color:var(--muted);font-size:11px;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+#props{overflow-y:auto;padding:12px;flex:1}
+.prop{margin:0 0 13px;display:flex;flex-direction:column;gap:5px}
+.prop>label{color:#b9b9bd;font-size:12px}
+.prop input,.prop select,.prop textarea{width:100%}
+.prop-row{display:grid;grid-template-columns:1fr 1fr;gap:9px}
+.dochead{padding:10px 12px;border-bottom:1px solid var(--line);display:flex;flex-direction:column;gap:5px}
+.dochead label{color:var(--muted);font-size:11px}
+.dochead input{width:100%}
+.actions{display:flex;gap:6px;flex-wrap:wrap}
+.empty{color:var(--muted);font-size:12px;line-height:1.6;padding:13px 6px}
+strong{font-size:13px}
+.hint{margin-top:12px;color:#999;line-height:1.5;font-size:12px}
+.warn{color:var(--warning);font-size:11px;line-height:1.5;margin-top:6px}
+.dividerline{border-top:1px solid #444;margin:12px 0}
+.checkbox{display:flex;align-items:center;gap:7px;cursor:pointer}
+.checkbox input{width:auto}
+</style>
+</head>
+<body>
+<div class="layout">
+ <aside class="panel left">
+   <div class="panelhead">Слои <span class="smallmuted" id="layerCount"></span></div>
+   <div id="layers"></div>
+   <div class="layerbottom">
+     <button id="up" title="Поднять слой">↑</button>
+     <button id="down" title="Опустить слой">↓</button>
+     <button id="clone" title="Дублировать">Дубль</button>
+     <button id="remove" title="Удалить">×</button>
+   </div>
+ </aside>
+ <main class="work">
+   <div class="tools">
+     <button data-add="text">+ Текст</button>
+     <button data-add="barcode">+ Штрихкод</button>
+     <button data-add="line">+ Линия</button>
+     <button data-add="rectangle">+ Рамка</button>
+     <div class="divider"></div>
+     <button id="undo" title="⌘Z">↶</button>
+     <button id="redo" title="⌘⇧Z">↷</button>
+     <label>Масштаб <select id="zoom"><option value="4">4×</option><option value="6">6×</option><option value="8" selected>8×</option><option value="10">10×</option><option value="12">12×</option></select></label>
+   </div>
+   <div id="desk"><div id="label" aria-label="Макет этикетки"><div id="grid"></div></div></div>
+   <div id="foot">Выделите объект на этикетке или в списке слоёв. Двойной щелчок по тексту — редактирование.</div>
+ </main>
+ <aside class="panel right">
+   <div class="panelhead">Свойства</div>
+   <div class="dochead"><label for="docname">Название макета</label><input id="docname" type="text" autocomplete="off"></div>
+   <div id="props"></div>
+ </aside>
+</div>
+<script>
+(function(){
+"use strict";
+let doc=null, selected=null, zoom=8, history=[], future=[], snap=true;
+const $=id=>document.getElementById(id);
+const typeNames={text:"Текст",barcode:"Code 39",line:"Линия",rectangle:"Рамка"};
+const patterns={"0":"nnnwwnwnn","1":"wnnwnnnnw","2":"nnwwnnnnw","3":"wnwwnnnnn","4":"nnnwwnnnw","5":"wnnwwnnnn","6":"nnwwwnnnn","7":"nnnwnnwnw","8":"wnnwnnwnn","9":"nnwwnnwnn","A":"wnnnnwnnw","B":"nnwnnwnnw","C":"wnwnnwnnn","D":"nnnnwwnnw","E":"wnnnwwnnn","F":"nnwnwwnnn","G":"nnnnnwwnw","H":"wnnnnwwnn","I":"nnwnnwwnn","J":"nnnnwwwnn","K":"wnnnnnnww","L":"nnwnnnnww","M":"wnwnnnnwn","N":"nnnnwnnww","O":"wnnnwnnwn","P":"nnwnwnnwn","Q":"nnnnnnwww","R":"wnnnnnwwn","S":"nnwnnnwwn","T":"nnnnwnwwn","U":"wwnnnnnnw","V":"nwwnnnnnw","W":"wwwnnnnnn","X":"nwnnwnnnw","Y":"wwnnwnnnn","Z":"nwwnwnnnn","-":"nwnnnnwnw",".":"wwnnnnwnn"," ":"nwwnnnwnn","$":"nwnwnwnnn","/":"nwnwnnnwn","+":"nwnnnwnwn","%":"nnnwnwnwn","*":"nwnnwnwnn"};
+const clone=o=>JSON.parse(JSON.stringify(o));
+function uid(){return "xxxxxxxx-xxxx-4xxx-yxxx-xxxxxxxxxxxx".replace(/[xy]/g,function(c){let r=Math.floor(Math.random()*16);return (c==="x"?r:(r&3|8)).toString(16)});}
+function send(type,payload){if(window.webkit&&window.webkit.messageHandlers&&window.webkit.messageHandlers.labelDesk){window.webkit.messageHandlers.labelDesk.postMessage(Object.assign({type:type},payload||{}));}}
+function commit(){if(!doc)return;send("document",{json:JSON.stringify(doc),selected:selected});}
+function checkpoint(){if(!doc)return;history.push(clone(doc));if(history.length>80)history.shift();future=[];}
+function restore(list,to){if(!list.length||!doc)return;to.push(clone(doc));doc=list.pop();selected=doc.elements.some(e=>e.id===selected)?selected:null;draw();commit();}
+function selectedObj(){return doc&&doc.elements.find(e=>e.id===selected);}
+function setSelected(id){selected=id;draw();}
+function newElem(kind){
+ if(!doc)return;
+ const dims={text:[3,3,27,7,"Текст"],barcode:[3,12,30,11,"1234"],line:[3,20,26,0.4,""],rectangle:[3,3,26,18,""]}[kind];
+ let e={id:uid(),kind:kind,xMM:dims[0],yMM:dims[1],widthMM:dims[2],heightMM:dims[3],value:dims[4],fontSize:12,rotation:0,showsHumanReadable:true,isBold:false};
+ e.widthMM=Math.max(1,Math.min(e.widthMM,doc.widthMM-e.xMM));
+ e.yMM=Math.min(e.yMM,Math.max(0,doc.heightMM-e.heightMM));
+ checkpoint();doc.elements.push(e);selected=e.id;draw();commit();
+}
+function moveLayer(delta){
+ if(!doc)return;let index=doc.elements.findIndex(e=>e.id===selected);let dest=index+delta;
+ if(index<0||dest<0||dest>=doc.elements.length)return;
+ checkpoint();let item=doc.elements.splice(index,1)[0];doc.elements.splice(dest,0,item);draw();commit();
+}
+function remove(){if(!selected||!doc)return;checkpoint();doc.elements=doc.elements.filter(e=>e.id!==selected);selected=null;draw();commit();}
+function duplicate(){const e=selectedObj();if(!e)return;checkpoint();let copy=clone(e);copy.id=uid();copy.xMM=Math.min(Math.max(0,doc.widthMM-copy.widthMM),copy.xMM+1);copy.yMM=Math.min(Math.max(0,doc.heightMM-copy.heightMM),copy.yMM+1);doc.elements.push(copy);selected=copy.id;draw();commit();}
+function labelFor(e){return typeNames[e.kind]+" · "+(e.value||"");}
+function renderLayers(){
+ const root=$("layers");root.replaceChildren();
+ if(!doc||!doc.elements.length){let p=document.createElement("p");p.className="empty";p.textContent="Пока нет объектов. Добавьте текст или штрихкод.";root.appendChild(p);}
+ else doc.elements.slice().reverse().forEach(function(e){
+   const b=document.createElement("button");b.type="button";b.className="layer"+(selected===e.id?" selected":"");b.title="Выделить объект";
+   const glyph=document.createElement("span");glyph.className="glyph";glyph.textContent={text:"T",barcode:"▥",line:"━",rectangle:"▢"}[e.kind];
+   const name=document.createElement("span");name.className="label";name.textContent=labelFor(e);
+   b.append(glyph,name);b.addEventListener("click",()=>setSelected(e.id));root.appendChild(b);
+ });
+ $("layerCount").textContent=doc?"("+doc.elements.length+")":"";
+ const pos=doc?doc.elements.findIndex(e=>e.id===selected):-1;
+ $("up").disabled=pos<0||pos===doc.elements.length-1;
+ $("down").disabled=pos<=0;
+ $("clone").disabled=pos<0;$("remove").disabled=pos<0;
+}
+function barcodeSVG(value,width,height,readable){
+ const content="*"+String(value||"").toUpperCase()+"*";
+ if(content.length<3||[...content].some(c=>!patterns[c]))return null;
+ const bits=[];for(let c of content){let p=patterns[c];for(let i=0;i<p.length;i++)bits.push({bar:i%2===0,weight:p[i]==="w"?3:1});bits.push({bar:false,weight:1});}
+ bits.pop();const units=bits.reduce((s,x)=>s+x.weight,0), mmPerUnit=width/units;
+ let svg=document.createElementNS("http://www.w3.org/2000/svg","svg");svg.setAttribute("viewBox","0 0 "+units+" 100");svg.setAttribute("preserveAspectRatio","none");
+ let x=0;for(let b of bits){if(b.bar){let rect=document.createElementNS("http://www.w3.org/2000/svg","rect");rect.setAttribute("x",x);rect.setAttribute("y",0);rect.setAttribute("width",b.weight);rect.setAttribute("height",100);rect.setAttribute("fill","#000");svg.appendChild(rect);}x+=b.weight;}
+ svg.style.width="100%";svg.style.height=readable?"calc(100% - 14px)":"100%";
+ return svg;
+}
+function renderCanvas(){
+ const el=$("label");el.querySelectorAll(".obj").forEach(n=>n.remove());if(!doc)return;
+ let width=Math.max(10,Math.min(60,Number(doc.widthMM)||40)),height=Math.max(10,Math.min(100,Number(doc.heightMM)||30));
+ el.style.width=(width*zoom)+"px";el.style.height=(height*zoom)+"px";
+ $("grid").style.backgroundImage="linear-gradient(to right,#0000000d 1px,transparent 1px),linear-gradient(to bottom,#0000000d 1px,transparent 1px)";
+ $("grid").style.backgroundSize=zoom+"px "+zoom+"px";
+ doc.elements.forEach(function(e){
+   let node=document.createElement("div");node.className="obj"+(selected===e.id?" sel":"");node.dataset.id=e.id;
+   node.style.left=(e.xMM*zoom)+"px";node.style.top=(e.yMM*zoom)+"px";
+   node.style.width=Math.max(3,e.widthMM*zoom)+"px";node.style.height=Math.max(3,e.heightMM*zoom)+"px";
+   let visual=document.createElement("div");visual.className="visual "+e.kind;
+   if(e.kind==="text"){
+     visual.textContent=e.value||"";
+     visual.style.fontSize=(e.fontSize*zoom/2.8346457)+"px";visual.style.fontWeight=e.isBold?"700":"400";
+     visual.style.transform="rotate("+(e.rotation||0)+"deg)";
+   } else if(e.kind==="barcode"){
+     const svg=barcodeSVG(e.value,e.widthMM,e.heightMM,e.showsHumanReadable);
+     if(svg)visual.appendChild(svg);else {visual.textContent="Неверный Code 39";visual.classList.add("invalid");}
+     if(e.showsHumanReadable){let digits=document.createElement("div");digits.className="digits";digits.textContent=e.value;digits.style.fontSize=Math.max(9,zoom*1.65)+"px";visual.appendChild(digits);}
+   }
+   node.appendChild(visual);
+   node.addEventListener("click",ev=>{ev.stopPropagation();if(selected!==e.id)setSelected(e.id);});
+   node.addEventListener("dblclick",ev=>{ev.stopPropagation();selected=e.id;draw();const field=$("field-value");if(field){field.focus();field.select();}});
+   node.addEventListener("pointerdown",ev=>beginDrag(ev,e.id));
+   el.appendChild(node);
+ });
+}
+function beginDrag(ev,id){
+ if(ev.button!==0||!doc)return;
+ const e=doc.elements.find(x=>x.id===id);if(!e)return;
+ ev.preventDefault();ev.stopPropagation();
+ if(selected!==id)setSelected(id);
+ checkpoint();
+ const x0=ev.clientX,y0=ev.clientY,origX=e.xMM,origY=e.yMM;
+ function move(m){
+   const item=doc.elements.find(x=>x.id===id);if(!item)return;
+   let x=origX+(m.clientX-x0)/zoom,y=origY+(m.clientY-y0)/zoom;
+   const step=snap?1:0.125;x=Math.round(x/step)*step;y=Math.round(y/step)*step;
+   item.xMM=Math.max(0,Math.min(doc.widthMM-item.widthMM,x));
+   item.yMM=Math.max(0,Math.min(doc.heightMM-item.heightMM,y));
+   renderCanvas();renderProps();
+ }
+ function end(){window.removeEventListener("pointermove",move);window.removeEventListener("pointerup",end);window.removeEventListener("pointercancel",end);commit();}
+ window.addEventListener("pointermove",move);window.addEventListener("pointerup",end);window.addEventListener("pointercancel",end);
+}
+function prop(title,control){
+ let div=document.createElement("div");div.className="prop";
+ let lbl=document.createElement("label");lbl.textContent=title;
+ div.append(lbl,control);return div;
+}
+function textInput(value,onChange,multiline,id){
+ let el=document.createElement(multiline?"textarea":"input");if(!multiline)el.type="text";if(id)el.id=id;el.value=value??"";
+ el.addEventListener("input",()=>{checkpoint();onChange(el.value);renderCanvas();renderLayers();commit();});
+ return el;
+}
+function numInput(value,onChange,min,max,step){
+ let el=document.createElement("input");el.type="number";el.step=String(step??0.1);if(min!==undefined)el.min=String(min);if(max!==undefined)el.max=String(max);
+ el.value=String(value);el.addEventListener("change",()=>{const n=Number(el.value);if(!Number.isFinite(n))return;checkpoint();onChange(Math.max(min??-1e6,Math.min(max??1e6,n)));renderCanvas();renderLayers();commit();});
+ return el;
+}
+function checkbox(label,value,onChange){
+ let row=document.createElement("label");row.className="checkbox";
+ let input=document.createElement("input");input.type="checkbox";input.checked=Boolean(value);input.addEventListener("change",()=>{checkpoint();onChange(input.checked);renderCanvas();commit();});
+ let txt=document.createElement("span");txt.textContent=label;row.append(input,txt);return row;
+}
+function pair(left,right){let p=document.createElement("div");p.className="prop-row";p.append(left,right);return p;}
+function renderProps(){
+ const root=$("props");root.replaceChildren();if(!doc)return;
+ const e=selectedObj();
+ if(!e){
+   const h=document.createElement("strong");h.textContent="Размер этикетки";root.appendChild(h);
+   root.appendChild(pair(prop("Ширина, мм",numInput(doc.widthMM,n=>{doc.widthMM=n;},10,55,0.5)),
+                        prop("Высота, мм",numInput(doc.heightMM,n=>{doc.heightMM=Math.round(n);},10,100,1))));
+   root.appendChild(prop("Зазор, мм",numInput(doc.gapMM,n=>{doc.gapMM=Math.round(n);},0,10,1)));
+   let note=document.createElement("p");note.className="hint";note.textContent="Головка EZ-2 — 56 мм; максимальная ширина графики — 55 мм. Координаты в миллиметрах. Выберите слой для его редактирования.";root.appendChild(note);
+   root.appendChild(checkbox("Привязка к сетке 1 мм",snap,n=>{snap=n;}));
+   return;
+ }
+ let h=document.createElement("strong");h.textContent=typeNames[e.kind];root.appendChild(h);
+ if(e.kind==="text"||e.kind==="barcode")root.appendChild(prop(e.kind==="text"?"Текст":"Значение Code 39",textInput(e.value,v=>{e.value=v;},e.kind==="text","field-value")));
+ root.appendChild(pair(prop("X, мм",numInput(e.xMM,n=>{e.xMM=Math.min(n,Math.max(0,doc.widthMM-e.widthMM));},0,55,0.125)),
+                       prop("Y, мм",numInput(e.yMM,n=>{e.yMM=Math.min(n,Math.max(0,doc.heightMM-e.heightMM));},0,100,0.125))));
+ root.appendChild(pair(prop("Ширина, мм",numInput(e.widthMM,n=>{e.widthMM=Math.min(n,doc.widthMM-e.xMM);},0.125,55,0.125)),
+                       prop("Высота, мм",numInput(e.heightMM,n=>{e.heightMM=Math.min(n,doc.heightMM-e.yMM);},0.125,100,0.125))));
+ if(e.kind==="text"){
+   root.appendChild(prop("Кегль, pt",numInput(e.fontSize,n=>{e.fontSize=n;},5,52,1)));
+   root.appendChild(checkbox("Жирный",e.isBold,n=>{e.isBold=n;}));
+   let rotation=document.createElement("select");
+   for(let angle of [0,90,180,270]){let opt=document.createElement("option");opt.value=angle;opt.textContent=angle+"°";rotation.append(opt);}rotation.value=e.rotation;
+   rotation.addEventListener("change",()=>{checkpoint();e.rotation=Number(rotation.value);renderCanvas();commit();});
+   root.appendChild(prop("Поворот",rotation));
+ } else if(e.kind==="barcode"){
+   root.appendChild(checkbox("Подпись под штрихкодом",e.showsHumanReadable,n=>{e.showsHumanReadable=n;}));
+   let note=document.createElement("p");note.className="warn";note.textContent="Код 39: A–Z, 0–9, пробел и - . $ / + %. Для сканирования минимум 2 точки на узкий модуль.";root.appendChild(note);
+ }
+ let sep=document.createElement("div");sep.className="dividerline";root.appendChild(sep);
+ let actions=document.createElement("div");actions.className="actions";
+ let c=document.createElement("button");c.textContent="Дублировать";c.onclick=duplicate;
+ let d=document.createElement("button");d.textContent="Удалить";d.onclick=remove;
+ actions.append(c,d);root.appendChild(actions);
+}
+function draw(){
+ if(!doc)return;
+ $("docname").value=doc.name;
+ renderLayers();renderCanvas();renderProps();
+ $("undo").disabled=!history.length;$("redo").disabled=!future.length;
+}
+window.labelDeskLoad=function(next){
+ if(!next||!Array.isArray(next.elements))return;
+ doc=clone(next);selected=null;history=[];future=[];draw();
+};
+document.querySelectorAll("[data-add]").forEach(b=>b.addEventListener("click",()=>newElem(b.dataset.add)));
+$("docname").addEventListener("input",function(){if(!doc)return;checkpoint();doc.name=this.value;commit();});
+$("label").addEventListener("click",ev=>{if(ev.target.id==="label"||ev.target.id==="grid")setSelected(null);});
+$("zoom").addEventListener("change",function(){zoom=Number(this.value);renderCanvas();});
+$("up").onclick=()=>moveLayer(1);$("down").onclick=()=>moveLayer(-1);
+$("clone").onclick=duplicate;$("remove").onclick=remove;
+$("undo").onclick=()=>{restore(history,future);$("undo").disabled=!history.length;$("redo").disabled=!future.length;};
+$("redo").onclick=()=>{restore(future,history);$("undo").disabled=!history.length;$("redo").disabled=!future.length;};
+document.addEventListener("keydown",function(ev){
+ const editable=["INPUT","TEXTAREA","SELECT"].includes(document.activeElement?.tagName);
+ if((ev.metaKey||ev.ctrlKey)&&ev.key.toLowerCase()==="s"){ev.preventDefault();send("save");return;}
+ if((ev.metaKey||ev.ctrlKey)&&ev.key.toLowerCase()==="z"){ev.preventDefault();if(ev.shiftKey)$("redo").click();else $("undo").click();return;}
+ if(!editable&&(ev.key==="Delete"||ev.key==="Backspace")){ev.preventDefault();remove();}
+});
+send("ready");
+})();
+</script>
+</body>
+</html>

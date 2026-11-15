@@ -46,13 +46,18 @@ struct GodexEZ2Encoder {
         precondition(raster.bytesPerLine <= EZ2Limits.maxRasterBytes)
         let totalLength = Int((document.heightMM + document.gapMM).rounded())
         var bytes: [UInt8] = []
-        bytes.reserveCapacity(raster.heightDots * (raster.bytesPerLine + 4) + 32)
+        bytes.reserveCapacity(raster.heightDots * (raster.bytesPerLine + 4) + 40)
 
         func command(_ value: String) {
             bytes.append(esc)
             bytes.append(contentsOf: value.utf8)
         }
 
+        // The verified TEST and raster probe both establish label registration
+        // with Q176. Omitting Q in full raster jobs caused paper to stop
+        // immediately after the last graphic row on the user's EZ-2.
+        // This is the measured working stop-position setting for this roll.
+        command("Q176")
         command(String(format: "q%03d", totalLength))
         command("S2")
         command("D\(min(7, max(0, profile.density)))")
@@ -60,11 +65,19 @@ struct GodexEZ2Encoder {
         // Never use the TEST profile's M18 offset for full-width graphics.
         command("M01")
 
-        let prefix: [UInt8] = [esc, 0x47] + Array(String(format: "%02d", raster.bytesPerLine).utf8)
+        // ESC Gnn consumes one row even when nn is smaller than the physical
+        // image width. Omit *trailing white bytes*; leading white is preserved
+        // because it determines horizontal positioning. Blank rows use G01 00.
+        // At 9600 8N1 this substantially reduces serial transfer time.
         for y in 0..<raster.heightDots {
-            bytes.append(contentsOf: prefix)
             let begin = y * raster.bytesPerLine
-            bytes.append(contentsOf: raster.rows[begin..<(begin + raster.bytesPerLine)])
+            let end = begin + raster.bytesPerLine
+            let fullRow = raster.rows[begin..<end]
+            let lastInk = fullRow.lastIndex(where: { $0 != 0 })
+            let count = max(1, (lastInk.map { $0 - begin + 1 }) ?? 0)
+            bytes += [esc, 0x47]
+            bytes.append(contentsOf: String(format: "%02d", count).utf8)
+            bytes.append(contentsOf: raster.rows[begin..<(begin + count)])
         }
         bytes.append(0x0C) // one form feed after the final raster row
         return Data(bytes)
