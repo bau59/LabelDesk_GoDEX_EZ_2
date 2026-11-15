@@ -25,6 +25,10 @@ struct LabelElement: Codable, Identifiable, Equatable {
     var rotation: Int = 0
     var showsHumanReadable = true
     var isBold = false
+    /// Optional for compatibility with templates saved before 0.7.
+    /// Unset text fields are considered variable until the designer marks them static.
+    var isVariable: Bool? = true
+    var fieldName: String?
 
     var isValidCode39: Bool {
         !value.isEmpty && value.unicodeScalars.allSatisfy { "ABCDEFGHIJKLMNOPQRSTUVWXYZ0123456789-. $/+%".unicodeScalars.contains($0) }
