@@ -32,7 +32,7 @@ final class WebLabelDeskBridge: NSObject, WKScriptMessageHandler, WKNavigationDe
         let old = (readJSON(manifestURL) as? [String: String]) ?? [:]
         var newHashes: [String: String] = [:]
 
-        for file in ["app.html", "app.js", "editor.html", "barcodes.js", "raster.js", "printer.sh"] {
+        for file in ["app.html", "app.js", "editor.html", "barcodes.js", "native.js", "raster.js", "printer.sh", "printer-native.sh"] {
             let ext = (file as NSString).pathExtension
             let basename = (file as NSString).deletingPathExtension
             guard let bundled = Bundle.main.url(forResource: basename, withExtension: ext) else {
