@@ -39,6 +39,30 @@ struct GodexEZ2Encoder {
         return Data(output)
     }
 
+    /// Explicit one-label experiment for the documented 8x10 and 16x26 ASCII fonts.
+    /// Never sent automatically and never used for Cyrillic.
+    func nativeFontProbe(profile: PrinterProfile) -> Data {
+        let esc = UInt8(0x1B)
+        var data: [UInt8] = []
+        func cmd(_ ascii: String) {
+            data.append(esc)
+            data.append(contentsOf: ascii.utf8)
+        }
+        cmd("Q176")
+        cmd("D5")
+        cmd("I0")
+        cmd("M03")
+        cmd("A00")
+        data += Array("SMALL 8x10".utf8)
+        data.append(0x0D)
+        cmd("M03")
+        cmd("A11")
+        data += Array("LARGE 16x26".utf8)
+        data.append(0x0D)
+        data.append(0x0C)
+        return Data(data)
+    }
+
     /// Each raster row is ESC Gnn, followed by nn raw binary bytes (1=black).
     /// ESC G maximum for EZ-2 is 55 bytes. Q/q are not interchangeable.
     func nativeCommands(for document: LabelDocument, profile: PrinterProfile) throws -> Data {
@@ -57,9 +81,15 @@ struct GodexEZ2Encoder {
         // with Q176. Omitting Q in full raster jobs caused paper to stop
         // immediately after the last graphic row on the user's EZ-2.
         // This is the measured working stop-position setting for this roll.
-        command("Q176")
+        command(String(format: "Q%03d", max(4, min(999, profile.topOfFormDots))))
         command(String(format: "q%03d", totalLength))
-        command("S2")
+        // EZ-2/4 2002 manual: S0 = 1 ips, S1 = 2 ips.
+        command("S\(profile.printSpeed.rawValue)")
+        switch profile.sensorMode {
+        case .unchanged: break
+        case .gap: command("F0")
+        case .blackMark: command("F1")
+        }
         command("D\(min(7, max(0, profile.density)))")
         // The bitmap is 55 mm maximum, so leave 1 mm of the 56-mm head.
         // Never use the TEST profile's M18 offset for full-width graphics.

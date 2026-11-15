@@ -163,7 +163,7 @@ struct LabelRasterizer {
         for y in 0..<height {
             for x in 0..<width {
                 let offset = y * stride + x * 4
-                if bitmap[offset] < 128 && bitmap[offset + 1] < 128 && bitmap[offset + 2] < 128 {
+                if bitmap[offset] < profile.rasterThreshold && bitmap[offset + 1] < profile.rasterThreshold && bitmap[offset + 2] < profile.rasterThreshold {
                     packed[y * byteWidth + x / 8] |= UInt8(0x80 >> (x % 8))
                 }
             }

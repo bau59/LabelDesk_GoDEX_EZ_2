@@ -4,7 +4,7 @@ on:
   push:
     branches:
       - main
-      - feature/editor-feed-0.5
+      - feature/layer-resize-settings-0.6
   workflow_dispatch:
 
 permissions:
@@ -97,6 +97,10 @@ jobs:
           python3 -c "import pathlib,re; s=pathlib.Path('LabelDesk/Resources/editor.html').read_text(); m=re.search(r'<script>(.*?)</script>',s,re.S); assert m; pathlib.Path('/tmp/label-editor.js').write_text(m.group(1))"
           node --check /tmp/label-editor.js
 
+      - name: Test selected-layer resize geometry
+        shell: bash
+        run: node Tests/EditorGeometrySmoke.js
+
       - name: Upload Intel packages
         uses: actions/upload-artifact@v4
         with:
@@ -138,4 +142,4 @@ jobs:
             --repo "$GITHUB_REPOSITORY" \
             --target "$GITHUB_SHA" \
             --title "LabelDesk ${APP_VERSION}" \
-            --notes "Intel macOS 15+. Offline WebKit layer editor, text properties, corrected ESC Q176 plus q label feed, compact ESC G raster transfer, verified test, persistent queue and updater. Run Feed TEST before batch printing. Ad-hoc signed; not notarized."
+            --notes "Intel macOS 15+. Explicit layer selection and working resize handles, printer settings for density/speed/threshold/sensor/Q, native ASCII font test, persistent print queue and updater. Native/raster hybrid not enabled until physical tests. Ad-hoc signed; not notarized."

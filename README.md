@@ -25,8 +25,25 @@ Download the latest Intel DMG from https://github.com/bau59/LabelDesk_GoDEX_EZ_2
 | Editor label height | 10–100 mm (conservative initial software cap) |
 | Gap | 0–10 mm, whole millimeters |
 
-The raster uses one ESC Gnn command per row with nn raw monochrome bytes (1 = black), a 1 mm left-margin command, ESC q with the full label height plus gap, and FF. The original ESC Q176 is used for the verified TEST only. ESC Q and ESC q are different instructions. A 55 mm raster is *not* the same as a 60 mm printable area.
+The raster uses one ESC Gnn command per row with nn raw monochrome bytes (1 = black), a 1 mm left-margin command, ESC q with the full label height plus gap, and FF. ESC Q176 is the previously tested default top-of-form value for text and raster, now adjustable for raster jobs. ESC Q and ESC q are different instructions. A 55 mm raster is *not* the same as a 60 mm printable area.
 
+## Version 0.6.0 — persistent selected layer, resize handles and EZ-2 settings
+
+- Layer selection is explicit: choose a layer on the left. Canvas clicks on other layers never automatically change selection. Adding an object selects the new layer.
+- The selected layer has four functional resizing handles (NW, NE, SW, SE) with boundaries, min sizes and 1-mm snapping (0.125 mm without snapping). Moving and resizing update the inspector when the gesture ends rather than repeatedly recreating its inputs.
+- Editable text keeps focus while typing; selection is preserved after saving and UUID case normalization when Swift reloads the document.
+- Printer Settings has separate tabs for serial connection, print quality/speed, paper & alignment, and native printer capabilities.
+- ESC D0–D7 sets thermal darkness; S0 or S1 selects 1 or 2 inches/sec. Software raster threshold is adjustable 64–192. Printer resolution is fixed at 203 dpi.
+- Optional sensor F0 (gap) or F1 (reflective black mark), otherwise the printer's current sensor setting is unchanged. Q top-of-form position is adjustable (default 176); changing it or the sensor setting invalidates the previously confirmed Feed TEST.
+- Existing JSON settings from v0.1–v0.5 migrate without losing the serial port.
+
+### Native font feasibility
+
+The original EZ-2/4 (2002) manual confirms built-in ASCII 8×10 (ESC A00), default 16×26 (ESC A11), character expansion (ESC Ahv), ASCII styles (ESC A0n), Code39/Code128 barcodes and regional character sets via ESC In. These regional tables do not include Russian Cyrillic.
+
+Use the explicitly confirmed **Font TEST** button for a one-label experiment with the two built-in ASCII sizes. This test does not enable native or hybrid printing of layouts. Native ASCII printing can be faster than full raster, but this printer has **line mode**, not general x/y overlay compositing. Mixing native text and raster safely would require a separate, physically verified print strategy for sequential non-overlapping sections. Cyrillic stays rasterized until proven otherwise.
+
+Protocol reference: https://www.manualslib.com/manual/302891/Godex-Ez-2.html (pages 12–19).
 ## Version 0.5.0 — HTML editor and paper feed
 
 The old SwiftUI canvas and inspector are replaced by an **offline HTML/JavaScript editor embedded in WKWebView**. SwiftUI continues to manage saved templates, printer settings, print queue and release updates. No server, remote assets, CDN, Electron or JavaScript dependencies.

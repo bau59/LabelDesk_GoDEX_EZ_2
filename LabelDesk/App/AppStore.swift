@@ -65,6 +65,15 @@ final class AppStore: ObservableObject {
     }
 
     func saveSettings() {
+        // Material registration must be rechecked after changing sensor or Q.
+        let oldProfile = storage.loadSettings().profile
+        if oldProfile.topOfFormDots != settings.profile.topOfFormDots
+            || oldProfile.sensorMode != settings.profile.sensorMode {
+            registrationVerified = false
+            feedTestPending = false
+            queue.pause()
+            UserDefaults.standard.set(false, forKey: "ez2V05FeedConfirmed")
+        }
         do {
             try storage.saveSettings(settings)
             status = settings.profile.portPath.isEmpty ? "No serial port selected" : "Ready: \(settings.profile.portPath)"
@@ -254,6 +263,37 @@ final class AppStore: ObservableObject {
             UserDefaults.standard.set(true, forKey: "ez2RasterVerified")
             self.status = "Graphics verified; label printing enabled"
         })
+    }
+
+    func sendFontTest() {
+        let profile = settings.profile
+        guard !profile.portPath.isEmpty else {
+            alert = AppAlert(title: "Select a port", message: "Choose the USB–RS232 port in settings.")
+            return
+        }
+        alert = AppAlert(
+            title: "Print native ASCII font test?",
+            message: "Prints one label using the EZ-2 built-in 8×10 and 16×26 ASCII fonts. Paper should be loaded. This test does not enable hybrid printing.",
+            action: { [weak self] in self?.performFontTest(profile: profile) }
+        )
+    }
+
+    private func performFontTest(profile: PrinterProfile) {
+        status = "Sending built-in font test…"
+        let data = encoder.nativeFontProbe(profile: profile)
+        Task.detached { [serialPort] in
+            do {
+                try serialPort.write(data, profile: profile)
+                await MainActor.run {
+                    self.status = "Native font TEST sent — inspect the printed label"
+                }
+            } catch {
+                await MainActor.run {
+                    self.status = "Native font TEST failed"
+                    self.alert = AppAlert(title: "Font test could not be sent", message: error.localizedDescription)
+                }
+            }
+        }
     }
 
     func sendTest() {
