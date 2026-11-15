@@ -24,6 +24,14 @@ struct RasterEncoderSmokeTest {
             0x1B, 0x4D, 0x30, 0x31
         ], "Line Mode header must match the successful Python batch")
 
+        // One blank-label advance is 40 mm. The original ESC fnn command
+        // accepts only 01...29 mm, so split the pitch into two safe feeds.
+        assert(Array(encoder.jobTearFeedCommands()) == [
+            0x1B, 0x66, 0x32, 0x39, // ESC f29
+            0x1B, 0x66, 0x31, 0x31  // ESC f11
+        ], "Tear feed must skip exactly one 40mm pitch")
+
+
         func checkPacket(_ data: Data, rows expectedRows: Int,
                          width expectedWidth: Int, raster: LabelRaster) {
             let bytes = [UInt8](data)
@@ -109,6 +117,6 @@ struct RasterEncoderSmokeTest {
                                                 from: JSONEncoder().encode(tuned))
         assert(decoded.labelIntervalSeconds == 0.8)
 
-        print("EZ-2 T3 startup, repeated F0/q040/M01, adaptive Gnn and FF passed.")
+        print("EZ-2 startup, Gnn/FF and single 40mm job-end tear feed passed.")
     }
 }
