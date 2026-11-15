@@ -24,12 +24,16 @@ final class SerialPortService {
         return names.filter { $0.hasPrefix("cu.") }.map { directory.appendingPathComponent($0).path }.sorted()
     }
 
-    func write(_ data: Data, profile: PrinterProfile) throws {
+    /// A successful return only means the serial driver accepted/drained the
+    /// bytes. EZ-2 provides no confirmed printed-label acknowledgement here.
+    func write(_ data: Data, profile: PrinterProfile, onProgress: ((String) -> Void)? = nil) throws {
         guard !profile.portPath.isEmpty else { throw SerialPortError.noPortSelected }
         let descriptor = open(profile.portPath, O_WRONLY | O_NOCTTY | O_NONBLOCK | O_EXLOCK)
         guard descriptor >= 0 else { throw SerialPortError.openFailed(String(cString: strerror(errno))) }
         defer { close(descriptor) }
+        onProgress?("port opened")
         try configure(descriptor, profile: profile)
+        onProgress?("serial configured baud=9600 8N1 flow=\(profile.flowControl.rawValue)")
         // The original Phase 1 test was tiny; raster jobs can exceed the
         // kernel's nonblocking TX buffer. Keep the port blocking after setup.
         let flags = fcntl(descriptor, F_GETFL)
@@ -37,6 +41,7 @@ final class SerialPortService {
             throw SerialPortError.configurationFailed("Cannot enable blocking serial writes.")
         }
 
+        var sent = 0
         try data.withUnsafeBytes { rawBuffer in
             guard var pointer = rawBuffer.baseAddress else { return }
             var remaining = rawBuffer.count
@@ -48,12 +53,18 @@ final class SerialPortService {
                 }
                 if count == 0 { throw SerialPortError.writeFailed("no bytes accepted") }
                 remaining -= count
+                sent += count
                 pointer = pointer.advanced(by: count)
+                if sent == data.count || sent % 4096 < count {
+                    onProgress?("bytes accepted \(sent)/\(data.count)")
+                }
             }
         }
+        onProgress?("waiting for serial driver to drain TX buffer")
         guard tcdrain(descriptor) == 0 else {
             throw SerialPortError.writeFailed(String(cString: strerror(errno)))
         }
+        onProgress?("TX driver drained; physical print NOT confirmed")
     }
 
     private func configure(_ descriptor: Int32, profile: PrinterProfile) throws {
