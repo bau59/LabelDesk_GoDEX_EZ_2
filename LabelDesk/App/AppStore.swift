@@ -42,6 +42,13 @@ final class AppStore: ObservableObject {
         templates = storage.listDocuments()
         folders = storage.loadFolders()
         queue = PrintQueueService(storage: storage)
+        // The 0.8.2 automatic Q table changes stop positioning for labels
+        // that are not 26 mm tall. Previously verified feed must be rechecked.
+        if settings.profile.automaticTopOfForm
+            && !UserDefaults.standard.bool(forKey: "ez2V082AutoQConfirmed") {
+            registrationVerified = false
+            UserDefaults.standard.set(false, forKey: "ez2V05FeedConfirmed")
+        }
         if !settings.profile.portPath.isEmpty { status = "Ready: \(settings.profile.portPath)" }
         if let raw = UserDefaults.standard.string(forKey: "labeldeskLastFolder"),
            let id = UUID(uuidString: raw),
@@ -352,11 +359,13 @@ final class AppStore: ObservableObject {
         // Material registration must be rechecked after changing sensor or Q.
         let oldProfile = storage.loadSettings().profile
         if oldProfile.topOfFormDots != settings.profile.topOfFormDots
-            || oldProfile.sensorMode != settings.profile.sensorMode {
+            || oldProfile.sensorMode != settings.profile.sensorMode
+            || oldProfile.automaticTopOfForm != settings.profile.automaticTopOfForm {
             registrationVerified = false
             feedTestPending = false
             queue.pause()
             UserDefaults.standard.set(false, forKey: "ez2V05FeedConfirmed")
+            UserDefaults.standard.set(false, forKey: "ez2V082AutoQConfirmed")
         }
         do {
             try storage.saveSettings(settings)
@@ -506,6 +515,7 @@ final class AppStore: ObservableObject {
                 self.feedTestPending = false
                 self.registrationVerified = true
                 UserDefaults.standard.set(true, forKey: "ez2V05FeedConfirmed")
+                UserDefaults.standard.set(true, forKey: "ez2V082AutoQConfirmed")
                 self.status = "Graphics and label advance verified"
             }
         )
