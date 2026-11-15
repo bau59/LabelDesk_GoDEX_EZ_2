@@ -309,8 +309,9 @@ function draw(){
 }
 window.labelDeskLoad=function(next){
  if(!next||!Array.isArray(next.elements))return;
- const previousSelected=selected;
- doc=clone(next);selected=doc.elements.some(e=>e.id===previousSelected)?previousSelected:(doc.elements.length?doc.elements[doc.elements.length-1].id:null);history=[];future=[];draw();
+ const previousSelected=selected?.toLowerCase();
+ doc=clone(next);const same=doc.elements.find(e=>e.id.toLowerCase()===previousSelected);
+ selected=same?same.id:(doc.elements.length?doc.elements[doc.elements.length-1].id:null);history=[];future=[];draw();
 };
 document.querySelectorAll("[data-add]").forEach(b=>b.addEventListener("click",()=>newElem(b.dataset.add)));
 $("docname").addEventListener("focus",()=>{if(doc)checkpoint();});
