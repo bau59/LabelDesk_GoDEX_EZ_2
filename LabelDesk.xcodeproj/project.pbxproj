@@ -1,0 +1,92 @@
+// !$*UTF8*$!
+{
+	archiveVersion = 1;
+	classes = {};
+	objectVersion = 56;
+	objects = {
+
+/* Begin PBXBuildFile section */
+		A00000000000000000000001 /* LabelDeskApp.swift in Sources */ = {isa = PBXBuildFile; fileRef = A00000000000000000000101 /* LabelDeskApp.swift */; };
+		A00000000000000000000002 /* AppStore.swift in Sources */ = {isa = PBXBuildFile; fileRef = A00000000000000000000102 /* AppStore.swift */; };
+		A00000000000000000000003 /* LabelDocument.swift in Sources */ = {isa = PBXBuildFile; fileRef = A00000000000000000000103 /* LabelDocument.swift */; };
+		A00000000000000000000004 /* LabelElement.swift in Sources */ = {isa = PBXBuildFile; fileRef = A00000000000000000000104 /* LabelElement.swift */; };
+		A00000000000000000000005 /* PrinterProfile.swift in Sources */ = {isa = PBXBuildFile; fileRef = A00000000000000000000105 /* PrinterProfile.swift */; };
+		A00000000000000000000006 /* PrintJob.swift in Sources */ = {isa = PBXBuildFile; fileRef = A00000000000000000000106 /* PrintJob.swift */; };
+		A00000000000000000000007 /* StorageService.swift in Sources */ = {isa = PBXBuildFile; fileRef = A00000000000000000000107 /* StorageService.swift */; };
+		A00000000000000000000008 /* SerialPortService.swift in Sources */ = {isa = PBXBuildFile; fileRef = A00000000000000000000108 /* SerialPortService.swift */; };
+		A00000000000000000000009 /* GodexEZ2Encoder.swift in Sources */ = {isa = PBXBuildFile; fileRef = A00000000000000000000109 /* GodexEZ2Encoder.swift */; };
+		A00000000000000000000010 /* PrintQueueService.swift in Sources */ = {isa = PBXBuildFile; fileRef = A00000000000000000000110 /* PrintQueueService.swift */; };
+		A00000000000000000000011 /* MainView.swift in Sources */ = {isa = PBXBuildFile; fileRef = A00000000000000000000111 /* MainView.swift */; };
+		A00000000000000000000012 /* TemplateLibraryView.swift in Sources */ = {isa = PBXBuildFile; fileRef = A00000000000000000000112 /* TemplateLibraryView.swift */; };
+		A00000000000000000000013 /* EditorView.swift in Sources */ = {isa = PBXBuildFile; fileRef = A00000000000000000000113 /* EditorView.swift */; };
+		A00000000000000000000014 /* InspectorView.swift in Sources */ = {isa = PBXBuildFile; fileRef = A00000000000000000000114 /* InspectorView.swift */; };
+		A00000000000000000000015 /* PrintQueueView.swift in Sources */ = {isa = PBXBuildFile; fileRef = A00000000000000000000115 /* PrintQueueView.swift */; };
+		A00000000000000000000016 /* PrinterSettingsView.swift in Sources */ = {isa = PBXBuildFile; fileRef = A00000000000000000000116 /* PrinterSettingsView.swift */; };
+		A00000000000000000000017 /* CalibrationView.swift in Sources */ = {isa = PBXBuildFile; fileRef = A00000000000000000000117 /* CalibrationView.swift */; };
+/* End PBXBuildFile section */
+
+/* Begin PBXFileReference section */
+		A00000000000000000000101 /* LabelDeskApp.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = LabelDeskApp.swift; sourceTree = "<group>"; };
+		A00000000000000000000102 /* AppStore.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = AppStore.swift; sourceTree = "<group>"; };
+		A00000000000000000000103 /* LabelDocument.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = LabelDocument.swift; sourceTree = "<group>"; };
+		A00000000000000000000104 /* LabelElement.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = LabelElement.swift; sourceTree = "<group>"; };
+		A00000000000000000000105 /* PrinterProfile.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = PrinterProfile.swift; sourceTree = "<group>"; };
+		A00000000000000000000106 /* PrintJob.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = PrintJob.swift; sourceTree = "<group>"; };
+		A00000000000000000000107 /* StorageService.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = StorageService.swift; sourceTree = "<group>"; };
+		A00000000000000000000108 /* SerialPortService.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = SerialPortService.swift; sourceTree = "<group>"; };
+		A00000000000000000000109 /* GodexEZ2Encoder.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = GodexEZ2Encoder.swift; sourceTree = "<group>"; };
+		A00000000000000000000110 /* PrintQueueService.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = PrintQueueService.swift; sourceTree = "<group>"; };
+		A00000000000000000000111 /* MainView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = MainView.swift; sourceTree = "<group>"; };
+		A00000000000000000000112 /* TemplateLibraryView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = TemplateLibraryView.swift; sourceTree = "<group>"; };
+		A00000000000000000000113 /* EditorView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = EditorView.swift; sourceTree = "<group>"; };
+		A00000000000000000000114 /* InspectorView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = InspectorView.swift; sourceTree = "<group>"; };
+		A00000000000000000000115 /* PrintQueueView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = PrintQueueView.swift; sourceTree = "<group>"; };
+		A00000000000000000000116 /* PrinterSettingsView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = PrinterSettingsView.swift; sourceTree = "<group>"; };
+		A00000000000000000000117 /* CalibrationView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = CalibrationView.swift; sourceTree = "<group>"; };
+		A00000000000000000000120 /* LabelDesk.app */ = {isa = PBXFileReference; explicitFileType = wrapper.application; includeInIndex = 0; path = LabelDesk.app; sourceTree = BUILT_PRODUCTS_DIR; };
+/* End PBXFileReference section */
+
+/* Begin PBXGroup section */
+		A00000000000000000000200 = {isa = PBXGroup; children = (A00000000000000000000201 /* LabelDesk */, A00000000000000000000220 /* Products */); sourceTree = "<group>"; };
+		A00000000000000000000201 /* LabelDesk */ = {isa = PBXGroup; children = (A00000000000000000000202 /* App */, A00000000000000000000203 /* Models */, A00000000000000000000204 /* Services */, A00000000000000000000205 /* Views */); path = LabelDesk; sourceTree = "<group>"; };
+		A00000000000000000000202 /* App */ = {isa = PBXGroup; children = (A00000000000000000000101, A00000000000000000000102); path = App; sourceTree = "<group>"; };
+		A00000000000000000000203 /* Models */ = {isa = PBXGroup; children = (A00000000000000000000103, A00000000000000000000104, A00000000000000000000105, A00000000000000000000106); path = Models; sourceTree = "<group>"; };
+		A00000000000000000000204 /* Services */ = {isa = PBXGroup; children = (A00000000000000000000107, A00000000000000000000108, A00000000000000000000109, A00000000000000000000110); path = Services; sourceTree = "<group>"; };
+		A00000000000000000000205 /* Views */ = {isa = PBXGroup; children = (A00000000000000000000111, A00000000000000000000112, A00000000000000000000113, A00000000000000000000114, A00000000000000000000115, A00000000000000000000116, A00000000000000000000117); path = Views; sourceTree = "<group>"; };
+		A00000000000000000000220 /* Products */ = {isa = PBXGroup; children = (A00000000000000000000120); name = Products; sourceTree = "<group>"; };
+/* End PBXGroup section */
+
+/* Begin PBXNativeTarget section */
+		A00000000000000000000300 /* LabelDesk */ = {isa = PBXNativeTarget; buildConfigurationList = A00000000000000000000401; buildPhases = (A00000000000000000000301 /* Sources */, A00000000000000000000302 /* Frameworks */, A00000000000000000000303 /* Resources */); buildRules = (); dependencies = (); name = LabelDesk; productName = LabelDesk; productReference = A00000000000000000000120; productType = "com.apple.product-type.application"; };
+/* End PBXNativeTarget section */
+
+/* Begin PBXProject section */
+		A00000000000000000000500 /* Project object */ = {isa = PBXProject; attributes = { BuildIndependentTargetsInParallel = 1; LastSwiftUpdateCheck = 1600; LastUpgradeCheck = 1600; TargetAttributes = { A00000000000000000000300 = { CreatedOnToolsVersion = 16.0; }; }; }; buildConfigurationList = A00000000000000000000400; compatibilityVersion = "Xcode 14.0"; developmentRegion = en; hasScannedForEncodings = 0; knownRegions = (en, Base); mainGroup = A00000000000000000000200; productRefGroup = A00000000000000000000220; projectDirPath = ""; projectRoot = ""; targets = (A00000000000000000000300); };
+/* End PBXProject section */
+
+/* Begin PBXResourcesBuildPhase section */
+		A00000000000000000000303 /* Resources */ = {isa = PBXResourcesBuildPhase; buildActionMask = 2147483647; files = (); runOnlyForDeploymentPostprocessing = 0; };
+/* End PBXResourcesBuildPhase section */
+
+/* Begin PBXSourcesBuildPhase section */
+		A00000000000000000000301 /* Sources */ = {isa = PBXSourcesBuildPhase; buildActionMask = 2147483647; files = (A00000000000000000000001); runOnlyForDeploymentPostprocessing = 0; };
+/* End PBXSourcesBuildPhase section */
+
+/* Begin PBXFrameworksBuildPhase section */
+		A00000000000000000000302 /* Frameworks */ = {isa = PBXFrameworksBuildPhase; buildActionMask = 2147483647; files = (); runOnlyForDeploymentPostprocessing = 0; };
+/* End PBXFrameworksBuildPhase section */
+
+/* Begin XCBuildConfiguration section */
+		A00000000000000000000600 /* Debug */ = {isa = XCBuildConfiguration; buildSettings = { CLANG_ENABLE_MODULES = YES; MACOSX_DEPLOYMENT_TARGET = 15.0; SDKROOT = macosx; }; name = Debug; };
+		A00000000000000000000601 /* Release */ = {isa = XCBuildConfiguration; buildSettings = { CLANG_ENABLE_MODULES = YES; MACOSX_DEPLOYMENT_TARGET = 15.0; SDKROOT = macosx; }; name = Release; };
+		A00000000000000000000602 /* Debug */ = {isa = XCBuildConfiguration; buildSettings = { ASSETCATALOG_COMPILER_APPICON_NAME = ""; CODE_SIGN_ENTITLEMENTS = ""; CODE_SIGN_STYLE = Automatic; COMBINE_HIDPI_IMAGES = YES; CURRENT_PROJECT_VERSION = 1; GENERATE_INFOPLIST_FILE = YES; INFOPLIST_KEY_CFBundleDisplayName = LabelDesk; INFOPLIST_KEY_LSApplicationCategoryType = "public.app-category.productivity"; LD_RUNPATH_SEARCH_PATHS = "$(inherited) @executable_path/../Frameworks"; MACOSX_DEPLOYMENT_TARGET = 15.0; MARKETING_VERSION = 0.1.0; PRODUCT_BUNDLE_IDENTIFIER = com.localsoft.LabelDesk; PRODUCT_NAME = "$(TARGET_NAME)"; SDKROOT = macosx; SUPPORTED_PLATFORMS = macosx; SWIFT_EMIT_LOC_STRINGS = YES; SWIFT_VERSION = 5.0; }; name = Debug; };
+		A00000000000000000000603 /* Release */ = {isa = XCBuildConfiguration; buildSettings = { ASSETCATALOG_COMPILER_APPICON_NAME = ""; CODE_SIGN_ENTITLEMENTS = ""; CODE_SIGN_STYLE = Automatic; COMBINE_HIDPI_IMAGES = YES; CURRENT_PROJECT_VERSION = 1; GENERATE_INFOPLIST_FILE = YES; INFOPLIST_KEY_CFBundleDisplayName = LabelDesk; INFOPLIST_KEY_LSApplicationCategoryType = "public.app-category.productivity"; LD_RUNPATH_SEARCH_PATHS = "$(inherited) @executable_path/../Frameworks"; MACOSX_DEPLOYMENT_TARGET = 15.0; MARKETING_VERSION = 0.1.0; PRODUCT_BUNDLE_IDENTIFIER = com.localsoft.LabelDesk; PRODUCT_NAME = "$(TARGET_NAME)"; SDKROOT = macosx; SUPPORTED_PLATFORMS = macosx; SWIFT_COMPILATION_MODE = wholemodule; SWIFT_EMIT_LOC_STRINGS = YES; SWIFT_OPTIMIZATION_LEVEL = "-O"; SWIFT_VERSION = 5.0; }; name = Release; };
+/* End XCBuildConfiguration section */
+
+/* Begin XCConfigurationList section */
+		A00000000000000000000400 = {isa = XCConfigurationList; buildConfigurations = (A00000000000000000000600, A00000000000000000000601); defaultConfigurationIsVisible = 0; defaultConfigurationName = Release; };
+		A00000000000000000000401 = {isa = XCConfigurationList; buildConfigurations = (A00000000000000000000602, A00000000000000000000603); defaultConfigurationIsVisible = 0; defaultConfigurationName = Release; };
+/* End XCConfigurationList section */
+	};
+	rootObject = A00000000000000000000500 /* Project object */;
+}
