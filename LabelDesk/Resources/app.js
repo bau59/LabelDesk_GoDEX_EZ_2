@@ -318,9 +318,15 @@
     }).join(""):'<tr><td colspan="4" class="empty">Заданий нет</td></tr>';
     const printable=active.filter(j=>j.state==="pending" && canPrint(j.document));
     const incompatible=active.filter(j=>j.state==="pending" && !compatibility(j.document).ok);
-    $("queueCompatibility").textContent=incompatible.length?
+    const supported=EZ2Raster.transportReady(media());
+    const incompatibleMessage=incompatible.length?
       "Несовместимых заданий: "+incompatible.length+". Они останутся в очереди, их размеры не изменяются.":"";
-    $("printState").textContent=state.running?"Идёт передача. Не закрывайте приложение и не отключайте RS-232.":"Готово к передаче";
+    const transportMessage=!supported?
+      " Выбранный рулон не поддерживается текущими командами печати (подтверждено только 38 мм + 2 мм).":"";
+    $("queueCompatibility").textContent=incompatibleMessage+transportMessage;
+    $("printState").textContent=state.running?
+      "Идёт передача. Не закрывайте приложение и не отключайте RS-232.":
+      supported?"Готово к передаче":"Печать заблокирована для выбранной высоты/зазора рулона.";
     $("printOne").disabled=state.running||!printable.length||!state.profile.portPath;
     $("printAll").disabled=$("printOne").disabled;
     $("stopPrinting").disabled=!state.running;
