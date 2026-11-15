@@ -1,6 +1,6 @@
 # LabelDesk — original GoDEX EZ-2 on macOS (WebKit + zsh)
 
-**1.0.1 WebKit/zsh rewrite.** No Node.js, Python, pip, npm, HTTP server or external dependencies are needed on the user's Mac. The system frameworks AppKit/WebKit and system commands `/bin/zsh`, `/bin/stty`, `/bin/cat` and `printf` handle the application and RS-232.
+**1.0.2 WebKit/zsh release.** No Node.js, Python, pip, npm, HTTP server or external dependencies are needed on the user's Mac. The system frameworks AppKit/WebKit and system commands `/bin/zsh`, `/bin/stty`, `/bin/cat` and `printf` handle the application and RS-232.
 
 ## Runtime layout
 
@@ -26,6 +26,16 @@ After the initial macOS installation, the following files are copied into the us
 The **compiled Swift app provides a WebKit window, a file/Process bridge and the existing signed GitHub updater** for reading/writing these local JSON files and invoking `printer.sh` via `/bin/zsh` with fixed arguments. All EZ-2 commands, bitmap rendering, queue policy and interface are outside Swift. Change a file in `live/`, then restart the application: **no Xcode, CI, DMG or rebuild is needed**.
 
 On installation/update, bundled runtime files overwrite the local version **only when it is still identical to the previously installed unmodified version**. Hand edits in `live/` are intentionally preserved.
+
+## Installed roll and template compatibility (1.0.2)
+
+Under Settings → **Installed roll**, set the **width, height and gap** actually loaded in the printer. Default is **58 × 38 mm, 2 mm gap**. Existing `settings.json` files without these fields use those defaults; other settings keys are retained.
+
+New labels use the stored media dimensions. Saved template JSON files are **never resized, converted, deleted or modified** when the roll changes. A template is currently considered compatible when its width, height and gap all **match exactly** (within 0.001 mm) the installed roll. Nonmatching templates show an explicit incompatible mark in the library, editor, quick-fill view and print queue; they remain editable and previewable. Incompatible queued jobs remain pending and are skipped by print actions.
+
+**Two distinct boundaries:** Red editor hatching indicates a template region outside the configured physical roll. Gray hatching marks the separate, currently verified 55-mm `ESC G55` graphics limit — it is not the edge of the roll.
+
+**Safety:** The current printing transport is still verified only for **38-mm label height plus 2-mm gap** (`ESC q040`, 280 raster rows). Settings for other media sizes can be saved and used to prepare templates, but sending them to the printer is blocked until a matching transport protocol has been physically verified. Changing settings does not silently change motor commands. Width changes within the supported template bounds do not alter the fixed motor pitch.
 
 ## Printing protocol
 
@@ -56,4 +66,4 @@ zsh Scripts/build-installer.sh
 
 GitHub Actions compiles an Intel x86_64 app and DMG and runs syntax and compatibility tests. Printing one copy and three copies within one job was physically confirmed on test 1.0.0. Two distinct queued jobs and the inter-job separator remain to be physically verified. Test short batches before production.
 
-The new native toolbar contains **Check for updates** / **Install update** using the existing SHA-256 and Intel signed-package verification plus rollback helper. From v0.9.5, the built-in updater can install 1.0.1. The temporary v1.0.0 test build did not include an updater, so users running it need to replace the app once using the 1.0.1 installer; subsequent updates work in-app. The app includes a button under Settings → *Open working files* to edit the files directly. The driver can also be inspected using a standard editor. No background daemon, open HTTP port or Node/Python runtime is involved.
+The new native toolbar contains **Check for updates** / **Install update** using the existing SHA-256 and Intel signed-package verification plus rollback helper. From v1.0.1, the built-in updater can install 1.0.2. The temporary v1.0.0 test build did not include an updater, so users running it need to replace the app once using the 1.0.1 installer; subsequent updates work in-app. The app includes a button under Settings → *Open working files* to edit the files directly. The driver can also be inspected using a standard editor. No background daemon, open HTTP port or Node/Python runtime is involved.

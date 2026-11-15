@@ -13,9 +13,16 @@
     const h=Array.from(arr,x=>x.toString(16).padStart(2,"0")).join("");
     return (h.slice(0,8)+"-"+h.slice(8,12)+"-"+h.slice(12,16)+"-"+h.slice(16,20)+"-"+h.slice(20)).toUpperCase();
   };
-  const defaultProfile=()=>({portPath:"",rasterThreshold:128,labelIntervalSeconds:1.5});
+  const defaultProfile=()=>({portPath:"",rasterThreshold:128,labelIntervalSeconds:1.5,
+    mediaWidthMM:58,mediaHeightMM:38,mediaGapMM:2});
+  const media=()=>EZ2Raster.mediaFromProfile(state.profile);
+  const compatibility=doc=>EZ2Raster.compatibility(doc,media());
+  const canPrint=doc=>compatibility(doc).ok && EZ2Raster.transportReady(media());
+  // A newly created document follows the installed roll; old documents retain
+  // their own dimensions and are never rewritten by a media-setting change.
   const newDocument=()=>({schemaVersion:1,id:uuid(),folderID:null,name:"Новая этикетка",
-    widthMM:58,heightMM:38,gapMM:2,elements:[],updatedAt:stamp()});
+    widthMM:media().widthMM,heightMM:media().heightMM,gapMM:media().gapMM,
+    elements:[],updatedAt:stamp()});
 
   let nextRequest=1;
   const requests=new Map();
@@ -40,7 +47,8 @@
 
   const state={view:"editor",templates:[],folders:[],jobs:[],profile:defaultProfile(),
     selectedID:null,selectedFolderID:null,current:null,quickValues:{},editorReady:false,
-    dirty:false,running:false,stopRequested:false,ports:[],runtimePath:"",log:[]};
+    dirty:false,running:false,stopRequested:false,ports:[],runtimePath:"",log:[],
+    settingsSnapshot:{}};
   const note=(message,error=false)=>{
     $("notify").textContent=message;
     $("notify").style.color=error?"#b4333e":"";
@@ -67,15 +75,25 @@
     state.view=view;
     document.querySelectorAll("nav [data-view]").forEach(b=>b.classList.toggle("active",b.dataset.view===view));
     document.querySelectorAll("main .view").forEach(v=>v.classList.toggle("active",v.id===view+"View"));
-    if(view==="editor")syncEditor();
+    if(view==="editor"){syncEditor();renderEditorCompatibility();}
     if(view==="quick")renderQuick();
     if(view==="queue")renderQueue();
     if(view==="settings")renderSettings();
   }
   function syncEditor(){
     if(state.editorReady && state.current){
-      $("editorFrame").contentWindow.postMessage({source:"labeldesk-app",type:"load",document:clone(state.current)},"*");
+      $("editorFrame").contentWindow.postMessage({
+        source:"labeldesk-app",type:"load",
+        document:clone(state.current),media:media()
+      },"*");
     }
+  }
+  function renderEditorCompatibility(){
+    const doc=state.current;
+    const check=compatibility(doc);
+    $("editorCompatibility").textContent=check.ok ? "" :
+      "Несовместим с установленным рулоном. " + check.reason +
+      " Макет сохранится без изменения размеров.";
   }
   window.addEventListener("message",ev=>{
     if(ev.source!==$("editorFrame").contentWindow || ev.data?.source!=="labeldesk-editor")return;
@@ -89,6 +107,7 @@
         if(doc?.elements?.length>150)throw Error("Слишком много слоёв");
         if(state.current && keySame(doc.id,state.current.id)){
           state.current=doc;state.dirty=true;
+          renderEditorCompatibility();
           if(state.view==="quick")renderQuick();
         }
       }catch(e){note("Ошибка редактора: "+e.message,true);}
@@ -103,17 +122,21 @@
         '" data-folder="'+esc(f.id)+'">'+esc(f.name)+'</button>').join("");
     const visible=state.selectedFolderID
       ? state.templates.filter(t=>keySame(t.folderID,state.selectedFolderID)):state.templates;
-    $("templates").innerHTML=visible.length?visible.map(t=>
-      '<button class="item '+(keySame(t.id,state.selectedID)?'active':'')+'" data-template="'+esc(t.id)+'">'+
-      esc(t.name)+'<small>'+esc(t.widthMM)+' × '+esc(t.heightMM)+' мм</small></button>').join("")
-      :'<p class="empty">Нет сохранённых шаблонов</p>';
+    $("templates").innerHTML=visible.length?visible.map(t=>{
+      const check=compatibility(t);
+      return '<button class="item '+(keySame(t.id,state.selectedID)?'active':'')+
+        '" data-template="'+esc(t.id)+'" title="'+esc(check.ok?"Подходит к установленному рулону":check.reason)+'">'+
+        esc(t.name)+'<small>'+esc(t.widthMM)+' × '+esc(t.heightMM)+' мм · зазор '+esc(t.gapMM)+' мм</small>'+
+        (check.ok?'':'<small class="media-incompatible">⚠ Несовместим с рулоном</small>')+
+        '</button>';
+    }).join(""):'<p class="empty">Нет сохранённых шаблонов</p>';
   }
   function selectTemplate(id){
     const t=findTemplate(id);if(!t)return;
     if(state.dirty && !window.confirm("Несохранённые изменения текущего макета будут потеряны. Продолжить?"))return;
     state.current=clone(t);state.selectedID=t.id;state.selectedFolderID=t.folderID||null;
     state.dirty=false;state.quickValues={};renderLibrary();
-    syncEditor();
+    syncEditor();renderEditorCompatibility();
     if(state.view==="quick")renderQuick();
     note("Шаблон: "+t.name);
   }
@@ -126,7 +149,7 @@
       if(index<0)state.templates.unshift(clone(state.current));
       else state.templates[index]=clone(state.current);
       state.selectedID=state.current.id;state.dirty=false;
-      renderLibrary();note("Макет сохранён: "+state.current.name);
+      renderLibrary();renderEditorCompatibility();note("Макет сохранён: "+state.current.name);
     }catch(e){note("Не удалось сохранить: "+e.message,true);}
   }
   function makeCurrent(){
@@ -134,7 +157,7 @@
     state.current=newDocument();
     state.current.folderID=state.selectedFolderID||null;
     state.selectedID=state.current.id;state.quickValues={};state.dirty=true;
-    renderLibrary();syncEditor();selectView("editor");
+    renderLibrary();syncEditor();renderEditorCompatibility();selectView("editor");
   }
   async function duplicateCurrent(){
     if(!state.current)return;
@@ -192,6 +215,10 @@
   function renderQuick(){
     const base=baseTemplate();if(!base)return;
     $("quickTemplateName").textContent=base.name;
+    const check=compatibility(base);
+    $("quickCompatibility").textContent=check.ok?"":("⚠ Несовместим с рулоном. "+check.reason);
+    $("queueQuick").disabled=!canPrint(base);
+    $("queueBatch").disabled=!canPrint(base);
     const fields=variableFields(base);
     $("quickFields").innerHTML=fields.length?fields.map(f=>
       '<div class="field"><label for="fill-'+esc(f.id)+'">'+esc(f.name)+'</label>'+
@@ -204,8 +231,18 @@
   function refreshPreview(){
     try{
       const doc=filledDocument();
+      // Compatibility prevents sending to hardware, not viewing/editing an
+      // existing template. Keep the preview visible for mismatched stock.
       const canvas=EZ2Raster.draw(doc);
       $("quickPreview").src=canvas.toDataURL("image/png");
+      const check=compatibility(doc);
+      if(!check.ok || !EZ2Raster.transportReady(media())){
+        $("previewError").textContent=check.ok ?
+          "Печать этого размера рулона пока не поддерживается драйвером.":
+          "Несовместим с рулоном. "+check.reason;
+        $("quickSize").textContent="Предпросмотр доступен, передача в принтер заблокирована.";
+        return;
+      }
       const packet=EZ2Raster.encode(doc,state.profile.rasterThreshold);
       $("quickSize").textContent=packet.widthBytes*8+" точек × "+packet.rows+" строк · "+packet.size+" байт в порт";
       $("previewError").textContent="";
@@ -221,7 +258,12 @@
   async function queueDocument(doc,copies){
     const n=Number(copies);
     if(!Number.isInteger(n)||n<1||n>200)throw Error("Количество копий: 1–200.");
-    // Validate before queueing, not after printer starts.
+    // Validate physical media compatibility BEFORE raster encoding and queueing.
+    const check=compatibility(doc);
+    if(!check.ok)throw new Error("Несовместим с рулоном. "+check.reason);
+    if(!EZ2Raster.transportReady(media())){
+      throw new Error("Этот размер рулона ещё не поддерживается транспортом. Измените настройки перед печатью.");
+    }
     EZ2Raster.encode(doc,state.profile.rasterThreshold);
     state.jobs.push({id:uuid(),document:clone(doc),copies:n,addedAt:stamp(),
       state:"pending",errorMessage:null});
@@ -244,7 +286,11 @@
         const doc=filledDocument();
         const el=doc.elements.find(e=>keySame(e.id,field));
         if(!el)throw Error("Поле не найдено");
-        el.value=value;EZ2Raster.encode(doc,state.profile.rasterThreshold);
+        el.value=value;
+        const check=compatibility(doc);
+        if(!check.ok)throw new Error("Несовместим с рулоном. "+check.reason);
+        if(!EZ2Raster.transportReady(media()))throw new Error("Размер рулона пока не поддерживается печатью.");
+        EZ2Raster.encode(doc,state.profile.rasterThreshold);
         toAdd.push({id:uuid(),document:doc,copies:1,addedAt:stamp(),
           state:"pending",errorMessage:null});
       }
@@ -258,18 +304,30 @@
   function renderQueue(){
     updateCounts();
     const active=state.jobs;
-    $("queueRows").innerHTML=active.length?active.map(job=>
-      '<tr><td>'+esc(job.document?.name||"Этикетка")+
+    $("queueRows").innerHTML=active.length?active.map(job=>{
+      const check=compatibility(job.document);
+      return '<tr><td>'+esc(job.document?.name||"Этикетка")+
       '<div class="muted" style="font-size:10px">'+esc(String(job.id).slice(0,8))+'</div></td>'+
       '<td>'+esc(job.copies)+'</td><td>'+esc(stateName[job.state]||job.state)+
+      (!check.ok?'<div class="media-incompatible">⚠ Несовместим: '+esc(check.reason)+'</div>':'')+
       (job.errorMessage?'<div class="error" style="font-size:11px">'+esc(job.errorMessage)+'</div>':'')+
       '</td><td>'+
       (job.state==="pending"?'<button data-cancel="'+esc(job.id)+'">Убрать</button>':
        ["failed","uncertain"].includes(job.state)?'<button data-retry="'+esc(job.id)+'">Повторить…</button>':"")+
-      '</td></tr>').join("")
-      :'<tr><td colspan="4" class="empty">Заданий нет</td></tr>';
-    $("printState").textContent=state.running?"Идёт передача. Не закрывайте приложение и не отключайте RS-232.":"Готово к передаче";
-    $("printOne").disabled=state.running||!active.some(j=>j.state==="pending")||!state.profile.portPath;
+      '</td></tr>';
+    }).join(""):'<tr><td colspan="4" class="empty">Заданий нет</td></tr>';
+    const printable=active.filter(j=>j.state==="pending" && canPrint(j.document));
+    const incompatible=active.filter(j=>j.state==="pending" && !compatibility(j.document).ok);
+    const supported=EZ2Raster.transportReady(media());
+    const incompatibleMessage=incompatible.length?
+      "Несовместимых заданий: "+incompatible.length+". Они останутся в очереди, их размеры не изменяются.":"";
+    const transportMessage=!supported?
+      " Выбранный рулон не поддерживается текущими командами печати (подтверждено только 38 мм + 2 мм).":"";
+    $("queueCompatibility").textContent=incompatibleMessage+transportMessage;
+    $("printState").textContent=state.running?
+      "Идёт передача. Не закрывайте приложение и не отключайте RS-232.":
+      supported?"Готово к передаче":"Печать заблокирована для выбранной высоты/зазора рулона.";
+    $("printOne").disabled=state.running||!printable.length||!state.profile.portPath;
     $("printAll").disabled=$("printOne").disabled;
     $("stopPrinting").disabled=!state.running;
     $("clearFinished").disabled=state.running||!active.some(j=>["sent","cancelled"].includes(j.state));
@@ -277,10 +335,10 @@
   }
   async function printQueue(one=false){
     if(state.running)return;
-    const jobs=state.jobs.filter(j=>j.state==="pending");
-    if(!jobs.length)return;
+    const jobs=state.jobs.filter(j=>j.state==="pending" && canPrint(j.document));
+    if(!jobs.length){note("Нет совместимых заданий для выбранного рулона.",true);return;}
     if(!state.profile.portPath){note("Выберите RS-232 порт в настройках",true);return;}
-    if(!one&&!window.confirm("Отправить "+jobs.length+" заданий? Печать не подтверждается датчиком принтера."))return;
+    if(!one&&!window.confirm("Отправить "+jobs.length+" совместимых заданий? Несовместимые останутся в очереди."))return;
     state.running=true;state.stopRequested=false;renderQueue();
     let first=true;
     for(const job of (one?jobs.slice(0,1):jobs)){
@@ -325,6 +383,12 @@
   function renderSettings(){
     $("interval").value=state.profile.labelIntervalSeconds;
     $("threshold").value=state.profile.rasterThreshold;
+    $("mediaWidth").value=media().widthMM;
+    $("mediaHeight").value=media().heightMM;
+    $("mediaGap").value=media().gapMM;
+    $("mediaSupport").textContent=EZ2Raster.transportReady(media())?
+      "Транспорт для высоты 38 мм и зазора 2 мм уже проверен. Печать до 55 мм по ширине.":
+      "Внимание: транспорт печати пока подтверждён только для высоты 38 мм и зазора 2 мм. Другие рулоны можно указать и подготовить шаблоны, но печать будет заблокирована.";
     renderPorts();
     $("runtimePath").textContent=state.runtimePath;
   }
@@ -346,11 +410,22 @@
        !Number.isInteger(threshold)||threshold<64||threshold>192){
       note("Интервал 0,2–10 с; порог 64–192",true);return;
     }
+    const configured={widthMM:Number($("mediaWidth").value),
+      heightMM:Number($("mediaHeight").value),gapMM:Number($("mediaGap").value)};
+    let checked;
+    try{checked=EZ2Raster.validateMedia(configured);}
+    catch(e){note(e.message,true);return;}
     if(state.running){note("Сначала завершите текущую передачу",true);return;}
-    const profile={portPath:port,rasterThreshold:threshold,labelIntervalSeconds:delay};
+    const profile={...state.profile,portPath:port,rasterThreshold:threshold,labelIntervalSeconds:delay,
+      mediaWidthMM:checked.widthMM,mediaHeightMM:checked.heightMM,mediaGapMM:checked.gapMM};
     try{
-      await native("saveData",{key:"settings",json:JSON.stringify({schemaVersion:1,profile,snapToGrid:true})});
-      state.profile=profile;updateCounts();note("Настройки сохранены");
+      const settings={...state.settingsSnapshot,profile};
+      await native("saveData",{key:"settings",json:JSON.stringify(settings)});
+      state.profile=profile;
+      state.settingsSnapshot=settings;
+      renderLibrary();renderQueue();renderSettings();renderEditorCompatibility();
+      syncEditor();
+      note("Рулон сохранён: "+checked.widthMM+"×"+checked.heightMM+" мм, зазор "+checked.gapMM+" мм");
     }catch(e){note(e.message,true);}
   }
   async function bootstrap(){
@@ -363,6 +438,7 @@
         return j;
       });
       state.profile={...defaultProfile(),...(info.settings?.profile||{})};
+      state.settingsSnapshot=info.settings||{schemaVersion:1,snapToGrid:true};
       state.runtimePath=info.runtimePath||"";
       state.current=state.templates.length?clone(state.templates[0]):newDocument();
       state.selectedID=state.current.id;

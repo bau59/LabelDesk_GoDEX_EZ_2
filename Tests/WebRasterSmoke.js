@@ -68,6 +68,10 @@ const right=blank();
 right.elements=[{kind:"line",xMM:56,yMM:2,widthMM:1,heightMM:1,value:""}];
 assert.throws(()=>encode(right),/правее 55/);
 const wrong=blank();wrong.gapMM=3;
-assert.throws(()=>encode(wrong),/проверен только/);
+assert.doesNotThrow(()=>window.EZ2Raster.draw(wrong),"Old incompatible stock must remain previewable");
+assert.throws(()=>encode(wrong),/проверена только/);
+const shorter=blank();shorter.heightMM=30;
+assert.doesNotThrow(()=>window.EZ2Raster.draw(shorter));
+assert.throws(()=>encode(shorter),/проверена только/);
 
 console.log("Web raster passed: G10x280 blank, compact ink, G55x280, edge guards, FF.");
