@@ -1,73 +1,59 @@
-# LabelDesk — GoDEX EZ-2 (Intel macOS)
+# LabelDesk — original GoDEX EZ-2 on macOS (WebKit + zsh)
 
-Native SwiftUI label designer and queue for the original 2002 GoDEX EZ-2. macOS 15+, Intel x86_64. Local templates, quick fill, serial transmission and application updates.
+**Experimental 1.0.0 rewrite.** No Node.js, Python, pip, npm, HTTP server or external dependencies are needed on the user's Mac. The system frameworks AppKit/WebKit and system commands `/bin/zsh`, `/bin/stty`, `/bin/cat` and `printf` handle the application and RS-232.
 
-## Physical configuration tested on 15 November 2026
+## Runtime layout
 
-- GoDEX EZ-2, Prolific PL2303 USB–RS232 (`/dev/cu.usbserial-1430` on the test Mac).
-- RS-232: **9600 8N1**, no hardware or software flow control.
-- Physical labels: **58 × 38 mm**, 2 mm gap, 40 mm pitch.
-- Thermal raster: **55 bytes / 440 dots per row**, tested working height **280 rows / 35 mm**. Actual media is wider and taller than this raster area.
-- Short and 280-row raster labels printed consecutively after a **1.5-second interval** between completed serial transmissions. This is an empirical operating setting, not a printer READY acknowledgement.
-- RX/CTS/DSR status feedback was not observed. The OS reporting that bytes drained does **not** mean the printer has finished printing.
-
-## Only active print protocol
-
-The queue starts with one separate buffered registration label:
+After the initial macOS installation, the following files are copied into the user's existing LabelDesk application-support directory:
 
 ```text
-ESC F0
-ESC q040
-ESC M01
-ESC B
-ESC A11 T3 CR
-ESC E
-ESC P01
+~/Library/Application Support/LabelDesk/
+├── live/
+│   ├── app.html       # all screens
+│   ├── app.js         # library, quick fill, saved queue
+│   ├── editor.html    # original editor, same layer/geometry UI
+│   ├── raster.js      # canvas renderer and ESC Gnn encoder
+│   └── printer.sh     # editable macOS RS-232 driver
+├── templates/          # existing UUID JSON templates, untouched
+├── folders.json        # existing logical folders, untouched
+├── queue.json          # existing queue and job history, untouched
+├── settings.json       # existing port and printer options, untouched
+├── spool/              # temporary binary files (removed after job)
+└── logs/
+    └── shell-driver.log
 ```
 
-That startup operation consumes **one physical label**. After it completes serial transmission, the host waits the configured inter-label interval.
+The **compiled Swift app is only a WebKit window and a bridge** for reading/writing these local JSON files and invoking `printer.sh` via `/bin/zsh` with fixed arguments. All EZ-2 commands, bitmap rendering, queue policy and interface are outside Swift. Change a file in `live/`, then restart the application: **no Xcode, CI, DMG or rebuild is needed**.
 
-After the T3 startup label, the application waits the configured interval, opens one Line Mode serial connection and sends `ESC F0`, `ESC q040`, `ESC M01` again, exactly as in the successful full-size two-label terminal test. **The Line Mode port stays open across copies of the same job; it closes before each separate buffered blank-label separator.**
+On installation/update, bundled runtime files overwrite the local version **only when it is still identical to the previously installed unmodified version**. Hand edits in `live/` are intentionally preserved.
 
-Each actual label consists of `ESC Gnn` rows followed by `FF` (`0x0C`). There is **no per-row delay**. The encoder uses the smallest constant `nn` from 10 to 55 bytes containing all ink and sends only the occupied height, rounded to whole millimeters, at least 32 and at most 280 rows. For content reaching the full tested area it still emits exactly `G55 × 280 + FF`. This avoids transmitting 16.5 KB for a one-word label.
+## Printing protocol
 
-After `tcdrain`, the application waits `labelIntervalSeconds` before sending the next label, including between different queue jobs. A Line Mode RS-232 connection is reopened between jobs after the blank-label separator. The default is **1.5 seconds**, adjustable under **Настройки принтера → Интервал между этикетками** (0.2–10 s). The queue stops on serial errors; it does not replay an uncertain label.
+- Original GoDEX EZ-2, USB–RS232, **9600 8N1**, flow control disabled.
+- Physically tested label stock: **58 × 38 mm, 2 mm gap**, one pitch 40 mm.
+- Start of batch: a buffered `T3` alignment job once.
+- Actual label: `ESC F0`, `ESC q040`, `ESC M01`, then binary `ESC Gnn` rows and `FF`.
+- Canvas raster uses 8 dots/mm, maximum width 55 bytes (440 dots), 280 verified rows (35 mm). It trims unused right-side bytes and trailing white rows for short text.
+- Copies share one open RS-232 port. Each label waits the configured interval (default **1.5 seconds**).
+- After **each job, not each copy**: close Line Mode, open a separate connection and send the **physically verified buffered blank label** (`F0 q040 M01 B A11 SPACE CR E P01`). This is intended to expose a blank label for tearing, and to position the next job.
+- `ESC f29/f11`, automatic reverse, Q calibration and silent retry have been removed.
 
-Existing settings JSON remains readable, but obsolete Q, X/Y, transport/pacing, sensor and flow-control fields are ignored. Existing templates and folders are left unchanged. New documents default to 58 × 38 mm and 2 mm gap.
+The stand-alone blank label and earlier raster tests were physically verified separately. **The combined application printing sequence still needs on-printer validation.** The adapter does not provide an acknowledgement of actual paper output. On a command failure or cancellation, the queued job becomes `uncertain`; it must only be retried after the operator inspects the paper.
 
-The encoder rejects non-white content below the tested 35-mm printing height rather than silently clipping it. The physical media height remains 38 mm. Printable graphic width is limited to 55 mm by the historical `ESC G55` protocol.
+## Existing files and migration
 
-## Version 0.9.5 — blank-label separator after each job
+Templates use the same `LabelDocument` structure: `id`, `folderID`, `name`, `widthMM`, `heightMM`, `gapMM`, `elements`, `updatedAt`. Old `LabelElement` fields and folder base-template IDs are retained. Quick fill changes only `isVariable` text values in each queued snapshot.
 
-After the last copy of each PrintJob (`ESC Gnn` + `FF`), wait the configured interval, drain and close the Line Mode serial connection. Then open a **separate** RS-232 connection and send a buffered, blank one-label job:
+Saved jobs use the old `PrintJob` JSON shape. `sending` jobs are considered `uncertain` on relaunch. Existing settings preserve the selected port and raster threshold; unused Q/pacing options are ignored.
 
-```text
-ESC F0
-ESC q040
-ESC M01
-ESC B
-ESC A11 [ASCII SPACE] CR
-ESC E
-ESC P01
+The current JS renderer handles text, alignment, line, rectangle, rotation and Code 39. Its bitmap output may differ slightly from the former Swift/CoreGraphics raster because system browser font metrics differ. Compare the on-screen print preview before sending a job.
+
+## Building and local testing
+
+```sh
+zsh Scripts/build-installer.sh
 ```
 
-This exact packet **has been physically tested in isolation**: it moves the 58 × 38 mm stock with 2 mm gap forward to the next label. Close the blank-label port after `tcdrain`. Before another job, reopen the Line Mode connection and resend `F0/q040/M01`, but **do not print T3 again** within the same batch. The previous line-by-line serial protocol and per-copy delays remain unchanged.
+GitHub Actions compiles an Intel x86_64 app and DMG and runs syntax and compatibility tests. **Do not publish 1.0.0 as the default stable release until the combined workflow is physically tested on the user's printer.**
 
-The separator runs **once per PrintJob**, never between copies of the same job. On error the queue stops as uncertain without retrying. The blank operation was physically confirmed separately; **the integration of Line Mode → blank buffered job → Line Mode still needs a short physical test**. The former experimental `ESC f29 + ESC f11` motor-feed approach has been removed; it was never tested physically.
-
-The original EZ-2 documentation also lists reverse feed `ESC Rnn` (1–29 mm), which is **not used automatically**, because reversing adhesive stock can affect registration and has not been physically tested.
-
-## Usage
-
-1. Connect the printer and select the `/dev/cu.*` RS-232 port in **Настройки**.
-2. Open a template in **Редактор** or **Заполнение**, prepare content inside the 55 × 35 mm raster bounds, then add it to **Очередь**.
-3. Start one job or the batch. The software prints the startup `T3` label once per queue run and then sends queued labels one by one.
-4. Check the paper if transmission stops, especially after a partial write. Use the queue history and `~/Library/Application Support/LabelDesk/logs/print.log` to diagnose.
-
-## Build and tests
-
-Run `zsh Scripts/build-installer.sh` on an Intel Mac with Xcode. GitHub Actions builds the Intel package and runs Swift raster, quick-fill, updater and diagnostic tests. The macOS package is ad-hoc signed, not notarized.
-
-Version 0.9.3 was physically tested and exposed an error: the T3 header alone did not reliably preserve next-label positioning, and fixed G55×280 took at least 17 seconds at 9600 baud even for tiny text. Version 0.9.4 corrects those discrepancies against the known-good terminal scripts. **The corrected Swift application still requires physical verification before production printing.**
-
-Download releases: https://github.com/bau59/LabelDesk_GoDEX_EZ_2/releases
+The app includes a button under Settings → *Open working files* to edit the files directly. The driver can also be inspected using a standard editor. No background daemon, open HTTP port or Node/Python runtime is involved.
