@@ -197,7 +197,11 @@ function assertExistsName(name){assert.ok(store.templates.some(t=>t.name===name)
   assert.doesNotMatch(element("templates").innerHTML,/Базовый товар/);
   element("templateSearch").value="";
   await trigger("templateSearch","input");
-  assert.match(element("templates").innerHTML,/Базовый товар/);
+  assert.doesNotMatch(element("templates").innerHTML,/Базовый товар/,
+    "No query means respect current unfiled folder filter");
+  await click("folder","all");
+  assert.match(element("templates").innerHTML,/Базовый товар/,
+    "All templates shows items from all folders");
 
   // 9: Editing + dirty confirmation must prevent discarding a draft.
   await click("template",base.id);
