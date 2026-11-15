@@ -73,11 +73,14 @@
     return !state.dirty || window.confirm("Текущий макет не сохранён. Отменить изменения?");
   }
   function visibleTemplates(){
+    // Search is global; without a query, the selected folder filters the list.
+    const query=state.librarySearch.trim().toLocaleLowerCase();
     return state.templates.filter(t=>{
+      if(query)return String(t.name||"").toLocaleLowerCase().includes(query);
       if(state.folderFilter==="unfiled" && t.folderID)return false;
       if(state.folderFilter!=="all" && state.folderFilter!=="unfiled" &&
          !keySame(t.folderID,state.folderFilter))return false;
-      return t.name.toLocaleLowerCase().includes(state.librarySearch.toLocaleLowerCase());
+      return true;
     }).sort((a,b)=>String(a.name).localeCompare(String(b.name),"ru"));
   }
   function updateCounts(){
