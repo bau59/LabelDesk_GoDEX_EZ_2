@@ -231,13 +231,18 @@
   function refreshPreview(){
     try{
       const doc=filledDocument();
-      const check=compatibility(doc);
-      if(!check.ok)throw new Error("Несовместим с рулоном. "+check.reason);
-      if(!EZ2Raster.transportReady(media())){
-        throw new Error("Для этого рулона печать пока не проверена: транспорт поддерживает высоту 38 мм и зазор 2 мм.");
-      }
+      // Compatibility prevents sending to hardware, not viewing/editing an
+      // existing template. Keep the preview visible for mismatched stock.
       const canvas=EZ2Raster.draw(doc);
       $("quickPreview").src=canvas.toDataURL("image/png");
+      const check=compatibility(doc);
+      if(!check.ok || !EZ2Raster.transportReady(media())){
+        $("previewError").textContent=check.ok ?
+          "Печать этого размера рулона пока не поддерживается драйвером.":
+          "Несовместим с рулоном. "+check.reason;
+        $("quickSize").textContent="Предпросмотр доступен, передача в принтер заблокирована.";
+        return;
+      }
       const packet=EZ2Raster.encode(doc,state.profile.rasterThreshold);
       $("quickSize").textContent=packet.widthBytes*8+" точек × "+packet.rows+" строк · "+packet.size+" байт в порт";
       $("previewError").textContent="";
