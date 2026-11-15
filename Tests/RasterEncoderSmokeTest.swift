@@ -40,9 +40,9 @@ struct RasterEncoderSmokeTest {
 
         let packet = [UInt8](try encoder.nativeCommands(for: document, profile: profile))
         let header: [UInt8] = [
-            0x1B, 0x51, 0x31, 0x37, 0x36,
-            0x1B, 0x71, 0x30, 0x33, 0x33,
-            0x1B, 0x53, 0x31,
+            0x1B, 0x51, 0x31, 0x34, 0x34, // Q144 for 30 mm
+            0x1B, 0x71, 0x30, 0x33, 0x33, // q033 for height + gap
+            0x1B, 0x53, 0x32, // S2 (2 ips)
             0x1B, 0x44, 0x35,
             0x1B, 0x4D, 0x30, 0x31
         ]
@@ -75,6 +75,7 @@ struct RasterEncoderSmokeTest {
         assert(migrated.portPath == "/dev/cu.usbserial-1430")
         assert(migrated.density == 6 && migrated.printSpeed == .normal)
         assert(migrated.topOfFormDots == 176 && migrated.rasterThreshold == 128)
+        assert(migrated.automaticTopOfForm && migrated.rasterTransport == .paced)
         assert(migrated.sensorMode == .unchanged)
 
         var tuned = profile
@@ -82,16 +83,39 @@ struct RasterEncoderSmokeTest {
         tuned.density = 7
         tuned.sensorMode = .gap
         tuned.topOfFormDots = 144
+        tuned.automaticTopOfForm = false
         let tunedPacket = [UInt8](try encoder.nativeCommands(for: document, profile: tuned))
         let tunedHeader: [UInt8] = [
             0x1B, 0x51, 0x31, 0x34, 0x34, // Q144
             0x1B, 0x71, 0x30, 0x33, 0x33, // q033
-            0x1B, 0x53, 0x30,             // S0 (1 ips)
+            0x1B, 0x53, 0x31,             // S1 (1 ips)
             0x1B, 0x46, 0x30,             // F0 transmissive
             0x1B, 0x44, 0x37,             // D7
             0x1B, 0x4D, 0x30, 0x31        // M01
         ]
         assert(Array(tunedPacket.prefix(tunedHeader.count)) == tunedHeader)
+
+        // Original 2002 EZ-2 label-paper Q lookup, not modern EZPL.
+        assert(GodexEZ2Encoder.labelStopQ(heightMM: 26) == 176)
+        assert(GodexEZ2Encoder.labelStopQ(heightMM: 30) == 144)
+        assert(GodexEZ2Encoder.labelStopQ(heightMM: 40) == 64)
+        assert(GodexEZ2Encoder.labelStopQ(heightMM: 50) == 384)
+        assert(GodexEZ2Encoder.effectiveQ(for: document, profile: profile) == 144)
+
+        var manualProfile = profile
+        manualProfile.automaticTopOfForm = false
+        manualProfile.topOfFormDots = 200
+        assert(GodexEZ2Encoder.effectiveQ(for: document, profile: manualProfile) == 200)
+        // Legacy user preferences remain readable; manually chosen Q is honored.
+        let manualData = [UInt8](try encoder.nativeCommands(for: document, profile: manualProfile))
+        assert(Array(manualData.prefix(5)) == [0x1B, 0x51, 0x32, 0x30, 0x30])
+
+        // A minimal 40-mm document must use Q064, not the previously
+        // hardcoded 26-mm Q176; short verified TEST remains unchanged.
+        var forty = document
+        forty.heightMM = 40
+        let fortyPacket = [UInt8](try encoder.nativeCommands(for: forty, profile: profile))
+        assert(Array(fortyPacket.prefix(5)) == [0x1B, 0x51, 0x30, 0x36, 0x34])
 
         let fontPacket = encoder.nativeFontProbe(profile: profile)
         assert(fontPacket.range(of: Data([0x1B, 0x41, 0x30, 0x30])) != nil, "Small ASCII font")
@@ -107,6 +131,6 @@ struct RasterEncoderSmokeTest {
             // Expected: 56mm head width is not 55-byte ESC G width.
         }
 
-        print("EZ-2 raster, profiles, speed, sensor and ASCII-font commands passed.")
+        print("EZ-2 raster, Q label-height table, S1/S2 speed, legacy profiles and ASCII-font commands passed.")
     }
 }
