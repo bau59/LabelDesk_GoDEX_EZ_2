@@ -1,0 +1,159 @@
+<!doctype html>
+<html lang="ru">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>LabelDesk</title>
+<style>
+:root{font:13px -apple-system,BlinkMacSystemFont,"Helvetica Neue",sans-serif;color:#222f44;background:#f3f6fb;--line:#dde5f0;--blue:#365bd4;--muted:#6e7c91}
+*{box-sizing:border-box}html,body{height:100%;margin:0}button,input,select,textarea{font:inherit}
+button{border:1px solid #d4dfed;border-radius:8px;background:#fff;color:#263a57;padding:8px 12px;cursor:pointer}
+button:hover{background:#eef3fd}button:disabled{opacity:.45;cursor:default}button.primary{background:var(--blue);color:white;border-color:var(--blue)}
+input,select,textarea{background:white;border:1px solid #cbd6e5;padding:8px;border-radius:8px;color:#222f44;max-width:100%}
+input:focus,textarea:focus,select:focus{outline:2px solid #9eb6ef}textarea{resize:vertical;min-height:70px;width:100%;user-select:text}
+.app{display:grid;grid-template-columns:236px 1fr;grid-template-rows:66px 1fr 32px;height:100vh;overflow:hidden}
+header{grid-column:1/3;background:white;display:flex;align-items:center;gap:16px;padding:0 20px;border-bottom:1px solid var(--line)}
+.brand{font-size:19px;font-weight:750;min-width:202px}.brand span{color:var(--muted);font-size:11px;font-weight:400;display:block;margin-top:3px}
+nav{display:flex;gap:6px;background:#f3f6fb;padding:4px;border-radius:9px}
+nav button{border:0;background:transparent}nav button.active{background:#fff;color:var(--blue);box-shadow:0 1px 4px #00000014;font-weight:700}
+header .right{margin-left:auto;display:flex;gap:8px}
+aside{background:#fff;border-right:1px solid var(--line);overflow-y:auto;min-height:0;padding:16px 11px}
+aside .sidebar-head{display:flex;justify-content:space-between;align-items:center;margin:1px 6px 10px;font-weight:700}
+aside .sidebar-head button{padding:4px 8px}
+aside button.item{width:100%;border:0;text-align:left;white-space:normal;margin:2px 0;padding:10px 11px;background:transparent}
+aside button.item.active{background:#e8efff;color:#2048ac;font-weight:700}
+aside button.item small{display:block;margin-top:4px;font-weight:400;color:var(--muted)}
+aside .separator{border-top:1px solid var(--line);margin:15px 4px}
+#content{min-width:0;min-height:0;overflow:auto}
+.view{display:none;height:100%}.view.active{display:flex;flex-direction:column}
+#editorView{background:#fff}#editorFrame{flex:1;width:100%;height:100%;border:0;background:white}
+.page{padding:24px;max-width:1060px;width:100%;margin:0 auto;overflow:auto}
+.page h2{font-size:22px;margin:0 0 6px}.page .intro{color:var(--muted);margin:0 0 19px}
+.card{background:white;border:1px solid var(--line);border-radius:12px;padding:20px;margin:12px 0}
+.card h3{margin:0 0 14px;font-size:15px}
+.card label{display:block;color:var(--muted);font-size:12px;margin:8px 0 5px}
+.grid2{display:grid;grid-template-columns:1fr 1fr;gap:15px}.flex{display:flex;align-items:center;gap:9px;flex-wrap:wrap}
+.flex.space{justify-content:space-between}.fields{display:grid;grid-template-columns:1fr 1fr;gap:14px}
+.fields .field{display:flex;flex-direction:column;gap:6px}
+.fields label{font-weight:650;color:#2c3b53}
+#quickPreview{display:block;max-width:100%;height:auto;image-rendering:pixelated;border:1px solid #aebdd2;background:white}
+#quickCopies,#interval,#threshold{width:100px}
+.badge{font-size:11px;background:#edf2ff;color:#2b55b3;border-radius:20px;padding:4px 9px}
+.warning{color:#915b0d}.error{color:#b4333e}.muted{color:var(--muted)}
+table{width:100%;border-collapse:collapse}td,th{padding:12px;text-align:left;border-bottom:1px solid var(--line);vertical-align:middle}th{font-size:11px;color:var(--muted);font-weight:700}
+main .empty{padding:22px;color:var(--muted)}
+footer{grid-column:1/3;background:white;border-top:1px solid var(--line);font-size:11px;color:var(--muted);padding:8px 20px;display:flex;justify-content:space-between}
+#notify{max-width:75%;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+#runtimePath{font-family:ui-monospace,Menlo,monospace;font-size:11px}
+.menu{display:flex;gap:5px;align-items:center}.menu button{font-size:11px;padding:5px 9px}
+@media(max-width:1100px){.fields{grid-template-columns:1fr}.grid2{grid-template-columns:1fr}}
+</style>
+</head>
+<body>
+<div class="app">
+<header>
+  <div class="brand">LabelDesk<span>GoDEX EZ-2 · WebKit + zsh</span></div>
+  <nav>
+    <button data-view="quick">Заполнение</button>
+    <button data-view="editor">Редактор</button>
+    <button data-view="queue">Очередь <span id="pendingCount"></span></button>
+    <button data-view="settings">Настройки</button>
+  </nav>
+  <div class="right">
+    <button id="newTemplate">Новая этикетка</button>
+    <button id="saveTemplate" class="primary">Сохранить</button>
+  </div>
+</header>
+<aside>
+  <div class="sidebar-head">Папки <button id="addFolder" title="Создать папку">＋</button></div>
+  <div id="folders"></div>
+  <div class="separator"></div>
+  <div class="sidebar-head">Шаблоны <span id="templateCount" class="muted"></span></div>
+  <div id="templates"></div>
+  <div class="separator"></div>
+  <div class="menu"><button id="duplicateTemplate">Дублировать</button><button id="deleteTemplate">Удалить</button></div>
+</aside>
+<main id="content">
+  <section class="view" id="editorView">
+    <iframe id="editorFrame" src="editor.html" title="Редактор этикетки"></iframe>
+  </section>
+  <section class="view" id="quickView">
+    <div class="page">
+      <h2>Заполнение этикетки</h2>
+      <p class="intro">Поля меняются только в задании на печать. Исходный шаблон сохраняется отдельно.</p>
+      <div class="grid2">
+        <div class="card">
+          <h3 id="quickTemplateName">Шаблон</h3>
+          <div id="quickFields" class="fields"></div>
+          <label for="quickCopies">Количество копий</label>
+          <input id="quickCopies" type="number" min="1" max="200" value="1">
+          <div class="flex" style="margin-top:16px">
+            <button id="queueQuick" class="primary">Добавить в очередь</button>
+            <button id="quickReset">Сбросить поля</button>
+          </div>
+        </div>
+        <div class="card">
+          <h3>Печатный растр</h3>
+          <div id="previewError" class="error"></div>
+          <img id="quickPreview" alt="Монохромный предпросмотр">
+          <p class="muted" id="quickSize"></p>
+        </div>
+      </div>
+      <div class="card">
+        <h3>Пакетное заполнение</h3>
+        <p class="muted">По одной строке на этикетку. Другие поля остаются неизменными.</p>
+        <select id="batchField"></select>
+        <textarea id="batchValues" rows="5" placeholder="Первая строка&#10;Вторая строка"></textarea>
+        <button id="queueBatch">Добавить список в очередь</button>
+      </div>
+    </div>
+  </section>
+  <section class="view" id="queueView">
+    <div class="page">
+      <h2>Очередь печати</h2>
+      <p class="intro">Печать: T3 один раз на серию → Gnn + FF → пустая буферная наклейка после задания. Физического подтверждения от EZ-2 нет.</p>
+      <div class="card">
+        <div class="flex">
+          <button id="printOne" class="primary">Проверить одно задание</button>
+          <button id="printAll">Печатать всю очередь</button>
+          <button id="stopPrinting">Остановить передачу</button>
+          <button id="clearFinished">Очистить завершённые</button>
+        </div>
+        <p id="printState" class="muted"></p>
+      </div>
+      <div class="card"><table>
+        <thead><tr><th>Этикетка</th><th>Копий</th><th>Статус</th><th></th></tr></thead>
+        <tbody id="queueRows"></tbody>
+      </table></div>
+      <div class="card"><div class="flex space"><h3>Журнал</h3><button id="clearLog">Очистить</button></div><pre id="printLog" style="overflow:auto;white-space:pre-wrap;max-height:250px;font-size:11px"></pre></div>
+    </div>
+  </section>
+  <section class="view" id="settingsView">
+    <div class="page">
+      <h2>Настройки EZ-2</h2>
+      <p class="intro">Только проверенный рулон 58×38 мм / зазор 2 мм. Никаких ручных Q-калибровок.</p>
+      <div class="card">
+        <h3>RS-232</h3>
+        <label for="port">Последовательный порт</label>
+        <div class="flex"><select id="port" style="min-width:300px"></select><button id="refreshPorts">Обновить</button></div>
+        <p class="muted">9600 бод, 8N1, без XON/XOFF и RTS/CTS</p>
+        <label for="interval">Интервал (секунды)</label>
+        <input id="interval" type="number" min="0.2" max="10" step="0.1" value="1.5">
+        <label for="threshold">Порог монохромного растра (64–192)</label>
+        <input id="threshold" type="number" min="64" max="192" step="8" value="128">
+        <div class="flex" style="margin-top:16px"><button id="saveSettings" class="primary">Сохранить настройки</button></div>
+      </div>
+      <div class="card">
+        <h3>Изменение драйвера без пересборки</h3>
+        <p>Интерфейс и скрипт лежат в <code>~/Library/Application Support/LabelDesk/live/</code>. Их можно исправлять и перезапускать LabelDesk без Xcode и GitHub Actions.</p>
+        <div class="flex"><button id="openRuntime">Открыть рабочие файлы</button><span id="runtimePath" class="muted"></span></div>
+      </div>
+    </div>
+  </section>
+</main>
+<footer><span id="notify">Загрузка…</span><span id="portStatus">Порт не выбран</span></footer>
+</div>
+<script src="raster.js"></script>
+<script src="app.js"></script>
+</body>
+</html>
