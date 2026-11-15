@@ -548,13 +548,7 @@ final class AppStore: ObservableObject {
             alert = AppAlert(title: "Порт не выбран", message: "Выберите USB–RS232 порт в настройках.")
             return
         }
-        var sample = document
-        sample.elements = [
-            LabelElement(kind: .text, xMM: 1, yMM: 1,
-                         widthMM: min(15, sample.widthMM - 2),
-                         heightMM: min(7, sample.heightMM - 2),
-                         value: "FEED", fontSize: 10)
-        ]
+        let sample = EZ2CalibrationPattern.feedText(for: document)
         let data: Data
         do {
             data = try encoder.nativeCommands(for: sample, profile: profile)
