@@ -735,6 +735,28 @@
       note("Рулон сохранён: "+checked.widthMM+"×"+checked.heightMM+" мм, зазор "+checked.gapMM+" мм");
     }catch(e){note(e.message,true);}
   }
+  async function installFoodPresets(){
+    const pack=window.EZ2FoodPresets;
+    if(!pack || state.settingsSnapshot.foodPresetsPack===pack.version)return;
+    const samples=pack.build();
+    // Stable identifiers + a settings marker prevent duplicate import and
+    // ensure never to overwrite a food sample edited by the user.
+    for(const doc of samples.templates){
+      if(state.templates.some(t=>keySame(t.id,doc.id)))continue;
+      await native("saveTemplate",{document:JSON.stringify(doc)});
+      state.templates.push(clone(doc));
+    }
+    const additions=samples.folders.filter(f=>
+      !state.folders.some(existing=>keySame(existing.id,f.id)));
+    if(additions.length){
+      const folders=[...state.folders,...additions];
+      await native("saveData",{key:"folders",json:JSON.stringify(folders)});
+      state.folders=folders;
+    }
+    const settings={...state.settingsSnapshot,foodPresetsPack:pack.version};
+    await native("saveData",{key:"settings",json:JSON.stringify(settings)});
+    state.settingsSnapshot=settings;
+  }
   async function bootstrap(){
     try {
       const info=await native("loadAll");
@@ -747,8 +769,16 @@
       state.profile={...defaultProfile(),...(info.settings?.profile||{})};
       state.settingsSnapshot=info.settings||{schemaVersion:1,snapToGrid:true};
       state.runtimePath=info.runtimePath||"";
+      const hadUserTemplates=state.templates.length>0;
+      const originalFirst=state.templates.slice().sort((a,b)=>
+        String(b.updatedAt||"").localeCompare(String(a.updatedAt||"")))[0];
+      try{await installFoodPresets();}
+      catch(error){note("Готовые шаблоны не установлены: "+error.message,true);}
       state.templates.sort((a,b)=>String(b.updatedAt||"").localeCompare(String(a.updatedAt||"")));
-      state.current=state.templates.length?clone(state.templates[0]):newDocument();
+      state.current=(hadUserTemplates&&originalFirst)?clone(originalFirst):
+        (state.templates.find(t=>t.starterPack==="food-v1") ?
+          clone(state.templates.find(t=>t.starterPack==="food-v1")):
+          (state.templates.length?clone(state.templates[0]):newDocument()));
       state.selectedID=state.current.id;
       state.folderFilter="all";
       state.selectedFolderID=null;
