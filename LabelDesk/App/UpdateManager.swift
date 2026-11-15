@@ -29,14 +29,26 @@ private enum UpdateError: LocalizedError {
     case unexpectedResponse
     case invalidRelease
     case missingInstaller
+    case checksumMissing
     case checksumMismatch
+    case invalidBundle
+    case permissionDenied
+    case notInstalled
+    case resourceMissing
+    case commandFailed(String)
 
     var errorDescription: String? {
         switch self {
-        case .unexpectedResponse: "Unexpected response from GitHub."
-        case .invalidRelease: "GitHub returned an invalid version."
-        case .missingInstaller: "The Intel DMG is missing from this release."
-        case .checksumMismatch: "The downloaded installer failed SHA-256 verification."
+        case .unexpectedResponse: return "GitHub returned an unexpected response."
+        case .invalidRelease: return "GitHub returned an invalid release version."
+        case .missingInstaller: return "This release has no Intel ZIP installer."
+        case .checksumMissing: return "GitHub did not provide a SHA-256 digest. Automatic installation was cancelled."
+        case .checksumMismatch: return "The downloaded archive does not match GitHub's SHA-256 digest."
+        case .invalidBundle: return "The downloaded app's signature, bundle ID, version or Intel architecture is invalid."
+        case .permissionDenied: return "Applications folder is not writable by this user. Install the new version manually."
+        case .notInstalled: return "Automatic installation is available only for LabelDesk.app in /Applications or ~/Applications."
+        case .resourceMissing: return "The updater helper is missing from this version of LabelDesk."
+        case .commandFailed(let text): return "Unable to prepare the update: \(text)"
         }
     }
 }
@@ -97,7 +109,7 @@ final class UpdateManager: ObservableObject {
                 if !silent { inform("LabelDesk v\(currentVersion) is up to date.") }
                 return
             }
-            guard let asset = release.assets.first(where: { $0.name == "LabelDesk-\(version).dmg" }),
+            guard let asset = release.assets.first(where: { $0.name == "LabelDesk-\(version)-intel.zip" }),
                   asset.browserDownloadURL.scheme == "https",
                   asset.browserDownloadURL.host == "github.com",
                   asset.browserDownloadURL.path.hasPrefix("/bau59/LabelDesk_GoDEX_EZ_2/releases/download/") else {
@@ -113,37 +125,67 @@ final class UpdateManager: ObservableObject {
         }
     }
 
-    func downloadInstaller() async {
+    /// Prepares and verifies an app update, launches an independent helper, then quits.
+    /// The helper waits for this process to exit before replacing the app and reopening it.
+    func installUpdate() async {
         guard let asset = selectedAsset, !isDownloading else { return }
         isDownloading = true
-        status = "Downloading v\(latestVersion)…"
+        status = "Preparing update…"
         defer { isDownloading = false }
 
+        var workspace: URL?
         do {
-            let (temporaryFile, response) = try await URLSession.shared.download(from: asset.browserDownloadURL)
+            let installed = Bundle.main.bundleURL.resolvingSymlinksInPath()
+            let parent = installed.deletingLastPathComponent()
+            let homeApplications = FileManager.default.homeDirectoryForCurrentUser
+                .appendingPathComponent("Applications", isDirectory: true)
+            guard installed.lastPathComponent == "LabelDesk.app",
+                  parent.path == "/Applications" || parent.path == homeApplications.path else {
+                throw UpdateError.notInstalled
+            }
+            guard FileManager.default.isWritableFile(atPath: parent.path) else {
+                throw UpdateError.permissionDenied
+            }
+            guard let helper = Bundle.main.url(forResource: "install-update", withExtension: "sh") else {
+                throw UpdateError.resourceMissing
+            }
+
+            status = "Downloading v\(latestVersion)…"
+            let (download, response) = try await URLSession.shared.download(from: asset.browserDownloadURL)
             guard let http = response as? HTTPURLResponse, http.statusCode == 200 else {
                 throw UpdateError.unexpectedResponse
             }
-            try verifyDigest(file: temporaryFile, expected: asset.digest)
 
-            let manager = FileManager.default
-            let downloads = manager.urls(for: .downloadsDirectory, in: .userDomainMask)[0]
-            try manager.createDirectory(at: downloads, withIntermediateDirectories: true)
-            var destination = downloads.appendingPathComponent(asset.name)
-            if manager.fileExists(atPath: destination.path) {
-                destination = downloads.appendingPathComponent("LabelDesk-\(latestVersion)-\(UUID().uuidString.prefix(8)).dmg")
-            }
-            try manager.moveItem(at: temporaryFile, to: destination)
-            status = "Installer downloaded"
+            status = "Verifying Intel update…"
+            let result = try await Task.detached(priority: .userInitiated) {
+                try Self.prepare(
+                    archive: download, asset: asset,
+                    expectedVersion: self.latestVersion, expectedBundleID: "com.localsoft.LabelDesk"
+                )
+            }.value
+            workspace = result.workspace
 
-            if NSWorkspace.shared.open(destination) {
-                inform("Installer opened. Drag LabelDesk.app into Applications and replace the old version. Your serial-port preference is preserved.")
-            } else {
-                inform("Installer saved to \(destination.path). Open it from Finder to install.")
-            }
+            // Run helper outside the bundle that is about to be replaced.
+            let helperCopy = result.workspace.appendingPathComponent("install-update.sh")
+            try FileManager.default.copyItem(at: helper, to: helperCopy)
+
+            let installer = Process()
+            installer.executableURL = URL(fileURLWithPath: "/bin/zsh")
+            installer.arguments = [
+                helperCopy.path,
+                String(ProcessInfo.processInfo.processIdentifier),
+                installed.path,
+                result.app.path,
+                result.workspace.path
+            ]
+            try installer.run()
+
+            status = "Closing for update…"
+            NSApplication.shared.terminate(nil)
         } catch {
-            status = "Download failed"
-            inform(error.localizedDescription)
+            if let workspace { try? FileManager.default.removeItem(at: workspace) }
+            status = "Automatic update failed"
+            inform(error.localizedDescription + " Download and install the DMG manually from GitHub Releases.")
         }
     }
 
@@ -151,8 +193,53 @@ final class UpdateManager: ObservableObject {
         UserDefaults.standard.set(Date().timeIntervalSince1970, forKey: lastCheckKey)
     }
 
-    private func verifyDigest(file: URL, expected: String?) throws {
-        guard let expected, expected.hasPrefix("sha256:") else { return }
+    nonisolated private static func prepare(
+        archive: URL, asset: GitHubReleaseAsset,
+        expectedVersion: String, expectedBundleID: String
+    ) throws -> (workspace: URL, app: URL) {
+        try verifyDigest(file: archive, expected: asset.digest)
+        let fm = FileManager.default
+        let workspace = fm.temporaryDirectory.appendingPathComponent("LabelDesk-update-\(UUID().uuidString)", isDirectory: true)
+        try fm.createDirectory(at: workspace, withIntermediateDirectories: false)
+        do {
+            let zipFile = workspace.appendingPathComponent("release.zip")
+            try fm.moveItem(at: archive, to: zipFile)
+            let expanded = workspace.appendingPathComponent("expanded", isDirectory: true)
+            try fm.createDirectory(at: expanded, withIntermediateDirectories: true)
+            try run("/usr/bin/ditto", ["-x", "-k", zipFile.path, expanded.path])
+
+            let app = expanded.appendingPathComponent("LabelDesk.app", isDirectory: true)
+            guard let bundle = Bundle(url: app),
+                  bundle.bundleIdentifier == expectedBundleID,
+                  (bundle.object(forInfoDictionaryKey: "CFBundleShortVersionString") as? String) == expectedVersion,
+                  let executable = bundle.executableURL else {
+                throw UpdateError.invalidBundle
+            }
+            try run("/usr/bin/codesign", ["--verify", "--deep", "--strict", app.path])
+            try run("/usr/bin/lipo", ["-verify_arch", "x86_64", executable.path])
+            return (workspace, app)
+        } catch {
+            try? fm.removeItem(at: workspace)
+            throw error
+        }
+    }
+
+    nonisolated private static func run(_ command: String, _ args: [String]) throws {
+        let process = Process()
+        process.executableURL = URL(fileURLWithPath: command)
+        process.arguments = args
+        process.standardOutput = FileHandle.nullDevice
+        process.standardError = FileHandle.nullDevice
+        try process.run()
+        process.waitUntilExit()
+        guard process.terminationStatus == 0 else {
+            throw UpdateError.commandFailed(URL(fileURLWithPath: command).lastPathComponent)
+        }
+    }
+
+    nonisolated private static func verifyDigest(file: URL, expected: String?) throws {
+        guard let expected, expected.hasPrefix("sha256:"),
+              expected.count == 71 else { throw UpdateError.checksumMissing }
         let expectedHex = String(expected.dropFirst("sha256:".count)).lowercased()
         let handle = try FileHandle(forReadingFrom: file)
         defer { try? handle.close() }
@@ -163,7 +250,7 @@ final class UpdateManager: ObservableObject {
             hasher.update(data: chunk)
         }
         let actualHex = hasher.finalize().map { String(format: "%02x", $0) }.joined()
-        guard expectedHex == actualHex else { throw UpdateError.checksumMismatch }
+        guard actualHex == expectedHex else { throw UpdateError.checksumMismatch }
     }
 
     private func inform(_ message: String) {
