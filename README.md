@@ -4,7 +4,7 @@ Native SwiftUI label editor, local queue and serial ESC printing. Requires macOS
 
 ## Install and updates
 
-Download the latest Intel DMG from https://github.com/bau59/LabelDesk_GoDEX_EZ_2/releases/latest. Install by copying LabelDesk.app into Applications. The app checks GitHub Releases daily and by button, and downloads an update after confirmation. Replacing the app remains a visible manual step. Builds are ad-hoc signed, not notarized.
+Download the latest Intel DMG from https://github.com/bau59/LabelDesk_GoDEX_EZ_2/releases/latest. Install by copying LabelDesk.app into Applications. Starting in v0.4.0, the app checks GitHub Releases daily and by button. With user confirmation it downloads the Intel ZIP, requires a SHA-256 release digest, verifies the signed bundle and x86_64 binary, closes, replaces the installed app using a detached helper, and relaunches it. The helper keeps a rollback copy until installation is verified. Install v0.4.0 once manually if currently running v0.3.0. Builds are ad-hoc signed, not notarized.
 
 ## Verified hardware
 
@@ -55,7 +55,9 @@ The preview is generated from the same black/white bitmap that is used for ESC G
 - The printer has a mechanical label-gap sensor adjustment (VR). LabelDesk does not claim automatic electronic calibration.
 - A successful serial write is not a printer acknowledgement: Sent means the bytes were transmitted, not that paper output was confirmed.
 - For large raster transfers use XON/XOFF if the device responds correctly, or the supported wired hardware flow-control mode.
-- No imported images, QR, database integration or automatic silent updater in version 0.3.0.
+- No imported images, QR, database integration or notarized Apple Developer ID distribution yet.
+- Automatic installation requires LabelDesk.app in /Applications or ~/Applications and a writable destination. When macOS permissions do not allow replacement, install the DMG manually. There is no privilege escalation.
+- Updater logs: ~/Library/Logs/LabelDesk/updater.log. Save current edits and finish active print jobs before an update.
 
 ## Build
 

@@ -4,7 +4,7 @@ on:
   push:
     branches:
       - main
-      - feature/editor-raster-0.3
+      - feature/self-update-0.4
   workflow_dispatch:
 
 permissions:
@@ -48,7 +48,9 @@ jobs:
           APP_VERSION: ${{ steps.version.outputs.value }}
         run: |
           set -euo pipefail
+          zsh -n Scripts/install-update.sh
           zsh Scripts/build-installer.sh
+          test -f build/LabelDesk.app/Contents/Resources/install-update.sh
           BIN="build/LabelDesk.app/Contents/MacOS/LabelDesk"
           test -f "$BIN"
           test "$(lipo -archs "$BIN")" = "x86_64"
@@ -72,6 +74,10 @@ jobs:
             Tests/RasterEncoderSmokeTest.swift \
             -o build/raster-smoke
           ./build/raster-smoke
+
+      - name: Verify automatic update replacement and rollback
+        shell: bash
+        run: zsh Tests/UpdaterSmoke.sh
 
       - name: Upload Intel packages
         uses: actions/upload-artifact@v4

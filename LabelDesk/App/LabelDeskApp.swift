@@ -65,12 +65,12 @@ private struct ContentView: View {
                 }
             }
             .alert("Update available", isPresented: $updater.showUpdatePrompt) {
-                Button("Download installer") {
-                    Task { await updater.downloadInstaller() }
+                Button("Install and restart") {
+                    Task { await updater.installUpdate() }
                 }
                 Button("Later", role: .cancel) { }
             } message: {
-                Text("LabelDesk v\(updater.latestVersion) is available. Download the Intel DMG from GitHub Releases and open it. To install, drag LabelDesk.app into Applications.")
+                Text("LabelDesk v\(updater.latestVersion) is available. Save unsaved work before installing. The app will close, update and reopen automatically.")
             }
             .alert("LabelDesk updates", isPresented: $updater.showInfo) {
                 Button("OK", role: .cancel) { }
