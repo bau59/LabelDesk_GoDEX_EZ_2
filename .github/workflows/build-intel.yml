@@ -4,20 +4,35 @@ on:
   push:
     branches:
       - main
+      - feature/github-updates
   workflow_dispatch:
 
 permissions:
   contents: read
+
+concurrency:
+  group: labeldesk-intel-release
+  cancel-in-progress: false
 
 jobs:
   build-intel:
     name: Build x86_64 .app and .dmg
     runs-on: macos-15-intel
     timeout-minutes: 25
+    outputs:
+      version: ${{ steps.version.outputs.value }}
 
     steps:
       - name: Check out source
         uses: actions/checkout@v4
+
+      - name: Read app version
+        id: version
+        shell: bash
+        run: |
+          set -euo pipefail
+          VERSION="$(/usr/libexec/PlistBuddy -c 'Print :CFBundleShortVersionString' LabelDesk/Resources/Info.plist)"
+          echo "value=$VERSION" >> "$GITHUB_OUTPUT"
 
       - name: Verify Intel build environment
         shell: bash
@@ -29,6 +44,8 @@ jobs:
 
       - name: Compile and package LabelDesk
         shell: bash
+        env:
+          APP_VERSION: ${{ steps.version.outputs.value }}
         run: |
           set -euo pipefail
           zsh Scripts/build-installer.sh
@@ -37,14 +54,48 @@ jobs:
           test "$(lipo -archs "$BIN")" = "x86_64"
           plutil -lint build/LabelDesk.app/Contents/Info.plist
           codesign --verify --deep --strict build/LabelDesk.app
-          ditto -c -k --keepParent build/LabelDesk.app build/LabelDesk-0.1.0-intel.zip
+          test -f "build/LabelDesk-${APP_VERSION}.dmg"
+          ditto -c -k --keepParent build/LabelDesk.app "build/LabelDesk-${APP_VERSION}-intel.zip"
 
       - name: Upload Intel packages
         uses: actions/upload-artifact@v4
         with:
-          name: LabelDesk-0.1.0-macOS-Intel
+          name: LabelDesk-${{ steps.version.outputs.value }}-macOS-Intel
           path: |
-            build/LabelDesk-0.1.0.dmg
-            build/LabelDesk-0.1.0-intel.zip
+            build/LabelDesk-${{ steps.version.outputs.value }}.dmg
+            build/LabelDesk-${{ steps.version.outputs.value }}-intel.zip
           if-no-files-found: error
           retention-days: 30
+
+  publish-release:
+    name: Publish versioned GitHub Release
+    needs: build-intel
+    if: github.event_name == 'push' && github.ref == 'refs/heads/main'
+    runs-on: ubuntu-latest
+    permissions:
+      contents: write
+    steps:
+      - uses: actions/download-artifact@v4
+        with:
+          name: LabelDesk-${{ needs.build-intel.outputs.version }}-macOS-Intel
+          path: dist
+
+      - name: Publish new version only
+        shell: bash
+        env:
+          GH_TOKEN: ${{ github.token }}
+          APP_VERSION: ${{ needs.build-intel.outputs.version }}
+        run: |
+          set -euo pipefail
+          TAG="v${APP_VERSION}"
+          if gh release view "$TAG" --repo "$GITHUB_REPOSITORY" > /dev/null 2>&1; then
+            echo "$TAG already published; skip release."
+            exit 0
+          fi
+          gh release create "$TAG" \
+            "dist/LabelDesk-${APP_VERSION}.dmg" \
+            "dist/LabelDesk-${APP_VERSION}-intel.zip" \
+            --repo "$GITHUB_REPOSITORY" \
+            --target "$GITHUB_SHA" \
+            --title "LabelDesk ${APP_VERSION}" \
+            --notes "Intel macOS 15+. Serial TEST printing and GitHub release update checking. Ad-hoc signed; not notarized."

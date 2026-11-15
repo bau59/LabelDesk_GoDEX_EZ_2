@@ -5,11 +5,13 @@ import Darwin
 @main
 struct LabelDeskApp: App {
     @StateObject private var printer = PrinterModel()
+    @StateObject private var updater = UpdateManager()
 
     var body: some Scene {
         WindowGroup {
             ContentView()
                 .environmentObject(printer)
+                .environmentObject(updater)
                 .frame(minWidth: 460, minHeight: 310)
         }
     }
@@ -17,6 +19,7 @@ struct LabelDeskApp: App {
 
 private struct ContentView: View {
     @EnvironmentObject private var printer: PrinterModel
+    @EnvironmentObject private var updater: UpdateManager
 
     var body: some View {
         VStack(alignment: .leading, spacing: 18) {
@@ -44,9 +47,38 @@ private struct ContentView: View {
                 if printer.isSending { ProgressView().controlSize(.small) }
                 Text(printer.status).foregroundStyle(printer.status.hasPrefix("Error") ? .red : .secondary)
             }
+            GroupBox("Application updates") {
+                HStack(spacing: 10) {
+                    Text("v\(updater.currentVersion) · \(updater.status)")
+                        .font(.caption)
+                        .foregroundStyle(.secondary)
+                    Spacer()
+                    if updater.isChecking || updater.isDownloading {
+                        ProgressView().controlSize(.small)
+                    }
+                    Button("Check for Updates") {
+                        Task { await updater.check(silent: false) }
+                    }
+                    .disabled(updater.isChecking || updater.isDownloading)
+                }
+            }
+            .alert("Update available", isPresented: $updater.showUpdatePrompt) {
+                Button("Download installer") {
+                    Task { await updater.downloadInstaller() }
+                }
+                Button("Later", role: .cancel) { }
+            } message: {
+                Text("LabelDesk v\(updater.latestVersion) is available. Download the Intel DMG from GitHub Releases and open it. To install, drag LabelDesk.app into Applications.")
+            }
+            .alert("LabelDesk updates", isPresented: $updater.showInfo) {
+                Button("OK", role: .cancel) { }
+            } message: {
+                Text(updater.infoMessage)
+            }
             Spacer()
         }
         .padding(24)
+        .task { await updater.checkOnLaunch() }
         .alert("Print TEST?", isPresented: $printer.confirmTest) {
             Button("Send") { printer.sendTest() }
             Button("Cancel", role: .cancel) { }
