@@ -121,6 +121,12 @@ strong{font-size:14px;display:block;margin-bottom:14px}
      <button data-add="line">+ Линия</button>
      <button data-add="rectangle">+ Рамка</button>
      <div class="divider"></div>
+     <label>Печать
+       <select id="printModeSelect" style="width:165px">
+         <option value="text">Текст CP866</option>
+         <option value="raster">Растр</option>
+       </select>
+     </label>
      <button id="undo" title="Отменить · ⌘Z">↶</button>
      <button id="redo" title="Повторить · ⌘⇧Z">↷</button>
      <label>Масштаб <select id="zoom"><option value="fit" selected>Вписать</option><option value="6">6×</option><option value="8">8×</option><option value="10">10×</option><option value="12">12×</option><option value="16">16×</option></select></label>
@@ -142,7 +148,7 @@ strong{font-size:14px;display:block;margin-bottom:14px}
 let doc=null, selected=null, zoom=8, zoomMode="fit", history=[], future=[], snap=true;
 let printerMedia={widthMM:58,heightMM:38,gapMM:2};
 const $=id=>document.getElementById(id);
-const typeNames={text:"Текст",barcode:"Code 39",line:"Линия",rectangle:"Рамка"};
+const typeNames={text:"Текст",barcode:"Штрихкод",line:"Линия",rectangle:"Рамка"};
 const patterns={"0":"nnnwwnwnn","1":"wnnwnnnnw","2":"nnwwnnnnw","3":"wnwwnnnnn","4":"nnnwwnnnw","5":"wnnwwnnnn","6":"nnwwwnnnn","7":"nnnwnnwnw","8":"wnnwnnwnn","9":"nnwwnnwnn","A":"wnnnnwnnw","B":"nnwnnwnnw","C":"wnwnnwnnn","D":"nnnnwwnnw","E":"wnnnwwnnn","F":"nnwnwwnnn","G":"nnnnnwwnw","H":"wnnnnwwnn","I":"nnwnnwwnn","J":"nnnnwwwnn","K":"wnnnnnnww","L":"nnwnnnnww","M":"wnwnnnnwn","N":"nnnnwnnww","O":"wnnnwnnwn","P":"nnwnwnnwn","Q":"nnnnnnwww","R":"wnnnnnwwn","S":"nnwnnnwwn","T":"nnnnwnwwn","U":"wwnnnnnnw","V":"nwwnnnnnw","W":"wwwnnnnnn","X":"nwnnwnnnw","Y":"wwnnwnnnn","Z":"nwwnwnnnn","-":"nwnnnnwnw",".":"wwnnnnwnn"," ":"nwwnnnwnn","$":"nwnwnwnnn","/":"nwnwnnnwn","+":"nwnnnwnwn","%":"nnnwnwnwn","*":"nwnnwnwnn"};
 const clone=o=>JSON.parse(JSON.stringify(o));
 function uid(){return "xxxxxxxx-xxxx-4xxx-yxxx-xxxxxxxxxxxx".replace(/[xy]/g,function(c){let r=Math.floor(Math.random()*16);return (c==="x"?r:(r&3|8)).toString(16)});}
@@ -460,14 +466,16 @@ function renderProps(){
  if(e.kind==="text"){
    if(doc.printMode!=="text")
      root.appendChild(prop("Кегль, pt (для растра)",numInput(e.fontSize,n=>{e.fontSize=n;},5,52,1)));
-   const modes=document.createElement("select");
-   for(const [id,label] of [["auto","Авто — растр, пока встроенные команды не проверены"],
-      ["device","Встроенный ASCII/CP437 — пробная печать"]]){
-     let opt=document.createElement("option");opt.value=id;opt.textContent=label;modes.appendChild(opt);
+   if(doc.printMode!=="text"){
+     const modes=document.createElement("select");
+     for(const [id,label] of [["auto","Растровый текст"],
+        ["device","Штатный шрифт — диагностический тест"]]){
+       let opt=document.createElement("option");opt.value=id;opt.textContent=label;modes.appendChild(opt);
+     }
+     modes.value=e.renderMode||"auto";
+     modes.addEventListener("change",()=>{checkpoint();e.renderMode=modes.value;renderProps();commit();});
+     root.appendChild(prop("Способ вывода (растр)",modes));
    }
-   modes.value=e.renderMode||"auto";
-   modes.addEventListener("change",()=>{checkpoint();e.renderMode=modes.value;renderProps();commit();});
-   root.appendChild(prop("Способ вывода",modes));
    if(doc.printMode==="text"||e.renderMode==="device"){
      const fonts=document.createElement("select");
      for(const preset of ["A11","A12","A13","A14","A21","A22","A31","A41","A00","A01","A02","A03","A04"]){
@@ -566,6 +574,10 @@ function renderProps(){
 function draw(){
  if(!doc)return;
  $("docname").value=doc.name;
+ $("printModeSelect").value=doc.printMode||"raster";
+ $("foot").textContent=doc.printMode==="text"?
+   "Текст CP866: порядок слоёв определяет порядок строк. Стрелки меняют порядок; Y автоматически задаётся принтером. Эскиз приблизительный.":
+   "Растр: перемещайте и масштабируйте объекты, точные координаты X/Y будут сохранены.";
  renderLayers();renderCanvas();renderProps();
  $("undo").disabled=!history.length;$("redo").disabled=!future.length;
 }
@@ -587,6 +599,10 @@ $("docname").addEventListener("focus",()=>{if(doc)checkpoint();});
 $("docname").addEventListener("input",function(){if(!doc)return;doc.name=this.value;commit();});
 $("label").addEventListener("click",ev=>{ev.stopPropagation();});
 $("zoom").addEventListener("change",function(){zoomMode=this.value;if(zoomMode!=="fit")zoom=Number(this.value);renderCanvas();});
+$("printModeSelect").addEventListener("change",function(){
+ if(!doc)return;
+ checkpoint();doc.printMode=this.value;draw();commit();
+});
 window.addEventListener("resize",()=>{if(zoomMode==="fit")renderCanvas();});
 $("up").onclick=()=>moveLayer(1);$("down").onclick=()=>moveLayer(-1);
 $("clone").onclick=duplicate;$("remove").onclick=remove;
