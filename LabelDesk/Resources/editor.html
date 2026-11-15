@@ -88,6 +88,8 @@ input{user-select:text}
 .actions{display:flex;gap:6px;flex-wrap:wrap}
 .empty{color:var(--muted);font-size:12px;line-height:1.6;padding:13px 7px}
 strong{font-size:14px;display:block;margin-bottom:14px}
+.symbol-palette{display:grid;grid-template-columns:repeat(5,minmax(0,1fr));gap:5px}
+.symbol-palette button{font-size:17px;padding:6px 0;font-family:Menlo,monospace}
 .text-align-controls{display:grid;grid-template-columns:repeat(3,minmax(0,1fr));gap:6px}
 .text-align-controls button{font-size:19px;padding:7px;border-radius:8px}
 .text-align-controls button.current{background:#eaf0ff;border-color:#7799eb;color:#2147ae;font-weight:bold}
@@ -398,7 +400,7 @@ function renderProps(){
    root.appendChild(prop("Кегль, pt (для растра)",numInput(e.fontSize,n=>{e.fontSize=n;},5,52,1)));
    const modes=document.createElement("select");
    for(const [id,label] of [["auto","Авто — растр, пока встроенные команды не проверены"],
-      ["device","Встроенный ASCII — тестовый режим"]]){
+      ["device","Встроенный ASCII/CP437 — пробная печать"]]){
      let opt=document.createElement("option");opt.value=id;opt.textContent=label;modes.appendChild(opt);
    }
    modes.value=e.renderMode||"auto";
@@ -413,9 +415,17 @@ function renderProps(){
      fonts.addEventListener("change",()=>{checkpoint();e.deviceFont=fonts.value;commit();});
      root.appendChild(prop("Встроенный размер EZ-2 (ESC)",fonts));
      const warn=document.createElement("p");warn.className="warn";
-     warn.textContent="Встроенный шрифт поддерживает ASCII. Кириллица останется в растровой печати. Реальная печать этим режимом будет включена после теста протокола.";
+     warn.textContent="Встроенный шрифт EZ-2: ASCII и символы рамок CP437. Кириллица остаётся растровой. Для проверки одной этикетки используйте отдельную кнопку в разделе «Заполнение».";
      root.appendChild(warn);
    }
+   const symbols=document.createElement("div");symbols.className="symbol-palette";
+   for(const ch of ["─","│","┌","┐","└","┘","┼","═","║","█"]){
+     const button=document.createElement("button");button.type="button";button.textContent=ch;
+     button.title="Вставить символ рамки CP437: "+ch;
+     button.onclick=()=>{checkpoint();e.value=(e.value||"")+ch;draw();commit();};
+     symbols.appendChild(button);
+   }
+   root.appendChild(prop("Символы рамок (CP437)",symbols));
    root.appendChild(checkbox("Жирный",e.isBold,n=>{e.isBold=n;}));
    const alignControls=document.createElement("div");alignControls.className="text-align-controls";
    for(const [mode,title] of [["left","По левому краю"],["center","По центру"],["right","По правому краю"]]){
