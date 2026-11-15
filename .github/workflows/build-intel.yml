@@ -11,8 +11,8 @@ permissions:
   contents: read
 
 concurrency:
-  group: labeldesk-intel-release
-  cancel-in-progress: false
+  group: labeldesk-intel-${{ github.ref }}
+  cancel-in-progress: true
 
 jobs:
   build-intel:
