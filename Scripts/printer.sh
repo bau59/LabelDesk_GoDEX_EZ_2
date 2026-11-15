@@ -50,7 +50,7 @@ if [[ "$FIRST" == "1" ]]; then
 fi
 
 # Original working Line Mode: F0/q040/M01 then ESC Gnn binary rows + FF.
-# Keep the same descriptor open across all copies within this job.
+# Keep the same descriptor open through the last blank separator label.
 open_port
 printf '\033F0\033q040\033M01' >&3
 integer i=1
@@ -60,12 +60,18 @@ while (( i <= COPIES )); do
   print "copy $i/$COPIES sent"
   (( i += 1 ))
 done
-close_port
 
-# Physically verified alone: a blank buffered label advances the roll by
-# one sensor-positioned label. Do not use unverified ESC f or reverse commands.
-open_port
-printf '\033F0\033q040\033M01\033B\033A11 \r\033E\033P01' >&3
+# IMPORTANT: 0.9.5 demonstrated that switching from raster Line Mode to a
+# buffered blank P01 after a job DOES NOT align the labels on this machine.
+# Do not repeat that sequence. Instead, retain Line Mode, send a blank raster
+# as a complete 280-row label, and terminate it with FF. G10 x 280 + FF
+# needs physical verification; do not run a batch before one-label inspection.
+integer row=0
+while (( row < 280 )); do
+  printf '\033G10\000\000\000\000\000\000\000\000\000\000' >&3
+  (( row += 1 ))
+done
+printf '\014' >&3
 /bin/sleep "$DELAY"
 close_port
-print "blank separator sent; physical result not acknowledged"
+print "blank 280-row Line Mode separator sent; physical result not acknowledged"
