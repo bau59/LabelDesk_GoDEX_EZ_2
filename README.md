@@ -1,6 +1,6 @@
 # LabelDesk — original GoDEX EZ-2 on macOS (WebKit + zsh)
 
-**1.0.2 WebKit/zsh release.** No Node.js, Python, pip, npm, HTTP server or external dependencies are needed on the user's Mac. The system frameworks AppKit/WebKit and system commands `/bin/zsh`, `/bin/stty`, `/bin/cat` and `printf` handle the application and RS-232.
+**1.0.4 WebKit/zsh release (barcode generator and isolated native-mode test).** No Node.js, Python, pip, npm, HTTP server or external dependencies are needed on the user's Mac. The system frameworks AppKit/WebKit and system commands `/bin/zsh`, `/bin/stty`, `/bin/cat` and `printf` handle the application and RS-232.
 
 ## Runtime layout
 
@@ -48,6 +48,49 @@ New labels use the stored media dimensions. Saved template JSON files are **neve
 **Two distinct boundaries:** Red editor hatching indicates a template region outside the configured physical roll. Gray hatching marks the separate, currently verified 55-mm `ESC G55` graphics limit — it is not the edge of the roll.
 
 **Safety:** The current printing transport is still verified only for **38-mm label height plus 2-mm gap** (`ESC q040`, 280 raster rows). Settings for other media sizes can be saved and used to prepare templates, but sending them to the printer is blocked until a matching transport protocol has been physically verified. Changing settings does not silently change motor commands. Width changes within the supported template bounds do not alter the fixed motor pitch.
+
+## Original EZ-2 built-in text and barcode features (1.0.4)
+
+Reference: the original *EZ-2/4 Manual*, April 2002, P/N 920-010210-00,
+[format-command table](https://www.manualslib.com/manual/302891/Godex-Ez-2.html?page=13),
+[barcode selectors](https://www.manualslib.com/manual/302891/Godex-Ez-2.html?page=14),
+[font sizes and graphics](https://www.manualslib.com/manual/302891/Godex-Ez-2.html?page=18)
+and [printer character set](https://www.manualslib.com/manual/302891/Godex-Ez-2.html?page=22).
+**Do not use later EZPL `^L` / `At,x,y` commands on this 2002 EZ-2 model.**
+
+The 2002 EZ-2 uses *sequential Line Mode* rather than absolute object XY commands.
+Documented resident commands are `ESC Ahv` (16×26-dot ASCII expanded horizontally 1–4,
+vertically 1–8), `ESC A0n` (8×10-dot text variants),
+`ESC ?n` (barcode selector),
+`ESC {DATA}` / `ESC |DATA}` (barcode with/without human-readable text),
+`ESC Mnn` (left margin), and `ESC Gnn` (graphics). The original manual explicitly lists
+Code128 B/C, Interleaved 2 of 5, Code39, Code93 and Codabar. Modern EZPL `L`, `R`, `A` arbitrary-coordinate drawing commands are **not documented for this hardware**.
+The printer's original 8-bit font page provides ASCII/CP437 symbols including box-drawing
+characters, but **not UTF-8 Cyrillic**.
+
+The HTML editor now creates new text, barcode, and line blocks across the **verified
+printable width** (55 mm on a 58-mm roll, not beyond the tested graphics head), keeping
+old templates untouched. Each block retains explicit alignment and size controls.
+Barcode types in the editor are:
+- **Code128**: encoder B for mixed printable ASCII, encoder C for even-length numeric text, weighted Mod-103 checksum
+- **Code39**: uppercase letters, digits and defined punctuation
+- **EAN-13 / EAN-8**: calculate missing check digit or reject invalid supplied check digit
+
+The same `barcodes.js` implementation renders editor preview and print bitmap. Narrow
+modules must be at least **2 dots** and enough quiet zone must fit within the barcode
+block: invalid or overly dense symbols are rejected rather than printed unreadably.
+Barcodes can be variable fields and thus filled per job or as a batch without changing
+the saved template.
+
+**Native protocol remains an explicitly isolated experimental one-label trial.** A single
+ASCII text block with `renderMode=device` / selected `A11`..font, or a single Code39
+barcode block, can be sent with the **Test built-in printing: 1 label** control.
+A compiled native packet uses the documented `F0/q040/M01` setup and buffered `B`...
+`E/P01` sequence. The trial uses a separate local `printer-native.sh`, does **not**
+send a startup T3, does **not** add a blank raster separator, and cannot send a batch.
+Any other template still uses the original verified 280-row raster queue. The direct-native
+layout and paper position have **not** been physically verified. **Do not automatically
+switch production print jobs to native output until the one-label hardware test is inspected.**
 
 ## Printing protocol
 

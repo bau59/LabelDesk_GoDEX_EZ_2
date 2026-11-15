@@ -74,6 +74,11 @@ footer{grid-column:1/3;background:#fff;border-top:1px solid var(--line);font-siz
 #notify{max-width:75%;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
 #runtimePath{font-family:ui-monospace,Menlo,monospace;font-size:11px;overflow-wrap:anywhere}
 @media(max-width:1100px){.app{grid-template-columns:248px minmax(0,1fr)}.brand{min-width:195px}header{gap:9px;padding:0 12px}nav button{padding:9px}.fields,.grid2{grid-template-columns:1fr}}
+.native-trial{margin-top:18px;border-top:1px solid var(--line);padding-top:15px}
+.native-trial strong{font-size:12px;color:#36465d}
+.native-trial p{font-size:11px;color:var(--muted);line-height:1.55;margin:6px 0 10px}
+.native-trial button{font-size:12px;color:#8d5b16;border-color:#efd9ab;background:#fff9ec}
+.native-trial button:hover{background:#fff0d4}
 </style>
 </head>
 <body>
@@ -126,6 +131,11 @@ footer{grid-column:1/3;background:#fff;border-top:1px solid var(--line);font-siz
           <div class="flex" style="margin-top:16px">
             <button id="queueQuick" class="primary">Добавить в очередь</button>
             <button id="quickReset">Сбросить поля</button>
+          </div>
+          <div class="native-trial">
+            <strong>Встроенные команды EZ-2 · отдельный тест</strong>
+            <p>Один ASCII-текст или один Code 39. Один экземпляр без дополнительной пустой этикетки. Обычная очередь по-прежнему печатает проверенным растром.</p>
+            <button id="testNative" type="button">Тест встроенной печати: 1 наклейка</button>
           </div>
         </div>
         <div class="card">
@@ -200,6 +210,8 @@ footer{grid-column:1/3;background:#fff;border-top:1px solid var(--line);font-siz
 </main>
 <footer><span id="notify">Загрузка…</span><span id="portStatus">Порт не выбран</span></footer>
 </div>
+<script src="barcodes.js"></script>
+<script src="native.js"></script>
 <script src="raster.js"></script>
 <script src="app.js"></script>
 </body>

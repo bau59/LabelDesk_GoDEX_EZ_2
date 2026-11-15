@@ -88,6 +88,8 @@ input{user-select:text}
 .actions{display:flex;gap:6px;flex-wrap:wrap}
 .empty{color:var(--muted);font-size:12px;line-height:1.6;padding:13px 7px}
 strong{font-size:14px;display:block;margin-bottom:14px}
+.symbol-palette{display:grid;grid-template-columns:repeat(5,minmax(0,1fr));gap:5px}
+.symbol-palette button{font-size:17px;padding:6px 0;font-family:Menlo,monospace}
 .text-align-controls{display:grid;grid-template-columns:repeat(3,minmax(0,1fr));gap:6px}
 .text-align-controls button{font-size:19px;padding:7px;border-radius:8px}
 .text-align-controls button.current{background:#eaf0ff;border-color:#7799eb;color:#2147ae;font-weight:bold}
@@ -132,6 +134,7 @@ strong{font-size:14px;display:block;margin-bottom:14px}
    <div id="props"></div>
  </aside>
 </div>
+<script src="barcodes.js"></script>
 <script>
 (function(){
 "use strict";
@@ -157,8 +160,16 @@ function selectedObj(){return doc&&doc.elements.find(e=>e.id===selected);}
 function setSelected(id){if(!doc||!doc.elements.some(e=>e.id===id))return;selected=id;draw();}
 function newElem(kind){
  if(!doc)return;
- const dims={text:[3,3,27,7,"Текст"],barcode:[3,12,30,11,"1234"],line:[3,20,26,0.4,""],rectangle:[3,3,26,18,""]}[kind];
- let e={id:uid(),kind:kind,xMM:dims[0],yMM:dims[1],widthMM:dims[2],heightMM:dims[3],value:dims[4],fontSize:12,rotation:0,showsHumanReadable:true,isBold:false,isVariable:kind==="text",fieldName:""};
+ const full=Math.min(55,doc.widthMM), last=doc.elements.reduce((n,e)=>Math.max(n,e.yMM+e.heightMM),0);
+ const defaults={text:[0,3,full,7,"Текст"],barcode:[0,12,full,13,"1234567890"],
+   line:[0,20,full,0.4,""],rectangle:[0,3,full,18,""]}[kind];
+ const dims=defaults.slice();
+ if(doc.elements.length && kind!=="rectangle"){
+   dims[1]=Math.max(0,Math.min(doc.heightMM-dims[3],last+1));
+ }
+ let e={id:uid(),kind:kind,xMM:dims[0],yMM:dims[1],widthMM:dims[2],heightMM:dims[3],
+   value:dims[4],fontSize:12,rotation:0,showsHumanReadable:true,isBold:false,
+   isVariable:kind==="text"||kind==="barcode",fieldName:"",barcodeType:"CODE128",renderMode:"auto",deviceFont:"A11"};
  e.widthMM=Math.max(1,Math.min(e.widthMM,doc.widthMM-e.xMM));
  e.yMM=Math.min(e.yMM,Math.max(0,doc.heightMM-e.heightMM));
  checkpoint();doc.elements.push(e);selected=e.id;draw();commit();
@@ -170,7 +181,7 @@ function moveLayer(delta){
 }
 function remove(){if(!selected||!doc)return;checkpoint();doc.elements=doc.elements.filter(e=>e.id!==selected);selected=null;draw();commit();}
 function duplicate(){const e=selectedObj();if(!e)return;checkpoint();let copy=clone(e);copy.id=uid();copy.xMM=Math.min(Math.max(0,doc.widthMM-copy.widthMM),copy.xMM+1);copy.yMM=Math.min(Math.max(0,doc.heightMM-copy.heightMM),copy.yMM+1);doc.elements.push(copy);selected=copy.id;draw();commit();}
-function labelFor(e){const variable=(e.kind==="text"&&e.isVariable!==false)?" • перем.":"";return typeNames[e.kind]+variable+" · "+(e.value||"");}
+function labelFor(e){const variable=((e.kind==="text"||e.kind==="barcode")&&e.isVariable!==false)?" • перем.":"";return typeNames[e.kind]+variable+" · "+(e.value||"");}
 function renderLayers(){
  const root=$("layers");root.replaceChildren();
  if(!doc||!doc.elements.length){let p=document.createElement("p");p.className="empty";p.textContent="Пока нет объектов. Добавьте текст или штрихкод.";root.appendChild(p);}
@@ -186,15 +197,28 @@ function renderLayers(){
  $("down").disabled=pos<=0;
  $("clone").disabled=pos<0;$("remove").disabled=pos<0;
 }
-function barcodeSVG(value,width,height,readable){
- const content="*"+String(value||"").toUpperCase()+"*";
- if(content.length<3||[...content].some(c=>!patterns[c]))return null;
- const bits=[];for(let c of content){let p=patterns[c];for(let i=0;i<p.length;i++)bits.push({bar:i%2===0,weight:p[i]==="w"?3:1});bits.push({bar:false,weight:1});}
- bits.pop();const units=bits.reduce((s,x)=>s+x.weight,0), mmPerUnit=width/units;
- let svg=document.createElementNS("http://www.w3.org/2000/svg","svg");svg.setAttribute("viewBox","0 0 "+units+" 100");svg.setAttribute("preserveAspectRatio","none");
- let x=0;for(let b of bits){if(b.bar){let rect=document.createElementNS("http://www.w3.org/2000/svg","rect");rect.setAttribute("x",x);rect.setAttribute("y",0);rect.setAttribute("width",b.weight);rect.setAttribute("height",100);rect.setAttribute("fill","#000");svg.appendChild(rect);}x+=b.weight;}
- svg.style.width="100%";svg.style.height=readable?"calc(100% - 14px)":"100%";
- return svg;
+function barcodeSVG(item,width,height){
+ try{
+  const result=window.EZ2Barcodes.layout(item.barcodeType||"CODE39",item.value,width*8);
+  const svg=document.createElementNS("http://www.w3.org/2000/svg","svg");
+  svg.setAttribute("viewBox","0 0 "+(width*8)+" 100");
+  svg.setAttribute("preserveAspectRatio","none");
+  for(let i=0;i<result.bits.length;i++){
+    if(result.bits[i]!=="1")continue;
+    const rect=document.createElementNS("http://www.w3.org/2000/svg","rect");
+    rect.setAttribute("x",result.offset+i*result.moduleDots);
+    rect.setAttribute("y",0);
+    rect.setAttribute("width",result.moduleDots);
+    rect.setAttribute("height",100);
+    rect.setAttribute("fill","#000");
+    svg.appendChild(rect);
+  }
+  svg.style.width="100%";
+  svg.style.height=item.showsHumanReadable?"calc(100% - 15px)":"100%";
+  return {svg,label:result.display};
+ }catch(error){
+  return {svg:null,label:"",error:error.message};
+ }
 }
 function renderCanvas(){
  const el=$("label");el.querySelectorAll(".obj,.printzone,.mediazone").forEach(n=>n.remove());if(!doc)return;
@@ -222,9 +246,15 @@ function renderCanvas(){
      visual.style.textAlign=e.textAlignment||"left";
      visual.style.transform="rotate("+(e.rotation||0)+"deg)";
    } else if(e.kind==="barcode"){
-     const svg=barcodeSVG(e.value,e.widthMM,e.heightMM,e.showsHumanReadable);
-     if(svg)visual.appendChild(svg);else {visual.textContent="Неверный Code 39";visual.classList.add("invalid");}
-     if(e.showsHumanReadable){let digits=document.createElement("div");digits.className="digits";digits.textContent=e.value;digits.style.fontSize=Math.max(9,zoom*1.65)+"px";visual.appendChild(digits);}
+     const preview=barcodeSVG(e,e.widthMM,e.heightMM);
+     if(preview.svg)visual.appendChild(preview.svg);
+     else {visual.textContent=preview.error;visual.classList.add("invalid");}
+     if(e.showsHumanReadable&&preview.svg){
+       let digits=document.createElement("div");digits.className="digits";
+       digits.textContent=preview.label;
+       digits.style.fontSize=Math.max(9,zoom*1.65)+"px";
+       visual.appendChild(digits);
+     }
    }
    node.appendChild(visual);
    if(selected===e.id){
@@ -361,13 +391,41 @@ function renderProps(){
    return;
  }
  let h=document.createElement("strong");h.textContent=typeNames[e.kind];root.appendChild(h);
- if(e.kind==="text"||e.kind==="barcode")root.appendChild(prop(e.kind==="text"?"Текст":"Значение Code 39",textInput(e.value,v=>{e.value=v;},e.kind==="text","field-value")));
+ if(e.kind==="text"||e.kind==="barcode")root.appendChild(prop(e.kind==="text"?"Текст":"Данные штрихкода",textInput(e.value,v=>{e.value=v;},e.kind==="text","field-value")));
  root.appendChild(pair(prop("X, мм",numInput(e.xMM,n=>{e.xMM=Math.min(n,Math.max(0,doc.widthMM-e.widthMM));},0,60,0.125)),
                        prop("Y, мм",numInput(e.yMM,n=>{e.yMM=Math.min(n,Math.max(0,doc.heightMM-e.heightMM));},0,100,0.125))));
  root.appendChild(pair(prop("Ширина, мм",numInput(e.widthMM,n=>{e.widthMM=Math.min(n,doc.widthMM-e.xMM);},0.125,60,0.125)),
                        prop("Высота, мм",numInput(e.heightMM,n=>{e.heightMM=Math.min(n,doc.heightMM-e.yMM);},0.125,100,0.125))));
  if(e.kind==="text"){
-   root.appendChild(prop("Кегль, pt",numInput(e.fontSize,n=>{e.fontSize=n;},5,52,1)));
+   root.appendChild(prop("Кегль, pt (для растра)",numInput(e.fontSize,n=>{e.fontSize=n;},5,52,1)));
+   const modes=document.createElement("select");
+   for(const [id,label] of [["auto","Авто — растр, пока встроенные команды не проверены"],
+      ["device","Встроенный ASCII/CP437 — пробная печать"]]){
+     let opt=document.createElement("option");opt.value=id;opt.textContent=label;modes.appendChild(opt);
+   }
+   modes.value=e.renderMode||"auto";
+   modes.addEventListener("change",()=>{checkpoint();e.renderMode=modes.value;renderProps();commit();});
+   root.appendChild(prop("Способ вывода",modes));
+   if(e.renderMode==="device"){
+     const fonts=document.createElement("select");
+     for(const preset of ["A11","A12","A13","A14","A21","A22","A31","A41","A00","A01","A02","A03","A04"]){
+       const opt=document.createElement("option");opt.value=preset;opt.textContent=preset;fonts.appendChild(opt);
+     }
+     fonts.value=e.deviceFont||"A11";
+     fonts.addEventListener("change",()=>{checkpoint();e.deviceFont=fonts.value;commit();});
+     root.appendChild(prop("Встроенный размер EZ-2 (ESC)",fonts));
+     const warn=document.createElement("p");warn.className="warn";
+     warn.textContent="Встроенный шрифт EZ-2: ASCII и символы рамок CP437. Кириллица остаётся растровой. Для проверки одной этикетки используйте отдельную кнопку в разделе «Заполнение».";
+     root.appendChild(warn);
+   }
+   const symbols=document.createElement("div");symbols.className="symbol-palette";
+   for(const ch of ["─","│","┌","┐","└","┘","┼","═","║","█"]){
+     const button=document.createElement("button");button.type="button";button.textContent=ch;
+     button.title="Вставить символ рамки CP437: "+ch;
+     button.onclick=()=>{checkpoint();e.value=(e.value||"")+ch;draw();commit();};
+     symbols.appendChild(button);
+   }
+   root.appendChild(prop("Символы рамок (CP437)",symbols));
    root.appendChild(checkbox("Жирный",e.isBold,n=>{e.isBold=n;}));
    const alignControls=document.createElement("div");alignControls.className="text-align-controls";
    for(const [mode,title] of [["left","По левому краю"],["center","По центру"],["right","По правому краю"]]){
@@ -391,8 +449,30 @@ function renderProps(){
    rotation.addEventListener("change",()=>{checkpoint();e.rotation=Number(rotation.value);renderCanvas();commit();});
    root.appendChild(prop("Поворот",rotation));
  } else if(e.kind==="barcode"){
-   root.appendChild(checkbox("Подпись под штрихкодом",e.showsHumanReadable,n=>{e.showsHumanReadable=n;}));
-   let note=document.createElement("p");note.className="warn";note.textContent="Код 39: A–Z, 0–9, пробел и - . $ / + %. Для сканирования минимум 2 точки на узкий модуль.";root.appendChild(note);
+   const kind=document.createElement("select");
+   for(const [id,label] of [["CODE128","Code 128 (автоматически B/C)"],["CODE39","Code 39"],
+      ["EAN13","EAN-13 (с контрольной цифрой)"],["EAN8","EAN-8 (с контрольной цифрой)"]]){
+     const opt=document.createElement("option");opt.value=id;opt.textContent=label;kind.appendChild(opt);
+   }
+   kind.value=e.barcodeType||"CODE39";
+   kind.addEventListener("change",()=>{checkpoint();e.barcodeType=kind.value;draw();commit();});
+   root.appendChild(prop("Формат штрихкода",kind));
+   root.appendChild(checkbox("Печатать цифры под штрихкодом",e.showsHumanReadable,n=>{e.showsHumanReadable=n;}));
+   root.appendChild(checkbox("Менять данные при заполнении",e.isVariable!==false,n=>{e.isVariable=n;renderLayers();}));
+   if(e.isVariable!==false){
+     root.appendChild(prop("Название поля в режиме заполнения",
+       textInput(e.fieldName||"",v=>{e.fieldName=v;},false,"field-name")));
+   }
+   const status=document.createElement("p");status.className="hint";
+   try{
+     const coded=window.EZ2Barcodes.layout(e.barcodeType||"CODE39",e.value,e.widthMM*8);
+     status.textContent="Код: "+coded.display+" · "+coded.moduleDots+" точек/модуль"+
+       (coded.checksum!==undefined?" · проверка: "+coded.checksum:"");
+   }catch(error){status.className="warn";status.textContent=error.message;}
+   root.appendChild(status);
+   const info=document.createElement("p");info.className="hint";
+   info.textContent="Штрихкод генерируется как сканируемые модули, не шрифт. В редакторе и в печати используется один кодировщик. EAN: контрольная цифра рассчитывается или проверяется.";
+   root.appendChild(info);
  }
  let positionActions=document.createElement("div");positionActions.className="actions";
  for(const [axis,title] of [["x","Блок по центру X"],["y","Блок по центру Y"]]){
@@ -406,6 +486,15 @@ function renderProps(){
    positionActions.appendChild(button);
  }
  root.appendChild(prop("Расположение блока",positionActions));
+ if(e.kind==="text"||e.kind==="barcode"||e.kind==="line"){
+   const full=document.createElement("button");full.type="button";
+   full.textContent="На всю ширину печати";
+   full.onclick=()=>{
+     checkpoint();e.xMM=0;e.widthMM=Math.min(55,doc.widthMM);
+     renderCanvas();renderProps();commit();
+   };
+   root.appendChild(prop("Ширина блока",full));
+ }
  let sep=document.createElement("div");sep.className="dividerline";root.appendChild(sep);
  let actions=document.createElement("div");actions.className="actions";
  let c=document.createElement("button");c.textContent="Дублировать";c.onclick=duplicate;

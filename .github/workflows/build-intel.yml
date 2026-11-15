@@ -11,6 +11,7 @@ on:
       - rewrite/web-shell-driver
       - fix/media-settings-template-compatibility-102
       - fix/sidebar-workflow-and-ui-103
+      - feat/ez2-native-fonts-barcodes-editor
   workflow_dispatch:
 
 permissions:
@@ -61,6 +62,9 @@ jobs:
           test -f build/LabelDesk.app/Contents/Resources/app.html
           test -f build/LabelDesk.app/Contents/Resources/app.js
           test -f build/LabelDesk.app/Contents/Resources/raster.js
+          test -f build/LabelDesk.app/Contents/Resources/barcodes.js
+          test -f build/LabelDesk.app/Contents/Resources/native.js
+          test -f build/LabelDesk.app/Contents/Resources/printer-native.sh
           test -f build/LabelDesk.app/Contents/Resources/printer.sh
           BIN="build/LabelDesk.app/Contents/MacOS/LabelDesk"
           test -f "$BIN"
@@ -120,12 +124,16 @@ jobs:
           set -euo pipefail
           python3 -c "import pathlib,re; s=pathlib.Path('LabelDesk/Resources/editor.html').read_text(); m=re.search(r'<script>(.*?)</script>',s,re.S); assert m; pathlib.Path('/tmp/label-editor.js').write_text(m.group(1))"
           node --check /tmp/label-editor.js
+          node --check LabelDesk/Resources/barcodes.js
+          node --check LabelDesk/Resources/native.js
           node --check LabelDesk/Resources/raster.js
           node --check LabelDesk/Resources/app.js
           node Tests/WebRasterSmoke.js
           node Tests/MediaCompatibilitySmoke.js
           node Tests/SidebarWorkflowSmoke.js
+          node Tests/BarcodesNativeSmoke.js
           zsh -n Scripts/printer.sh
+          zsh -n Scripts/printer-native.sh
 
       - name: Test selected-layer resize geometry
         shell: bash
@@ -192,4 +200,4 @@ jobs:
             --repo "$GITHUB_REPOSITORY" \
             --target "$GITHUB_SHA" \
             --title "LabelDesk ${APP_VERSION}" \
-            --notes "LabelDesk 1.0.3 for Intel macOS 15+. Repairs the complete folder/template sidebar workflow: independent copied base when creating folders, direct ☆ assign-base, template move/duplicate/delete with base protection, folder rename and nondestructive folder deletion, global search, safe unsaved-change handling, correct quick-fill and persisted queue. Refined UI hierarchy, spacing, sidebar and editor proportions. Media compatibility settings are unchanged. Printing protocol, working 38mm+2mm raster flow, secure updater and existing data files remain untouched. CI now includes full mocked WebKit/JSON workflow tests. App is ad-hoc signed, not notarized."
+            --notes "LabelDesk 1.0.4 for Intel macOS 15+. Visual editor creates text, barcode and line blocks across 55mm verified print width; old templates unchanged. New shared barcode generator supports Code39, Code128 B/C with Mod103 checksum, EAN8/EAN13 with verified or calculated check digit, quiet zones and minimum 2-dot modules. Barcode values can now be variable fields for quick-fill and batch jobs. Original April 2002 EZ-2 native ESC A font / ESC ? barcode commands have a strictly isolated one-label experimental test via printer-native.sh; this is not used by the production raster queue. Normal printer.sh, 280-row Gnn feed, installed-roll settings, folder workflows and secure updater remain unchanged. Experimental native paper placement has not yet been physically verified. Ad-hoc signed, not notarized."

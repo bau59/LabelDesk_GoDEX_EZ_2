@@ -3,17 +3,6 @@
 (function (root) {
   "use strict";
   const DOTS = 8, MAX_DOTS = 440, PRINT_ROWS = 280, GAP = 2;
-  const patterns = {
-    "0":"nnnwwnwnn","1":"wnnwnnnnw","2":"nnwwnnnnw","3":"wnwwnnnnn","4":"nnnwwnnnw",
-    "5":"wnnwwnnnn","6":"nnwwwnnnn","7":"nnnwnnwnw","8":"wnnwnnwnn","9":"nnwwnnwnn",
-    "A":"wnnnnwnnw","B":"nnwnnwnnw","C":"wnwnnwnnn","D":"nnnnwwnnw","E":"wnnnwwnnn",
-    "F":"nnwnwwnnn","G":"nnnnnwwnw","H":"wnnnnwwnn","I":"nnwnnwwnn","J":"nnnnwwwnn",
-    "K":"wnnnnnnww","L":"nnwnnnnww","M":"wnwnnnnwn","N":"nnnnwnnww","O":"wnnnwnnwn",
-    "P":"nnwnwnnwn","Q":"nnnnnnwww","R":"wnnnnnwwn","S":"nnwnnnwwn","T":"nnnnwnwwn",
-    "U":"wwnnnnnnw","V":"nwwnnnnnw","W":"wwwnnnnnn","X":"nwnnwnnnw","Y":"wwnnwnnnn",
-    "Z":"nwwnwnnnn","-":"nwnnnnwnw",".":"wwnnnnwnn"," ":"nwwnnnwnn",
-    "$":"nwnwnwnnn","/":"nwnwnnnwn","+":"nwnnnwnwn","%":"nnnwnwnwn","*":"nwnnwnwnn"
-  };
   const inRange = (n, min, max) => Number.isFinite(n) && n >= min && n <= max;
 
   function validate(label) {
@@ -80,30 +69,8 @@
   }
 
   function barcode(ctx, item, x,y,w,h) {
-    const value=String(item.value||"").toUpperCase();
-    if (!value || value.length>40 || Array.from(value).some(ch=>ch==="*" || !patterns[ch])) {
-      throw new Error("Некорректный Code 39: "+value);
-    }
-    const segments=Array.from("*"+value+"*").map(ch=>patterns[ch]);
-    const units=segments.reduce((total,s)=>total+Array.from(s).reduce((n,ch)=>n+(ch==="w"?3:1),0),0)+segments.length-1;
-    const narrow=Math.floor(w/units);
-    if (narrow<2) throw new Error("Недостаточно ширины для штрихкода "+value);
-    const barHeight=Math.max(4,h-(item.showsHumanReadable ? 16:0));
-    let pos=x;
-    segments.forEach((s,index)=>{
-      for (let i=0;i<s.length;i++) {
-        const bw=narrow*(s[i]==="w"?3:1);
-        if(i%2===0) ctx.fillRect(pos,y,bw,barHeight);
-        pos+=bw;
-      }
-      if(index!==segments.length-1)pos+=narrow;
-    });
-    if (item.showsHumanReadable) {
-      ctx.font='13px Menlo, monospace';
-      ctx.textAlign="center";
-      ctx.textBaseline="top";
-      ctx.fillText(value,x+w/2,y+h-16);
-    }
+    if(!root.EZ2Barcodes)throw new Error("Генератор штрихкодов не загружен");
+    return root.EZ2Barcodes.draw(ctx,item,x,y,w,h);
   }
 
   function draw(label) {
