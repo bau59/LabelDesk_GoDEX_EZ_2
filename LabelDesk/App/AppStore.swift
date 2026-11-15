@@ -358,6 +358,10 @@ final class AppStore: ObservableObject {
     func saveSettings() {
         // Material registration must be rechecked after changing sensor or Q.
         let oldProfile = storage.loadSettings().profile
+        if oldProfile.xOffsetMM != settings.profile.xOffsetMM
+            || oldProfile.yOffsetMM != settings.profile.yOffsetMM {
+            queue.pause()
+        }
         if oldProfile.topOfFormDots != settings.profile.topOfFormDots
             || oldProfile.sensorMode != settings.profile.sensorMode
             || oldProfile.automaticTopOfForm != settings.profile.automaticTopOfForm {
@@ -452,6 +456,54 @@ final class AppStore: ObservableObject {
     }
 
     func pauseQueue() { queue.pause() }
+
+    /// Explicit single-label calibration test. Uses the SAME raster encoder
+    /// and transport as the regular queue; leaves user templates untouched.
+    func sendCalibrationPattern() {
+        let profile = settings.profile
+        guard !profile.portPath.isEmpty else {
+            alert = AppAlert(title: "Порт не выбран", message: "Выберите USB–RS232 порт в настройках.")
+            return
+        }
+        let sample = EZ2CalibrationPattern.make(for: document)
+        let packet: Data
+        do {
+            packet = try encoder.nativeCommands(for: sample, profile: profile)
+        } catch {
+            alert = AppAlert(title: "Ошибка размеров этикетки", message: error.localizedDescription)
+            return
+        }
+        alert = AppAlert(
+            title: "Напечатать одну калибровочную этикетку?",
+            message: "Будет передана одна рамка с отступом 2 мм от краёв, осевыми линиями и текущими поправками X/Y. Размер: \(Int(document.widthMM))×\(Int(document.heightMM)) мм, зазор \(Int(document.gapMM)) мм. Проверьте положение бумаги.",
+            action: { [weak self] in self?.performCalibrationPattern(data: packet, profile: profile) }
+        )
+    }
+
+    private func performCalibrationPattern(data: Data, profile: PrinterProfile) {
+        queue.pause()
+        status = "Передача одной калибровочной этикетки…"
+        let diagnostics = queue.diagnostics
+        diagnostics.record("calibration begin", details:
+            "port=\(profile.portPath) size=\(document.widthMM)x\(document.heightMM) gap=\(document.gapMM) x=\(profile.xOffsetMM) y=\(profile.yOffsetMM) autoQ=\(profile.automaticTopOfForm) bytes=\(data.count)")
+        Task.detached { [serialPort, diagnostics] in
+            do {
+                try serialPort.write(data, profile: profile, rasterTransport: profile.rasterTransport) { stage in
+                    Task { @MainActor in diagnostics.record("calibration serial", details: stage) }
+                }
+                await diagnostics.record("calibration sent", details: "TX complete; inspect actual paper output")
+                await MainActor.run {
+                    self.status = "Калибровка передана; проверьте рамку на бумаге"
+                }
+            } catch {
+                await diagnostics.record("calibration FAILED", details: error.localizedDescription)
+                await MainActor.run {
+                    self.status = "Калибровка не передана"
+                    self.alert = AppAlert(title: "Ошибка передачи", message: error.localizedDescription)
+                }
+            }
+        }
+    }
 
     func sendFeedTest() {
         let profile = settings.profile
