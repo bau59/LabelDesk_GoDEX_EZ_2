@@ -192,7 +192,9 @@ function moveLayer(delta){
  checkpoint();let item=doc.elements.splice(index,1)[0];doc.elements.splice(dest,0,item);draw();commit();
 }
 function remove(){if(!selected||!doc)return;checkpoint();doc.elements=doc.elements.filter(e=>e.id!==selected);selected=null;draw();commit();}
-function duplicate(){const e=selectedObj();if(!e)return;checkpoint();let copy=clone(e);copy.id=uid();copy.xMM=Math.min(Math.max(0,doc.widthMM-copy.widthMM),copy.xMM+1);copy.yMM=Math.min(Math.max(0,doc.heightMM-copy.heightMM),copy.yMM+1);doc.elements.push(copy);selected=copy.id;draw();commit();}
+function duplicate(){const e=selectedObj();if(!e)return;checkpoint();let copy=clone(e);copy.id=uid();
+ if(doc.printMode==="text"){copy.xMM=0;copy.widthMM=Math.min(55,doc.widthMM);}
+ else {copy.xMM=Math.min(Math.max(0,doc.widthMM-copy.widthMM),copy.xMM+1);copy.yMM=Math.min(Math.max(0,doc.heightMM-copy.heightMM),copy.yMM+1);}doc.elements.push(copy);selected=copy.id;draw();commit();}
 function labelFor(e){const variable=((e.kind==="text"||e.kind==="barcode")&&e.isVariable!==false)?" • перем.":"";return typeNames[e.kind]+variable+" · "+(e.value||"");}
 function renderLayers(){
  const root=$("layers");root.replaceChildren();
@@ -496,7 +498,8 @@ function renderProps(){
      symbols.appendChild(button);
    }
    root.appendChild(prop("Символы рамок (CP437)",symbols));
-   root.appendChild(checkbox("Жирный",e.isBold,n=>{e.isBold=n;}));
+   if(doc.printMode!=="text")
+     root.appendChild(checkbox("Жирный",e.isBold,n=>{e.isBold=n;}));
    const alignControls=document.createElement("div");alignControls.className="text-align-controls";
    for(const [mode,title] of [["left","По левому краю"],["center","По центру"],["right","По правому краю"]]){
      const button=document.createElement("button");button.type="button";
@@ -517,7 +520,7 @@ function renderProps(){
    let rotation=document.createElement("select");
    for(let angle of [0,90,180,270]){let opt=document.createElement("option");opt.value=angle;opt.textContent=angle+"°";rotation.append(opt);}rotation.value=e.rotation;
    rotation.addEventListener("change",()=>{checkpoint();e.rotation=Number(rotation.value);renderCanvas();commit();});
-   root.appendChild(prop("Поворот",rotation));
+   if(doc.printMode!=="text")root.appendChild(prop("Поворот",rotation));
  } else if(e.kind==="barcode"){
    const kind=document.createElement("select");
    for(const [id,label] of [["CODE128","Code 128 (автоматически B/C)"],["CODE39","Code 39"],
@@ -614,6 +617,7 @@ document.addEventListener("keydown",function(ev){
  if((ev.metaKey||ev.ctrlKey)&&ev.key.toLowerCase()==="z"){ev.preventDefault();if(ev.shiftKey)$("redo").click();else $("undo").click();return;}
  if(!editable&&selected&&["ArrowLeft","ArrowRight","ArrowUp","ArrowDown"].includes(ev.key)){
    ev.preventDefault();
+   if(doc?.printMode==="text")return;
    const e=selectedObj();if(!e)return;
    const step=ev.shiftKey?1:(snap?1:0.125);
    const dx=ev.key==="ArrowLeft"?-step:ev.key==="ArrowRight"?step:0;
