@@ -27,9 +27,11 @@ ESC P01
 
 That startup operation consumes **one physical label**. After it completes serial transmission, the host waits the configured inter-label interval.
 
-Each actual label uses **Line Mode**: exactly 280 commands consisting of `ESC G55` plus 55 raw bitmap bytes, followed by one `FF` (`0x0C`). Every row is sent as one 59-byte chunk with **no intentional per-row delay**. There are no `ESC Q`, speed, density, additional feed or buffered graphic commands in the raster path.
+After the T3 startup label, the application waits the configured interval, opens one Line Mode serial connection and sends `ESC F0`, `ESC q040`, `ESC M01` again, exactly as in the successful full-size two-label terminal test. **The same serial port stays open for the entire batch.**
 
-After `tcdrain`, the application waits `labelIntervalSeconds` before sending the next label, including between different queue jobs. The default is **1.5 seconds**, adjustable under **Настройки принтера → Интервал между этикетками** (0.2–10 s). The queue stops on serial errors; it does not replay an uncertain label.
+Each actual label consists of `ESC Gnn` rows followed by `FF` (`0x0C`). There is **no per-row delay**. The encoder uses the smallest constant `nn` from 10 to 55 bytes containing all ink and sends only the occupied height, rounded to whole millimeters, at least 32 and at most 280 rows. For content reaching the full tested area it still emits exactly `G55 × 280 + FF`. This avoids transmitting 16.5 KB for a one-word label.
+
+After `tcdrain`, the application waits `labelIntervalSeconds` before sending the next label, including between different queue jobs. The persistent RS-232 connection closes after the batch or on an error. The default is **1.5 seconds**, adjustable under **Настройки принтера → Интервал между этикетками** (0.2–10 s). The queue stops on serial errors; it does not replay an uncertain label.
 
 Existing settings JSON remains readable, but obsolete Q, X/Y, transport/pacing, sensor and flow-control fields are ignored. Existing templates and folders are left unchanged. New documents default to 58 × 38 mm and 2 mm gap.
 
@@ -46,6 +48,6 @@ The encoder rejects non-white content below the tested 35-mm printing height rat
 
 Run `zsh Scripts/build-installer.sh` on an Intel Mac with Xcode. GitHub Actions builds the Intel package and runs Swift raster, quick-fill, updater and diagnostic tests. The macOS package is ad-hoc signed, not notarized.
 
-The software has been changed to reflect actual hardware trials. **The new Swift serial implementation still requires a physical end-to-end test on the user's printer** before prolonged production use.
+Version 0.9.3 was physically tested and exposed an error: the T3 header alone did not reliably preserve next-label positioning, and fixed G55×280 took at least 17 seconds at 9600 baud even for tiny text. Version 0.9.4 corrects those discrepancies against the known-good terminal scripts. **The corrected Swift application still requires physical verification before production printing.**
 
 Download releases: https://github.com/bau59/LabelDesk_GoDEX_EZ_2/releases
