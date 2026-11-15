@@ -10,6 +10,7 @@ on:
       - fix/ez2-job-tear-feed-095
       - rewrite/web-shell-driver
       - fix/media-settings-template-compatibility-102
+      - fix/sidebar-workflow-and-ui-103
   workflow_dispatch:
 
 permissions:
@@ -123,6 +124,7 @@ jobs:
           node --check LabelDesk/Resources/app.js
           node Tests/WebRasterSmoke.js
           node Tests/MediaCompatibilitySmoke.js
+          node Tests/SidebarWorkflowSmoke.js
           zsh -n Scripts/printer.sh
 
       - name: Test selected-layer resize geometry
@@ -190,4 +192,4 @@ jobs:
             --repo "$GITHUB_REPOSITORY" \
             --target "$GITHUB_SHA" \
             --title "LabelDesk ${APP_VERSION}" \
-            --notes "LabelDesk 1.0.2 for Intel macOS 15+. Installed roll dimensions (width, height, gap) are now adjustable in printer settings. New templates inherit these dimensions; existing templates are never deleted or resized, and incompatible sizes are marked in the library, editor, quick-fill and queue. Printing incompatible jobs is blocked without removing them. Gray marker shows independently verified G55 print limit, red overlay denotes configured paper dimensions. Existing 38mm+2mm working print transport unchanged; alternate media pitch cannot be printed until verified. In-app secure updater preserved."
+            --notes "LabelDesk 1.0.3 for Intel macOS 15+. Repairs the complete folder/template sidebar workflow: independent copied base when creating folders, direct ☆ assign-base, template move/duplicate/delete with base protection, folder rename and nondestructive folder deletion, global search, safe unsaved-change handling, correct quick-fill and persisted queue. Refined UI hierarchy, spacing, sidebar and editor proportions. Media compatibility settings are unchanged. Printing protocol, working 38mm+2mm raster flow, secure updater and existing data files remain untouched. CI now includes full mocked WebKit/JSON workflow tests. App is ad-hoc signed, not notarized."
