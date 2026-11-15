@@ -17,7 +17,7 @@ private struct QueueContent: View {
             HStack(spacing: 12) {
                 Label(store.status, systemImage: store.rasterVerified ? "checkmark.circle" : "exclamationmark.triangle")
                     .font(.caption)
-                    .foregroundStyle(store.rasterVerified ? .secondary : .orange)
+                    .foregroundStyle(store.rasterVerified ? Color.secondary : Color.orange)
                 Spacer()
                 Stepper("Copies: \(store.copies)", value: $store.copies, in: 1...99)
                     .frame(width: 150)
@@ -53,7 +53,7 @@ private struct QueueContent: View {
                         Text(job.title).lineLimit(1)
                         Spacer()
                         Text(job.state.rawValue.capitalized)
-                            .foregroundStyle(job.state == .failed || job.state == .uncertain ? .red : .secondary)
+                            .foregroundStyle(job.state == .failed || job.state == .uncertain ? Color.red : Color.secondary)
                         if job.state == .pending {
                             Button("Cancel") { queue.cancel(job.id) }
                         } else if job.state == .failed || job.state == .uncertain {
