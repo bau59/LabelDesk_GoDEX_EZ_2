@@ -27,6 +27,18 @@ The **compiled Swift app provides a WebKit window, a file/Process bridge and the
 
 On installation/update, bundled runtime files overwrite the local version **only when it is still identical to the previously installed unmodified version**. Hand edits in `live/` are intentionally preserved.
 
+## Sidebar and template workflow (1.0.3)
+
+The library is now a real folder/template manager, not a flat shortcut list. Open a folder to display its assigned base template in **Quick Fill**, or choose any saved template to open it in the editor. Change the folder's base with the **☆** control next to a template in that folder, or with the explicit dropdown in the folder inspector. The blue/gray selection distinguishes the currently edited template from the folder's persistent base; a gold star denotes the base.
+
+Create a folder → the current editor label is **cloned into a new independent base JSON**; the original is not moved or overwritten. New templates created while inside a folder belong to it. Save them and assign them as the base using ☆. A template can be duplicated, moved between folders, or moved to *Unfiled*. Moving/deleting an active base is blocked until another base is selected. Rename folders freely. Removing a folder **moves all its templates into Unfiled** without deleting template files, and attempts to roll back on a partial write failure.
+
+Search matches templates **globally** across folders. With an empty search, the selected folder filters the list. Draft changes prompt before switching folders/templates; the editor shows the current folder/template and unsaved state. Quick-fill only changes variable text in a queued snapshot and never overwrites the saved base. Existing media incompatibility markers are retained.
+
+The interface has a wider hierarchical sidebar, direct template actions, clearer navigation and adjusted editor panel widths. Printer transport (`printer.sh`), EZ-2 serial commands, existing JSON storage paths, queue transmission and secure native updater are **unchanged**.
+
+CI exercises the actual UI controller using a fake WebKit/JSON bridge: folder creation, independent base clone, assignment by dropdown and star, duplication/move, rename/delete with file preservation, global search, draft protection, quick-fill, queue, printing invocation and failed-write rollback. Browser appearance still needs inspection in the actual application window; the connected Mac is currently offline.
+
 ## Installed roll and template compatibility (1.0.2)
 
 Under Settings → **Installed roll**, set the **width, height and gap** actually loaded in the printer. Default is **58 × 38 mm, 2 mm gap**. Existing `settings.json` files without these fields use those defaults; other settings keys are retained.
@@ -66,4 +78,4 @@ zsh Scripts/build-installer.sh
 
 GitHub Actions compiles an Intel x86_64 app and DMG and runs syntax and compatibility tests. Printing one copy and three copies within one job was physically confirmed on test 1.0.0. Two distinct queued jobs and the inter-job separator remain to be physically verified. Test short batches before production.
 
-The new native toolbar contains **Check for updates** / **Install update** using the existing SHA-256 and Intel signed-package verification plus rollback helper. From v1.0.1, the built-in updater can install 1.0.2. The temporary v1.0.0 test build did not include an updater, so users running it need to replace the app once using the 1.0.1 installer; subsequent updates work in-app. The app includes a button under Settings → *Open working files* to edit the files directly. The driver can also be inspected using a standard editor. No background daemon, open HTTP port or Node/Python runtime is involved.
+The new native toolbar contains **Check for updates** / **Install update** using the existing SHA-256 and Intel signed-package verification plus rollback helper. From v1.0.2, the built-in updater can install 1.0.3. The temporary v1.0.0 test build did not include an updater, so users running it need to replace the app once using the 1.0.1 installer; subsequent updates work in-app. The app includes a button under Settings → *Open working files* to edit the files directly. The driver can also be inspected using a standard editor. No background daemon, open HTTP port or Node/Python runtime is involved.
