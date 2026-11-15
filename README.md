@@ -27,6 +27,28 @@ Download the latest Intel DMG from https://github.com/bau59/LabelDesk_GoDEX_EZ_2
 
 The raster uses one ESC Gnn command per row with nn raw monochrome bytes (1 = black), a 1 mm left-margin command, ESC q with the full label height plus gap, and FF. The original ESC Q176 is used for the verified TEST only. ESC Q and ESC q are different instructions. A 55 mm raster is *not* the same as a 60 mm printable area.
 
+## Version 0.5.0 — HTML editor and paper feed
+
+The old SwiftUI canvas and inspector are replaced by an **offline HTML/JavaScript editor embedded in WKWebView**. SwiftUI continues to manage saved templates, printer settings, print queue and release updates. No server, remote assets, CDN, Electron or JavaScript dependencies.
+
+- **Layers:** click any object, reorder it using arrows, duplicate or delete.
+- **Canvas:** drag objects, use a millimetre grid and adjustable zoom.
+- **Inspector:** edit text in a real textarea (double-click a text object to focus it), barcode values, position, size, font size and weight, and rotation.
+- **Undo/redo**, Cmd+S to save and existing JSON template compatibility.
+
+### Paper-feed validation
+
+The user reported that full raster labels stopped at the last raster row instead of positioning the next label, although the original text TEST and Raster TEST advanced correctly.
+
+Version 0.5 restores **ESC Q176** from the physically verified tests before the existing **ESC qNNN** (label height plus gap) and final form feed. It deliberately does **not** append an arbitrary ESC fNN movement, which could skip labels. Q176 is a setting that worked for the user's test roll, not a universal constant for every label size.
+
+Choose your actual label height and gap, press **Feed TEST** to print a single small raster, and confirm only if the paper reaches the start of the next label. The queue is locked until this new feed-alignment test has been confirmed. If the test fails, report material dimensions and the exact stopping position before changing commands again.
+
+### Serial speed
+
+The tested RS-232 speed is 9600 baud. Full-width 55 mm raster data is inherently slow at that bit rate. The encoder now removes **trailing white bytes on each raster row** while preserving leading whitespace and row count. A blank row uses ESC G01 followed by a zero byte. This reduces sparse label transfers significantly, but full-width graphical borders still require substantial data.
+
+Packet tests verify that only trailing zero bytes are dropped. The optimized raster output still requires physical validation on the EZ-2. Do not increase the adapter baud rate unless the printer's serial configuration is changed accordingly.
 ## How to test version 0.3.0
 
 1. Select your USB serial port under Printer settings and save; old settings migrate from the working TEST app.
