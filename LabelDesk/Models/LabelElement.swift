@@ -13,6 +13,19 @@ enum LabelElementKind: String, Codable, CaseIterable, Identifiable {
     }
 }
 
+/// Text alignment; optional in LabelElement so pre-0.9 templates decode unchanged.
+enum LabelTextAlignment: String, Codable, CaseIterable, Identifiable {
+    case left, center, right
+    var id: String { rawValue }
+    var title: String {
+        switch self {
+        case .left: "Слева"
+        case .center: "По центру"
+        case .right: "Справа"
+        }
+    }
+}
+
 struct LabelElement: Codable, Identifiable, Equatable {
     var id = UUID()
     var kind: LabelElementKind
@@ -29,6 +42,9 @@ struct LabelElement: Codable, Identifiable, Equatable {
     /// Unset text fields are considered variable until the designer marks them static.
     var isVariable: Bool? = true
     var fieldName: String?
+    /// Nil on older JSON files means left-aligned text.
+    var textAlignment: LabelTextAlignment? = .left
+    var effectiveTextAlignment: LabelTextAlignment { textAlignment ?? .left }
 
     var isValidCode39: Bool {
         !value.isEmpty && value.unicodeScalars.allSatisfy { "ABCDEFGHIJKLMNOPQRSTUVWXYZ0123456789-. $/+%".unicodeScalars.contains($0) }

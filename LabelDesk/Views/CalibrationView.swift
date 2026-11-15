@@ -1,27 +1,311 @@
 import SwiftUI
 
+/// Guided calibration for the original EZ-2. No undocumented reset/autosense
+/// commands are sent: the operator measures an actual one-label print.
 struct CalibrationView: View {
     @EnvironmentObject private var store: AppStore
     @Environment(\.dismiss) private var dismiss
 
+    @State private var step = 0
+    @State private var widthMM: Double = 40
+    @State private var heightMM: Double = 30
+    @State private var gapMM: Double = 3
+    @State private var draft = PrinterProfile()
+
+    private var hasChanges: Bool {
+        draft != store.settings.profile
+            || widthMM != store.document.widthMM
+            || heightMM != store.document.heightMM
+            || gapMM != store.document.gapMM
+    }
+
     var body: some View {
-        VStack(alignment: .leading, spacing: 16) {
-            Text("Material calibration").font(.title2)
-            Text("Set the material dimensions below, then use the explicit TEST command from the main window to check paper movement. No automatic calibration command is sent.")
-            Form {
-                NumberField(title: "Label width", value: $store.document.widthMM, suffix: "mm")
-                NumberField(title: "Label height", value: $store.document.heightMM, suffix: "mm")
-                NumberField(title: "Inter-label gap", value: $store.document.gapMM, suffix: "mm")
-                NumberField(title: "Horizontal correction", value: $store.settings.profile.xOffsetMM, suffix: "mm")
-                NumberField(title: "Vertical correction", value: $store.settings.profile.yOffsetMM, suffix: "mm")
+        VStack(spacing: 0) {
+            HStack(spacing: 11) {
+                Image(systemName: "scope")
+                    .font(.system(size: 20))
+                    .foregroundStyle(DeskPalette.accent)
+                    .frame(width: 42, height: 42)
+                    .background(DeskPalette.paleBlue, in: RoundedRectangle(cornerRadius: 11))
+                VStack(alignment: .leading, spacing: 4) {
+                    Text("Калибровка этикетки")
+                        .font(.system(size: 21, weight: .semibold))
+                        .foregroundStyle(DeskPalette.ink)
+                    Text("GoDEX EZ-2 · одна пробная этикетка на каждый шаг")
+                        .font(.system(size: 12))
+                        .foregroundStyle(DeskPalette.secondary)
+                }
+                Spacer()
+                Button("Закрыть") { dismiss() }
+                    .buttonStyle(.bordered)
             }
-            GroupBox("Gap sensor — manual adjustment") {
-                Text("With the printer powered on and label material under the sensor, adjust the VR slowly and press FEED repeatedly until the indicator is green and the feed aligns. This is a mechanical setting on the EZ-2; LabelDesk does not claim to calibrate it electronically.")
-                    .fixedSize(horizontal: false, vertical: true)
+            .padding(21)
+
+            DeskPalette.border.frame(height: 1)
+
+            Picker("Этап", selection: $step) {
+                Text("1. Материал").tag(0)
+                Text("2. Подача ленты").tag(1)
+                Text("3. Положение печати").tag(2)
             }
-            HStack { Spacer(); Button("Save and close") { store.saveSettings(); dismiss() }.buttonStyle(.borderedProminent) }
+            .pickerStyle(.segmented)
+            .padding(.horizontal, 23)
+            .padding(.vertical, 15)
+
+            ScrollView {
+                VStack(alignment: .leading, spacing: 18) {
+                    switch step {
+                    case 0: materialStep
+                    case 1: feedStep
+                    default: positionStep
+                    }
+                }
+                .padding(.horizontal, 23)
+                .padding(.bottom, 20)
+                .frame(maxWidth: .infinity, alignment: .topLeading)
+            }
+
+            DeskPalette.border.frame(height: 1)
+
+            VStack(spacing: 10) {
+                if hasChanges {
+                    Label("Сначала сохраните новые параметры. Тест будет использовать сохранённый профиль.",
+                          systemImage: "exclamationmark.circle")
+                        .font(.system(size: 11))
+                        .foregroundStyle(DeskPalette.amber)
+                        .frame(maxWidth: .infinity, alignment: .leading)
+                }
+                HStack(spacing: 9) {
+                    Button("Сохранить параметры") {
+                        _ = store.applyCalibration(widthMM: widthMM, heightMM: heightMM,
+                                                   gapMM: gapMM, profile: draft)
+                    }
+                    .buttonStyle(.borderedProminent)
+                    .tint(DeskPalette.accent)
+                    .disabled(!hasChanges)
+
+                    Button("Feed TEST") { store.sendFeedTest() }
+                        .disabled(hasChanges)
+                    if store.feedTestPending {
+                        Button("Подтвердить подачу") { store.confirmFeedTest() }
+                            .disabled(hasChanges)
+                    }
+                    Spacer()
+                    Button("Печать рамки", systemImage: "square.dashed") {
+                        store.sendCalibrationPattern()
+                    }
+                    .disabled(hasChanges)
+                    .help("Напечатает только одну этикетку, без изменений шаблона")
+                }
+            }
+            .padding(19)
         }
-        .padding(20)
-        .frame(width: 560)
+        .background(Color.white)
+        .frame(width: 760, height: 650)
+        .onAppear {
+            widthMM = store.document.widthMM
+            heightMM = store.document.heightMM
+            gapMM = store.document.gapMM
+            draft = store.settings.profile
+        }
+        .alert(store.alert?.title ?? "", isPresented: Binding(
+            get: { store.alert != nil },
+            set: { if !$0 { store.alert = nil } }
+        )) {
+            if let action = store.alert?.action {
+                Button("Подтвердить") {
+                    store.alert = nil
+                    action()
+                }
+                Button("Отмена", role: .cancel) { store.alert = nil }
+            } else {
+                Button("OK") { store.alert = nil }
+            }
+        } message: {
+            Text(store.alert?.message ?? "")
+        }
+    }
+
+    private var materialStep: some View {
+        VStack(alignment: .leading, spacing: 17) {
+            heading("Укажите фактический материал",
+                    subtitle: "Ширину и высоту измерьте по самой наклейке, зазор — между наклейками.")
+            VStack(alignment: .leading, spacing: 14) {
+                dimension("Ширина, мм", value: $widthMM, range: 10...55)
+                dimension("Высота, мм", value: $heightMM, range: 10...100)
+                dimension("Зазор, мм", value: $gapMM, range: 0...10)
+                Divider()
+                Picker("Тип датчика", selection: $draft.sensorMode) {
+                    ForEach(EZ2SensorMode.allCases) { mode in
+                        Text(mode.title).tag(mode)
+                    }
+                }
+                .frame(maxWidth: .infinity, alignment: .leading)
+            }
+            .deskSurface()
+
+            note("Эти значения изменяют текущий шаблон после сохранения. Если его объекты выходят за новые границы, сохранение будет отклонено. Для обычных наклеек с просветом используйте соответствующий датчик.")
+            note("Механика EZ-2: уложите рулон, придвиньте направляющую и проверьте расположение датчика просвета. Чувствительность VR регулируется на самом принтере, а не программой.")
+        }
+    }
+
+    private var feedStep: some View {
+        VStack(alignment: .leading, spacing: 17) {
+            heading("Положение остановки ленты",
+                    subtitle: "Настраивается расстояние до начала следующей этикетки, а не размещение текста.")
+            VStack(alignment: .leading, spacing: 15) {
+                Toggle("Подбирать ESC Q по высоте этикетки", isOn: $draft.automaticTopOfForm)
+                    .font(.system(size: 13))
+                Divider()
+                if draft.automaticTopOfForm {
+                    HStack {
+                        Text("Для высоты \(Int(heightMM)) мм")
+                        Spacer()
+                        Text("Q\(String(format: "%03d", GodexEZ2Encoder.labelStopQ(heightMM: Int(heightMM))))")
+                            .font(.system(.body, design: .monospaced, weight: .semibold))
+                    }
+                } else {
+                    Stepper(value: $draft.topOfFormDots, in: 4...999, step: 8) {
+                        HStack {
+                            Text("Ручное значение ESC Q")
+                            Spacer()
+                            Text("\(draft.topOfFormDots)")
+                                .monospacedDigit()
+                        }
+                    }
+                }
+                Divider()
+                HStack {
+                    Text("Длина наклейки с зазором (ESC q)")
+                    Spacer()
+                    Text("\(Int(heightMM + gapMM)) мм")
+                        .fontWeight(.semibold)
+                }
+            }
+            .font(.system(size: 13))
+            .deskSurface()
+
+            note("Порядок: сохранить → нажать Feed TEST → убедиться, что лента дошла до начала следующей наклейки → подтвердить подачу. Не подтверждайте, если принтер остановился слишком рано или пропустил наклейку.")
+            note("Если ошибка повторяется на каждой наклейке, проверьте высоту, зазор и механический датчик. При ручной настройке Q изменяйте значение небольшими шагами и повторяйте тест.")
+        }
+    }
+
+    private var positionStep: some View {
+        VStack(alignment: .leading, spacing: 17) {
+            heading("Положение изображения и рабочая ширина",
+                    subtitle: "Поправки смещают содержимое этикетки, но не изменяют движение рулона.")
+            VStack(alignment: .leading, spacing: 18) {
+                axisControl("X — влево / вправо", value: $draft.xOffsetMM,
+                            help: "Положительное X сдвигает рисунок вправо.")
+                Divider()
+                axisControl("Y — раньше / позже", value: $draft.yOffsetMM,
+                            help: "Положительное Y сдвигает рисунок ниже по этикетке.")
+            }
+            .deskSurface()
+            VStack(alignment: .leading, spacing: 11) {
+                HStack {
+                    Text("Пробная рамка")
+                        .font(.system(size: 14, weight: .semibold))
+                        .foregroundStyle(DeskPalette.ink)
+                    Spacer()
+                    Text("2 мм от краёв")
+                        .font(.system(size: 11))
+                        .foregroundStyle(DeskPalette.secondary)
+                }
+                HStack(spacing: 17) {
+                    calibrationDiagram
+                    VStack(alignment: .leading, spacing: 8) {
+                        Text("Рамка показывает все четыре края и центральные оси.")
+                        Text("Если она смещена, меняйте X/Y и печатайте повторно.")
+                        Text("Если правый край обрезан, уменьшите X или ширину макета. Головка EZ-2 ограничивает растровую печать 55 мм.")
+                    }
+                    .font(.system(size: 12))
+                    .foregroundStyle(DeskPalette.secondary)
+                    .fixedSize(horizontal: false, vertical: true)
+                }
+            }
+            .deskSurface()
+            note("Если лента начинает печатать на предыдущей наклейке, сначала исправьте датчик и подачу на этапе 2. Здесь исправляется только расположение графики в пределах текущей этикетки.")
+        }
+    }
+
+    private var calibrationDiagram: some View {
+        ZStack {
+            Rectangle().fill(Color.white)
+            Rectangle().stroke(DeskPalette.ink, lineWidth: 1.5).padding(12)
+            Rectangle().fill(DeskPalette.secondary).frame(width: 1)
+                .padding(.vertical, 12)
+            Rectangle().fill(DeskPalette.secondary).frame(height: 1)
+                .padding(.horizontal, 12)
+        }
+        .frame(width: 146, height: 95)
+        .overlay { Rectangle().strokeBorder(DeskPalette.border) }
+    }
+
+    private func heading(_ title: String, subtitle: String) -> some View {
+        VStack(alignment: .leading, spacing: 6) {
+            Text(title)
+                .font(.system(size: 19, weight: .semibold))
+                .foregroundStyle(DeskPalette.ink)
+            Text(subtitle)
+                .font(.system(size: 12))
+                .foregroundStyle(DeskPalette.secondary)
+        }
+    }
+
+    private func dimension(_ title: String, value: Binding<Double>, range: ClosedRange<Double>) -> some View {
+        Stepper(value: value, in: range, step: 1) {
+            HStack {
+                Text(title)
+                Spacer()
+                Text("\(Int(value.wrappedValue))")
+                    .monospacedDigit()
+                    .fontWeight(.semibold)
+            }
+        }
+        .font(.system(size: 13))
+    }
+
+    private func axisControl(_ title: String, value: Binding<Double>, help: String) -> some View {
+        VStack(alignment: .leading, spacing: 9) {
+            HStack {
+                Text(title)
+                    .font(.system(size: 13, weight: .semibold))
+                    .foregroundStyle(DeskPalette.ink)
+                Spacer()
+                Text(String(format: "%+.3f мм", value.wrappedValue))
+                    .font(.system(size: 13, design: .monospaced))
+                    .foregroundStyle(DeskPalette.ink)
+            }
+            HStack(spacing: 8) {
+                Button {
+                    value.wrappedValue = max(-8, value.wrappedValue - 0.125)
+                } label: { Image(systemName: "minus") }
+                .buttonStyle(.bordered)
+                Slider(value: value, in: -8...8, step: 0.125)
+                    .tint(DeskPalette.accent)
+                Button {
+                    value.wrappedValue = min(8, value.wrappedValue + 0.125)
+                } label: { Image(systemName: "plus") }
+                .buttonStyle(.bordered)
+                Button("0") { value.wrappedValue = 0 }
+                    .buttonStyle(.bordered)
+                    .help("Сбросить поправку")
+            }
+            Text(help).font(.system(size: 11)).foregroundStyle(DeskPalette.secondary)
+        }
+    }
+
+    private func note(_ value: String) -> some View {
+        HStack(alignment: .top, spacing: 10) {
+            Image(systemName: "info.circle")
+                .foregroundStyle(DeskPalette.accent)
+            Text(value)
+                .foregroundStyle(DeskPalette.secondary)
+                .fixedSize(horizontal: false, vertical: true)
+        }
+        .font(.system(size: 12))
+        .padding(13)
+        .background(DeskPalette.background, in: RoundedRectangle(cornerRadius: 10))
     }
 }

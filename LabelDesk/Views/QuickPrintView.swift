@@ -75,20 +75,28 @@ struct QuickPrintView: View {
                                     .tint(DeskPalette.accent)
                             }
                         } else {
+                            Text("Enter создаёт новую строку. Длинные слова и предложения переносятся в рамках текстового блока; всё лишнее по высоте обрезается.")
+                                .font(.system(size: 11))
+                                .foregroundStyle(DeskPalette.secondary)
+                                .fixedSize(horizontal: false, vertical: true)
                             ForEach(store.quickFields) { field in
                                 VStack(alignment: .leading, spacing: 7) {
                                     Text(field.title)
                                         .font(.system(size: 12, weight: .semibold))
                                         .foregroundStyle(DeskPalette.ink)
-                                    TextField(
-                                        "Введите \(field.title.lowercased())",
+                                    TextEditor(
                                         text: Binding(
                                             get: { store.quickValues[field.id] ?? field.initialValue },
                                             set: { store.quickValues[field.id] = $0 }
                                         )
                                     )
-                                    .textFieldStyle(.roundedBorder)
-                                    .controlSize(.large)
+                                    .font(.system(size: 14))
+                                    .scrollContentBackground(.hidden)
+                                    .padding(7)
+                                    .frame(minHeight: 83, maxHeight: 120)
+                                    .background(DeskPalette.background, in: RoundedRectangle(cornerRadius: 9))
+                                    .overlay { RoundedRectangle(cornerRadius: 9).strokeBorder(DeskPalette.border) }
+                                    .help("Enter — новая строка; длинный текст переносится внутри границ блока")
                                 }
                             }
                         }

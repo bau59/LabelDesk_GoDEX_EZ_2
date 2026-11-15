@@ -34,4 +34,12 @@ assert.match(html, /zoomMode==="fit"/, "Responsive fit zoom should exist");
 assert.match(html, /ArrowLeft.*ArrowRight.*ArrowUp.*ArrowDown/, "Arrow keys should nudge objects");
 assert.match(html, /for\(const corner of \["nw","ne","sw","se"\]\)/, "Four actual handles expected");
 assert.match(html, /previousSelected=selected\?\.toLowerCase\(\)/, "Selection must survive save/reload");
-console.log("Editor geometry smoke test passed: click selection, hover, fit zoom, keyboard and four-corner resizing.");
+assert.match(html, /visual\.style\.textAlign=e\.textAlignment\|\|"left"/,
+             "HTML preview must use saved text alignment");
+assert.match(html, /e\.textAlignment=mode/,
+             "Inspector must update text alignment");
+assert.match(html, /e\.xMM=Math\.max\(0,\(doc\.widthMM-e\.widthMM\)\/2\)/,
+             "Selected block must support horizontal centering");
+assert.match(html, /e\.yMM=Math\.max\(0,\(doc\.heightMM-e\.heightMM\)\/2\)/,
+             "Selected block must support vertical centering");
+console.log("Editor geometry smoke test passed: mouse interaction, text alignment, centering and four-corner resizing.");
