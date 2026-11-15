@@ -55,7 +55,7 @@ struct MainView: View {
                     case .editor:
                         EditorView()
                     case .queue:
-                        PrintQueueView()
+                        PrintQueueView(onBack: { showQueue = false })
                     }
                 }
                 .frame(minWidth: 730, maxWidth: .infinity, maxHeight: .infinity)
