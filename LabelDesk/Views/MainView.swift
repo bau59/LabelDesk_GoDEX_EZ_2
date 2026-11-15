@@ -66,6 +66,8 @@ struct MainView: View {
         }
         .background(DeskPalette.background)
         .frame(minWidth: 1090, minHeight: 710)
+        .onChange(of: store.selectedFolderID) { _, _ in showQueue = false }
+        .onChange(of: store.mode) { _, _ in showQueue = false }
         .sheet(isPresented: $store.showSettings) { PrinterSettingsView() }
         .sheet(isPresented: $store.showCalibration) { CalibrationView() }
         .alert(store.alert?.title ?? "", isPresented: Binding(
@@ -105,7 +107,7 @@ struct MainView: View {
                 navigationButton("Заполнение", icon: "text.badge.checkmark", for: .quick)
                     .disabled(store.activeFolder == nil)
                 navigationButton("Редактор", icon: "slider.horizontal.3", for: .editor)
-                navigationButton("Очередь", icon: "printer", for: .queue)
+                 navigationButton(pendingJobs > 0 ? "Очередь · \(pendingJobs)" : "Очередь", icon: "printer", for: .queue)
             }
             .padding(4)
             .background(DeskPalette.background, in: RoundedRectangle(cornerRadius: 11))
@@ -133,23 +135,15 @@ struct MainView: View {
             }
             .buttonStyle(.bordered)
 
-            Button {
-                showQueue = true
-            } label: {
-                HStack(spacing: 7) {
-                    Image(systemName: "tray.full.fill")
-                    Text("Задания")
-                    if pendingJobs > 0 {
-                        Text("\(pendingJobs)")
-                            .font(.system(size: 11, weight: .bold))
-                            .padding(.horizontal, 6)
-                            .padding(.vertical, 2)
-                            .background(.white.opacity(0.24), in: Capsule())
-                    }
+            if section == .editor {
+                Button {
+                    store.saveDocument()
+                } label: {
+                    Label("Сохранить", systemImage: "square.and.arrow.down")
                 }
+                .buttonStyle(.borderedProminent)
+                .tint(DeskPalette.accent)
             }
-            .buttonStyle(.borderedProminent)
-            .tint(DeskPalette.accent)
         }
         .padding(.horizontal, 21)
         .padding(.vertical, 15)
