@@ -120,6 +120,7 @@ jobs:
           node --check /tmp/label-editor.js
           node --check LabelDesk/Resources/raster.js
           node --check LabelDesk/Resources/app.js
+          node Tests/WebRasterSmoke.js
           zsh -n Scripts/printer.sh
 
       - name: Test selected-layer resize geometry
