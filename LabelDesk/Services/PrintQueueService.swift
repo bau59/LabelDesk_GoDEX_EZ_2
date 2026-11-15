@@ -47,6 +47,21 @@ final class PrintQueueService: ObservableObject {
                            details: "User must inspect paper to avoid duplicate labels")
     }
 
+    /// An explicit new job: preserve the original transmission record.
+    /// Requires user confirmation in the UI because physical output is unknown.
+    func requeueSent(_ id: UUID) {
+        guard let previous = jobs.first(where: { $0.id == id && $0.state == .sent }) else { return }
+        var retry = previous
+        retry.id = UUID()
+        retry.addedAt = Date()
+        retry.state = .pending
+        retry.errorMessage = nil
+        jobs.append(retry)
+        persist()
+        diagnostics.record("manual resend queued", jobID: retry.id,
+                           details: "previousJob=\(id.uuidString) copies=\(retry.copies), duplication possible")
+    }
+
     func clearCompleted() {
         let count = jobs.filter { [.sent, .cancelled].contains($0.state) }.count
         jobs.removeAll { [.sent, .cancelled].contains($0.state) }
