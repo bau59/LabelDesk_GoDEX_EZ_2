@@ -125,7 +125,7 @@ function setSelected(id){if(!doc||!doc.elements.some(e=>e.id===id))return;select
 function newElem(kind){
  if(!doc)return;
  const dims={text:[3,3,27,7,"Текст"],barcode:[3,12,30,11,"1234"],line:[3,20,26,0.4,""],rectangle:[3,3,26,18,""]}[kind];
- let e={id:uid(),kind:kind,xMM:dims[0],yMM:dims[1],widthMM:dims[2],heightMM:dims[3],value:dims[4],fontSize:12,rotation:0,showsHumanReadable:true,isBold:false};
+ let e={id:uid(),kind:kind,xMM:dims[0],yMM:dims[1],widthMM:dims[2],heightMM:dims[3],value:dims[4],fontSize:12,rotation:0,showsHumanReadable:true,isBold:false,isVariable:kind==="text",fieldName:""};
  e.widthMM=Math.max(1,Math.min(e.widthMM,doc.widthMM-e.xMM));
  e.yMM=Math.min(e.yMM,Math.max(0,doc.heightMM-e.heightMM));
  checkpoint();doc.elements.push(e);selected=e.id;draw();commit();
@@ -137,7 +137,7 @@ function moveLayer(delta){
 }
 function remove(){if(!selected||!doc)return;checkpoint();doc.elements=doc.elements.filter(e=>e.id!==selected);selected=null;draw();commit();}
 function duplicate(){const e=selectedObj();if(!e)return;checkpoint();let copy=clone(e);copy.id=uid();copy.xMM=Math.min(Math.max(0,doc.widthMM-copy.widthMM),copy.xMM+1);copy.yMM=Math.min(Math.max(0,doc.heightMM-copy.heightMM),copy.yMM+1);doc.elements.push(copy);selected=copy.id;draw();commit();}
-function labelFor(e){return typeNames[e.kind]+" · "+(e.value||"");}
+function labelFor(e){const variable=(e.kind==="text"&&e.isVariable!==false)?" • перем.":"";return typeNames[e.kind]+variable+" · "+(e.value||"");}
 function renderLayers(){
  const root=$("layers");root.replaceChildren();
  if(!doc||!doc.elements.length){let p=document.createElement("p");p.className="empty";p.textContent="Пока нет объектов. Добавьте текст или штрихкод.";root.appendChild(p);}
@@ -293,6 +293,11 @@ function renderProps(){
  if(e.kind==="text"){
    root.appendChild(prop("Кегль, pt",numInput(e.fontSize,n=>{e.fontSize=n;},5,52,1)));
    root.appendChild(checkbox("Жирный",e.isBold,n=>{e.isBold=n;}));
+   root.appendChild(checkbox("Менять при печати",e.isVariable!==false,n=>{e.isVariable=n;renderLayers();}));
+   if(e.isVariable!==false){
+     root.appendChild(prop("Название поля в режиме заполнения",
+       textInput(e.fieldName||"",v=>{e.fieldName=v;},false,"field-name")));
+   }
    let rotation=document.createElement("select");
    for(let angle of [0,90,180,270]){let opt=document.createElement("option");opt.value=angle;opt.textContent=angle+"°";rotation.append(opt);}rotation.value=e.rotation;
    rotation.addEventListener("change",()=>{checkpoint();e.rotation=Number(rotation.value);renderCanvas();commit();});

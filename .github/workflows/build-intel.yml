@@ -4,15 +4,15 @@ on:
   push:
     branches:
       - main
-      - feature/layer-resize-settings-0.6
+      - feature/folder-quickprint-0.7
   workflow_dispatch:
 
 permissions:
   contents: read
 
 concurrency:
-  group: labeldesk-intel-release
-  cancel-in-progress: false
+  group: labeldesk-intel-${{ github.ref }}
+  cancel-in-progress: true
 
 jobs:
   build-intel:
@@ -101,6 +101,14 @@ jobs:
         shell: bash
         run: node Tests/EditorGeometrySmoke.js
 
+      - name: Test folder persistence and quick-fill immutability
+        shell: bash
+        run: |
+          set -euo pipefail
+          SDK_PATH="$(xcrun --sdk macosx --show-sdk-path)"
+          swiftc -target x86_64-apple-macosx15.0 -sdk "$SDK_PATH"             -parse-as-library             LabelDesk/Models/LabelDocument.swift             LabelDesk/Models/LabelElement.swift             LabelDesk/Models/PrinterProfile.swift             LabelDesk/Models/PrintJob.swift             LabelDesk/Services/StorageService.swift             Tests/QuickPrintSmokeTest.swift             -o build/quickprint-smoke
+          ./build/quickprint-smoke
+
       - name: Upload Intel packages
         uses: actions/upload-artifact@v4
         with:
@@ -142,4 +150,4 @@ jobs:
             --repo "$GITHUB_REPOSITORY" \
             --target "$GITHUB_SHA" \
             --title "LabelDesk ${APP_VERSION}" \
-            --notes "Intel macOS 15+. Explicit layer selection and working resize handles, printer settings for density/speed/threshold/sensor/Q, native ASCII font test, persistent print queue and updater. Native/raster hybrid not enabled until physical tests. Ad-hoc signed; not notarized."
+            --notes "Intel macOS 15+. Persistent folder library, one base template per folder, variable text quick-fill mode, true printer preview, list batch queues, and legacy template compatibility. Includes original editor, USB-RS232 printing and updater. Ad-hoc signed; not notarized."
