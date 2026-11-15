@@ -11,6 +11,7 @@ struct LabelDeskApp: App {
     var body: some Scene {
         WindowGroup {
             MainView()
+                .preferredColorScheme(.light)
                 .environmentObject(store)
                 .environmentObject(printer)
                 .environmentObject(updater)
