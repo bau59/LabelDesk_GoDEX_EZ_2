@@ -4,7 +4,7 @@ on:
   push:
     branches:
       - main
-      - fix/print-diagnostics-mouse-0.8.1
+      - fix/ez2-raster-transfer-0.8.2
   workflow_dispatch:
 
 permissions:
@@ -176,4 +176,4 @@ jobs:
             --repo "$GITHUB_REPOSITORY" \
             --target "$GITHUB_SHA" \
             --title "LabelDesk ${APP_VERSION}" \
-            --notes "Intel macOS 15+. Print diagnostics with persistent RS-232 stages, encoded-byte stats, and honest port-only status; single-job print test and guarded batch resend. Canvas mouse selection/hover/zoom fixed, printer settings layout rebuilt. No EZ-2 protocol changes. Ad-hoc signed; not notarized."
+            --notes "Intel macOS 15+. GoDEX EZ-2 raster reliability experiment: paced 64-byte 9600-baud writes with bidirectional XON/XOFF, optional legacy transport, correct S1/S2 and automatic Q table (30mm=Q144). Print TEST packet remains unchanged; new Feed TEST required before batch output. Diagnostics keep millisecond stage times. Hardware print needs confirmation. Ad-hoc signed; not notarized."

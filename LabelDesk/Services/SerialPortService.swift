@@ -26,9 +26,16 @@ final class SerialPortService {
 
     /// A successful return only means the serial driver accepted/drained the
     /// bytes. EZ-2 provides no confirmed printed-label acknowledgement here.
-    func write(_ data: Data, profile: PrinterProfile, onProgress: ((String) -> Void)? = nil) throws {
+    func write(_ data: Data, profile: PrinterProfile,
+               rasterTransport: EZ2RasterTransport? = nil,
+               onProgress: ((String) -> Void)? = nil) throws {
         guard !profile.portPath.isEmpty else { throw SerialPortError.noPortSelected }
-        let descriptor = open(profile.portPath, O_WRONLY | O_NOCTTY | O_NONBLOCK | O_EXLOCK)
+        // On paced raster jobs open RX too, so the host serial driver can
+        // observe printer-side XON/XOFF signals. Short verified TEST packets
+        // deliberately preserve their original write-only path.
+        let paced = rasterTransport == .paced
+        let direction = paced ? O_RDWR : O_WRONLY
+        let descriptor = open(profile.portPath, direction | O_NOCTTY | O_NONBLOCK | O_EXLOCK)
         guard descriptor >= 0 else { throw SerialPortError.openFailed(String(cString: strerror(errno))) }
         defer { close(descriptor) }
         onProgress?("port opened")
@@ -41,12 +48,21 @@ final class SerialPortService {
             throw SerialPortError.configurationFailed("Cannot enable blocking serial writes.")
         }
 
+        // EZ-2 accepts native text bursts, but large graphic streams can
+        // exceed firmware buffers even if macOS accepted a single huge write.
+        // Pacing keeps the serial sender close to 9600-baud wire time.
+        // 64 bytes = ~67 ms at 8N1; add 5 ms of processing margin.
+        let maxBurst = paced ? 64 : max(1, data.count)
+        if paced {
+            onProgress?("paced raster: 64-byte bursts at <= ~900 B/s, bidirectional port")
+        }
         var sent = 0
         try data.withUnsafeBytes { rawBuffer in
             guard var pointer = rawBuffer.baseAddress else { return }
             var remaining = rawBuffer.count
             while remaining > 0 {
-                let count = Darwin.write(descriptor, pointer, remaining)
+                let request = min(remaining, maxBurst)
+                let count = Darwin.write(descriptor, pointer, request)
                 if count < 0 {
                     if errno == EINTR { continue }
                     throw SerialPortError.writeFailed(String(cString: strerror(errno)))
@@ -55,8 +71,12 @@ final class SerialPortService {
                 remaining -= count
                 sent += count
                 pointer = pointer.advanced(by: count)
-                if sent == data.count || sent % 4096 < count {
+                if sent == data.count || (sent / 512) != ((sent - count) / 512) {
                     onProgress?("bytes accepted \(sent)/\(data.count)")
+                }
+                if paced {
+                    let wireMicroseconds = (count * 10 * 1_000_000 + 9_599) / 9_600
+                    usleep(useconds_t(wireMicroseconds + 5_000))
                 }
             }
         }

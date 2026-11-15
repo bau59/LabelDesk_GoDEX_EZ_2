@@ -13,6 +13,9 @@ final class PrintDiagnostics: ObservableObject {
     private let dateFormatter = ISO8601DateFormatter()
 
     init(rootURL: URL? = nil) {
+        // Millisecond timestamps show whether TX time is spent writing,
+        // waiting for the adapter, or simply waiting in the UI actor.
+        dateFormatter.formatOptions = [.withInternetDateTime, .withFractionalSeconds]
         let root = rootURL ?? FileManager.default.urls(for: .applicationSupportDirectory, in: .userDomainMask)[0]
             .appendingPathComponent("LabelDesk", isDirectory: true)
         let folder = root.appendingPathComponent("logs", isDirectory: true)

@@ -198,6 +198,19 @@ struct PrinterSettingsView: View {
                     }
                 }
                 Divider()
+                field("Передача больших растров") {
+                    Picker("Передача", selection: $draft.rasterTransport) {
+                        ForEach(EZ2RasterTransport.allCases) { transport in
+                            Text(transport.title).tag(transport)
+                        }
+                    }
+                    .labelsHidden()
+                    .frame(maxWidth: .infinity, alignment: .leading)
+                    Text("Совместимый режим отправляет небольшие блоки с ограничением скорости 9600 бод. Исходный режим сохранён для сравнения.")
+                        .font(.system(size: 11))
+                        .foregroundStyle(DeskPalette.secondary)
+                }
+                Divider()
                 field("Порог растра: \(draft.rasterThreshold)") {
                     HStack(spacing: 14) {
                         Slider(value: Binding(
@@ -215,7 +228,7 @@ struct PrinterSettingsView: View {
                 spec("56 мм", "Печатная головка")
                 spec("55 мм", "Ширина растра")
             }
-            tip("Скорость S0/S1 управляет движением бумаги, но не увеличивает пропускную способность RS-232. На 9600 бод большие растровые макеты передаются медленно.")
+            tip("По руководству EZ-2 скорость задаётся S1 (1 дюйм/с) и S2 (2 дюйма/с). Передача через RS-232 9600 бод ограничивает скорость большого растра.")
         }
     }
 
@@ -233,12 +246,19 @@ struct PrinterSettingsView: View {
                     .frame(maxWidth: .infinity)
                 }
                 Divider()
-                field("ESC Q: \(draft.topOfFormDots) точек") {
-                    Stepper(value: $draft.topOfFormDots, in: 4...999, step: 8) {
-                        Text("\(draft.topOfFormDots)")
-                            .monospacedDigit()
+                field("Остановка этикетки (ESC Q)") {
+                    Toggle("Подбирать по высоте этикетки", isOn: $draft.automaticTopOfForm)
+                    if draft.automaticTopOfForm {
+                        Text("Для текущего макета \(Int(store.document.heightMM)) мм: Q\(String(format: "%03d", GodexEZ2Encoder.labelStopQ(heightMM: Int(store.document.heightMM))))")
+                            .font(.system(size: 12))
+                            .foregroundStyle(DeskPalette.secondary)
+                    } else {
+                        Stepper(value: $draft.topOfFormDots, in: 4...999, step: 8) {
+                            Text("Q\(String(format: "%03d", draft.topOfFormDots))")
+                                .monospacedDigit()
+                        }
+                        .frame(maxWidth: 200, alignment: .leading)
                     }
-                    .frame(maxWidth: 180, alignment: .leading)
                 }
                 Divider()
                 HStack(spacing: 20) {
@@ -248,7 +268,7 @@ struct PrinterSettingsView: View {
                 Divider()
                 NumberField(title: "Отступ Print TEST", value: $draft.leftMarginMM, suffix: "мм")
             }
-            tip("По умолчанию сохранено ESC Q176. Не меняйте датчик или Q без необходимости: ошибка приведёт к неправильной протяжке. После изменения выполните Feed TEST на одной этикетке.")
+            tip("По таблице EZ-2 Q176 соответствует высоте 26 мм; Q144 — 30 мм. Отдельная команда q учитывает высоту с зазором. После изменения режима Q сделайте Feed TEST, чтобы проверить протяжку.")
         }
     }
 
