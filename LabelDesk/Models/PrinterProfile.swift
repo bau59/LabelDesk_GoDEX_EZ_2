@@ -73,10 +73,11 @@ struct PrinterProfile: Codable, Equatable {
         density = min(7, max(0, try keys.decodeIfPresent(Int.self, forKey: .density) ?? 5))
         printSpeed = try keys.decodeIfPresent(EZ2PrintSpeed.self, forKey: .printSpeed) ?? .normal
         rasterTransport = try keys.decodeIfPresent(EZ2RasterTransport.self, forKey: .rasterTransport) ?? .paced
-        automaticTopOfForm = try keys.decodeIfPresent(Bool.self, forKey: .automaticTopOfForm) ?? true
+        // Older saved custom Q values remain manual; only the original Q176 default migrates to auto-Q.
         rasterThreshold = min(192, max(64, try keys.decodeIfPresent(Int.self, forKey: .rasterThreshold) ?? 128))
         sensorMode = try keys.decodeIfPresent(EZ2SensorMode.self, forKey: .sensorMode) ?? .unchanged
         topOfFormDots = min(999, max(4, try keys.decodeIfPresent(Int.self, forKey: .topOfFormDots) ?? 176))
+        automaticTopOfForm = try keys.decodeIfPresent(Bool.self, forKey: .automaticTopOfForm) ?? (topOfFormDots == 176)
         leftMarginMM = try keys.decodeIfPresent(Double.self, forKey: .leftMarginMM) ?? 18
         topOffsetDots = try keys.decodeIfPresent(Int.self, forKey: .topOffsetDots) ?? 0
         xOffsetMM = try keys.decodeIfPresent(Double.self, forKey: .xOffsetMM) ?? 0
