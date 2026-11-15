@@ -204,37 +204,43 @@ function renderCanvas(){
    el.appendChild(node);
  });
 }
+// Geometry is kept pure so native CI can test corner resizing without a WebView.
+function transformRect(original,dx,dy,mode,docWidth,docHeight,step,minimum){
+ const round=n=>Math.round(n/step)*step;
+ const clamp=(n,lo,hi)=>Math.max(lo,Math.min(hi,n));
+ if(mode==="move"){
+   return {
+     xMM:clamp(round(original.xMM+dx),0,Math.max(0,docWidth-original.widthMM)),
+     yMM:clamp(round(original.yMM+dy),0,Math.max(0,docHeight-original.heightMM)),
+     widthMM:original.widthMM,
+     heightMM:original.heightMM
+   };
+ }
+ let left=original.xMM,top=original.yMM;
+ let right=original.xMM+original.widthMM,bottom=original.yMM+original.heightMM;
+ if(mode.includes("w"))left=clamp(round(original.xMM+dx),0,right-minimum);
+ if(mode.includes("e"))right=clamp(round(original.xMM+original.widthMM+dx),left+minimum,docWidth);
+ if(mode.includes("n"))top=clamp(round(original.yMM+dy),0,bottom-minimum);
+ if(mode.includes("s"))bottom=clamp(round(original.yMM+original.heightMM+dy),top+minimum,docHeight);
+ return {xMM:left,yMM:top,widthMM:Math.max(minimum,right-left),heightMM:Math.max(minimum,bottom-top)};
+}
+
 function startManipulation(ev,id,mode){
- // The layer panel is the only selection control. Never auto-switch layers
- // just because a different object occupies this point on the canvas.
+ // Only the selected layer can move or resize. Canvas clicks never auto-select.
  if(ev.button!==0||!doc||selected!==id)return;
  const item=doc.elements.find(x=>x.id===selected);if(!item)return;
  ev.preventDefault();ev.stopPropagation();
- const original=clone(item), sx=ev.clientX,sy=ev.clientY,step=snap?1:0.125;
- const minimum=(item.kind==="line")?0.125:1;
+ const original=clone(item),sx=ev.clientX,sy=ev.clientY,step=snap?1:0.125;
+ const minimum=item.kind==="line"?0.125:1;
  checkpoint();
- const round=n=>Math.round(n/step)*step;
- const clamp=(n,lo,hi)=>Math.max(lo,Math.min(hi,n));
  function move(event){
    const active=doc.elements.find(x=>x.id===selected);if(!active||active.id!==id)return;
-   const dx=round((event.clientX-sx)/zoom),dy=round((event.clientY-sy)/zoom);
-   if(mode==="move"){
-     active.xMM=clamp(round(original.xMM+dx),0,Math.max(0,doc.widthMM-original.widthMM));
-     active.yMM=clamp(round(original.yMM+dy),0,Math.max(0,doc.heightMM-original.heightMM));
-   }else{
-     let left=original.xMM,top=original.yMM;
-     let right=original.xMM+original.widthMM,bottom=original.yMM+original.heightMM;
-     if(mode.includes("w"))left=clamp(round(original.xMM+dx),0,right-minimum);
-     if(mode.includes("e"))right=clamp(round(original.xMM+original.widthMM+dx),left+minimum,doc.widthMM);
-     if(mode.includes("n"))top=clamp(round(original.yMM+dy),0,bottom-minimum);
-     if(mode.includes("s"))bottom=clamp(round(original.yMM+original.heightMM+dy),top+minimum,doc.heightMM);
-     active.xMM=left;active.yMM=top;
-     active.widthMM=Math.max(minimum,right-left);
-     active.heightMM=Math.max(minimum,bottom-top);
-   }
+   const dims=transformRect(original,(event.clientX-sx)/zoom,(event.clientY-sy)/zoom,
+                            mode,doc.widthMM,doc.heightMM,step,minimum);
+   Object.assign(active,dims);
    renderCanvas();
  }
- function finish(event){
+ function finish(){
    window.removeEventListener("pointermove",move);
    window.removeEventListener("pointerup",finish);
    window.removeEventListener("pointercancel",finish);
