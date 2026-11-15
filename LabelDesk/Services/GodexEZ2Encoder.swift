@@ -140,26 +140,37 @@ struct GodexEZ2Encoder {
 
 /// A single bounded label used to measure horizontal/vertical print origin
 /// and the available width. Deliberately not persisted as a user template.
+/// Physical printable-width test. All strokes stay within the documented
+/// ESC G 55-byte row limit. On 56–60 mm media the unprinted right edge is
+/// intentional and must not be mistaken for a registration failure.
 enum EZ2CalibrationPattern {
     static func make(for source: LabelDocument) -> LabelDocument {
         var sample = source
         sample.id = UUID()
         sample.name = "CALIBRATION"
+        let rasterWidth = min(source.widthMM, EZ2Limits.maxRasterWidthMM)
+        let innerWidth = rasterWidth - 4
+        let innerHeight = source.heightMM - 4
         sample.elements = [
-            // The border should be 2 mm from each physical label edge.
             LabelElement(kind: .rectangle, xMM: 2, yMM: 2,
-                         widthMM: source.widthMM - 4, heightMM: source.heightMM - 4,
-                         value: ""),
-            // The upper-left corner is asymmetrical, to establish feed direction.
+                         widthMM: innerWidth, heightMM: innerHeight, value: ""),
             LabelElement(kind: .line, xMM: 2, yMM: 2,
-                         widthMM: min(7, source.widthMM - 4), heightMM: 0.6, value: ""),
+                         widthMM: min(7, innerWidth), heightMM: 0.6, value: ""),
             LabelElement(kind: .line, xMM: 2, yMM: 2,
-                         widthMM: 0.6, heightMM: min(7, source.heightMM - 4), value: ""),
-            LabelElement(kind: .line, xMM: source.widthMM / 2 - 0.15, yMM: 2,
-                         widthMM: 0.3, heightMM: source.heightMM - 4, value: ""),
+                         widthMM: 0.6, heightMM: min(7, innerHeight), value: ""),
+            LabelElement(kind: .line, xMM: rasterWidth / 2 - 0.15, yMM: 2,
+                         widthMM: 0.3, heightMM: innerHeight, value: ""),
             LabelElement(kind: .line, xMM: 2, yMM: source.heightMM / 2 - 0.15,
-                         widthMM: source.widthMM - 4, heightMM: 0.3, value: "")
+                         widthMM: innerWidth, heightMM: 0.3, value: "")
         ]
+        // Short guide marks every 5mm: compare their actual spacing and the
+        // last visible stroke to determine usable physical printhead coverage.
+        for x in stride(from: 5.0, through: rasterWidth - 2, by: 5.0) {
+            sample.elements.append(LabelElement(
+                kind: .line, xMM: x, yMM: 2, widthMM: 0.3,
+                heightMM: min(3, innerHeight), value: ""
+            ))
+        }
         return sample
     }
 }

@@ -212,6 +212,11 @@ struct QuickPrintView: View {
                             Text("\(Int(label.widthMM)) × \(Int(label.heightMM)) мм · 203 dpi")
                                 .font(.system(size: 12))
                                 .foregroundStyle(DeskPalette.secondary)
+                            if label.unprintableRightMM > 0 {
+                                Text("Растр 55 мм — справа \(String(format: "%.1f", label.unprintableRightMM)) мм без печати")
+                                    .font(.system(size: 11))
+                                    .foregroundStyle(DeskPalette.amber)
+                            }
                         }
                     }
                     Spacer()

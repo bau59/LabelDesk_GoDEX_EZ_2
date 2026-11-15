@@ -42,4 +42,6 @@ assert.match(html, /e\.xMM=Math\.max\(0,\(doc\.widthMM-e\.widthMM\)\/2\)/,
              "Selected block must support horizontal centering");
 assert.match(html, /e\.yMM=Math\.max\(0,\(doc\.heightMM-e\.heightMM\)\/2\)/,
              "Selected block must support vertical centering");
-console.log("Editor geometry smoke test passed: mouse interaction, text alignment, centering and four-corner resizing.");
+assert.match(html,/numInput\(doc\.widthMM,n=>\{doc\.widthMM=n;\},10,60,0\.5\)/, "Physical media width must allow 60mm");
+assert.match(html,/className="printzone"/, "Editor must hatch unreachable ESC G area");
+console.log("Editor geometry smoke test passed: selection, media width, print-zone hatch, text and four-corner resizing.");

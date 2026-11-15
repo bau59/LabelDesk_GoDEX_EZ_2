@@ -2,8 +2,9 @@ import AppKit
 import Foundation
 import CoreGraphics
 
-/// EZ-2 printhead: 203 dpi = 8 dots/mm; ESC G accepts at most 55 bytes (440 dots) per row.
-/// The physical head is 56 mm wide, but full-raster printing is limited to 55 mm.
+/// EZ-2: media width may reach 60 mm, physical head 56 mm.
+/// The historical ESC G graphics command accepts at most 55 bytes per row.
+/// A wider physical label is allowed; its right-side graphics are clipped safely.
 enum EZ2Limits {
     static let dotsPerMM = 8.0
     static let maxRasterBytes = 55
@@ -22,7 +23,7 @@ enum LabelRenderError: LocalizedError {
     var errorDescription: String? {
         switch self {
         case .invalidSize:
-            return "Label must be 10–55 mm wide, 10–100 mm high (whole millimeters), with a 0–10 mm gap (whole millimeters). Graphics are limited to 55 bytes per line."
+            return "Label width: 10–60 mm. Printer graphics: max 55 mm (the rest is not printed). Height 10–100 mm, gap 0–10 mm; height and gap must be whole millimeters."
         case .invalidElement(let detail):
             return "Item exceeds the printable label area: \(detail)"
         case .invalidBarcode(let detail):
@@ -58,7 +59,7 @@ struct LabelRasterizer {
 
     static func validate(_ document: LabelDocument) throws {
         guard document.widthMM.isFinite, document.heightMM.isFinite, document.gapMM.isFinite,
-              (10...EZ2Limits.maxRasterWidthMM).contains(document.widthMM),
+              (10...EZ2Limits.maxMediaWidthMM).contains(document.widthMM),
               (10...EZ2Limits.maxRasterHeightMM).contains(document.heightMM),
               (0...10).contains(document.gapMM),
               abs(document.heightMM.rounded() - document.heightMM) < 0.001,
@@ -93,7 +94,8 @@ struct LabelRasterizer {
 
     func rasterize(_ document: LabelDocument, profile: PrinterProfile) throws -> LabelRaster {
         try Self.validate(document)
-        let width = Int((document.widthMM * EZ2Limits.dotsPerMM).rounded(.up))
+        // Clip ONLY the outgoing raster, not the physical media template width.
+        let width = Int((document.printableWidthMM * EZ2Limits.dotsPerMM).rounded(.up))
         let height = Int((document.heightMM * EZ2Limits.dotsPerMM).rounded(.up))
         let byteWidth = (width + 7) / 8
         guard byteWidth <= EZ2Limits.maxRasterBytes,

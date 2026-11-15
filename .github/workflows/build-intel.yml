@@ -4,7 +4,7 @@ on:
   push:
     branches:
       - main
-      - feature/text-wrap-calibration-0.9
+      - fix/media-width-sensor-0.9.1
   workflow_dispatch:
 
 permissions:
@@ -176,4 +176,4 @@ jobs:
             --repo "$GITHUB_REPOSITORY" \
             --target "$GITHUB_SHA" \
             --title "LabelDesk ${APP_VERSION}" \
-            --notes "Intel macOS 15+. Multiline quick-fill, block-clipped raster text with left/center/right alignment, center block controls, and 3-step EZ-2 calibration of media/gap, Q/feed and X/Y origin. One-label bounded calibration pattern with diagnostics; preserves verified test commands, print queue and existing templates. Physical calibration must be confirmed on paper. Ad-hoc signed; not notarized."
+            --notes "Intel macOS 15+. Separate 60mm physical media width from documented safe 55mm ESC G printing width. Visually mark the unprintable right band, test printing with 5mm ruler, and require stable mechanical Feed sensor before raster calibration. No unsupported G56 or firmware changes. Original printer queue, profiles and updater preserved. Ad-hoc signed; not notarized."

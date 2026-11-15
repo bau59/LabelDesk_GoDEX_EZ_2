@@ -60,6 +60,8 @@ input{user-select:text}
 .obj:not(.sel){cursor:pointer}
 .obj:not(.sel):hover{outline:2px dashed #8ca7ed;outline-offset:1px}
 .obj.sel{cursor:move}
+.printzone{position:absolute;top:0;bottom:0;z-index:4;pointer-events:none;border-left:2px dashed #dc6473;background:repeating-linear-gradient(135deg,#e1667833 0px,#e1667833 5px,#e1667810 5px,#e1667810 10px)}
+
 .obj.sel:hover{outline:2px solid #345cd3}
 .obj:active{cursor:grabbing}
 .layer{cursor:pointer}
@@ -186,7 +188,7 @@ function barcodeSVG(value,width,height,readable){
  return svg;
 }
 function renderCanvas(){
- const el=$("label");el.querySelectorAll(".obj").forEach(n=>n.remove());if(!doc)return;
+ const el=$("label");el.querySelectorAll(".obj,.printzone").forEach(n=>n.remove());if(!doc)return;
  if(zoomMode==="fit"){
    const desk=$("desk");
    const usableWidth=Math.max(220,desk.clientWidth-100);
@@ -236,6 +238,13 @@ function renderCanvas(){
    node.addEventListener("pointerdown",ev=>startManipulation(ev,e.id,"move"));
    el.appendChild(node);
  });
+ if(width>55){
+   const limited=document.createElement("div");limited.className="printzone";
+   limited.style.left=(55*zoom)+"px";
+   limited.style.width=((width-55)*zoom)+"px";
+   limited.title="Правый край материала: ESC G не печатает дальше 55 мм";
+   el.appendChild(limited);
+ }
 }
 // Geometry is kept pure so native CI can test corner resizing without a WebView.
 function transformRect(original,dx,dy,mode,docWidth,docHeight,step,minimum){
@@ -316,18 +325,18 @@ function renderProps(){
  const e=selectedObj();
  if(!e){
    const h=document.createElement("strong");h.textContent="Размер этикетки";root.appendChild(h);
-   root.appendChild(pair(prop("Ширина, мм",numInput(doc.widthMM,n=>{doc.widthMM=n;},10,55,0.5)),
+   root.appendChild(pair(prop("Ширина ленты, мм",numInput(doc.widthMM,n=>{doc.widthMM=n;},10,60,0.5)),
                         prop("Высота, мм",numInput(doc.heightMM,n=>{doc.heightMM=Math.round(n);},10,100,1))));
    root.appendChild(prop("Зазор, мм",numInput(doc.gapMM,n=>{doc.gapMM=Math.round(n);},0,10,1)));
-   let note=document.createElement("p");note.className="hint";note.textContent="Головка EZ-2 — 56 мм; максимальная ширина графики — 55 мм. Координаты в миллиметрах. Выберите слой для его редактирования.";root.appendChild(note);
+   let note=document.createElement("p");note.className="hint";note.textContent=doc.widthMM>55?"Ширина ленты — "+doc.widthMM+" мм. Заштрихованные справа "+(doc.widthMM-55).toFixed(1)+" мм НЕ печатаются ESC G. Печатная графика — 0…55 мм.":"Материал — до 60 мм, графика ESC G — до 55 мм. Выберите слой для редактирования.";;root.appendChild(note);
    root.appendChild(checkbox("Привязка к сетке 1 мм",snap,n=>{snap=n;}));
    return;
  }
  let h=document.createElement("strong");h.textContent=typeNames[e.kind];root.appendChild(h);
  if(e.kind==="text"||e.kind==="barcode")root.appendChild(prop(e.kind==="text"?"Текст":"Значение Code 39",textInput(e.value,v=>{e.value=v;},e.kind==="text","field-value")));
- root.appendChild(pair(prop("X, мм",numInput(e.xMM,n=>{e.xMM=Math.min(n,Math.max(0,doc.widthMM-e.widthMM));},0,55,0.125)),
+ root.appendChild(pair(prop("X, мм",numInput(e.xMM,n=>{e.xMM=Math.min(n,Math.max(0,doc.widthMM-e.widthMM));},0,60,0.125)),
                        prop("Y, мм",numInput(e.yMM,n=>{e.yMM=Math.min(n,Math.max(0,doc.heightMM-e.heightMM));},0,100,0.125))));
- root.appendChild(pair(prop("Ширина, мм",numInput(e.widthMM,n=>{e.widthMM=Math.min(n,doc.widthMM-e.xMM);},0.125,55,0.125)),
+ root.appendChild(pair(prop("Ширина, мм",numInput(e.widthMM,n=>{e.widthMM=Math.min(n,doc.widthMM-e.xMM);},0.125,60,0.125)),
                        prop("Высота, мм",numInput(e.heightMM,n=>{e.heightMM=Math.min(n,doc.heightMM-e.yMM);},0.125,100,0.125))));
  if(e.kind==="text"){
    root.appendChild(prop("Кегль, pt",numInput(e.fontSize,n=>{e.fontSize=n;},5,52,1)));

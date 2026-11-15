@@ -533,7 +533,7 @@ final class AppStore: ObservableObject {
         }
         alert = AppAlert(
             title: "Напечатать одну калибровочную этикетку?",
-            message: "Будет передана одна рамка с отступом 2 мм от краёв, осевыми линиями и текущими поправками X/Y. Размер: \(Int(document.widthMM))×\(Int(document.heightMM)) мм, зазор \(Int(document.gapMM)) мм. Проверьте положение бумаги.",
+            message: "Будет напечатана рамка в пределах растровой области до 55 мм и метки через 5 мм. Для ленты шириной больше 55 мм правый край останется пустым — это ожидаемо. Размер ленты: \(Int(document.widthMM))×\(Int(document.heightMM)) мм, зазор \(Int(document.gapMM)) мм. Сначала проверьте стабильность датчика.",
             action: { [weak self] in self?.performCalibrationPattern(data: packet, profile: profile) }
         )
     }
