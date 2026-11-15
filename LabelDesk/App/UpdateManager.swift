@@ -13,7 +13,7 @@ private struct GitHubRelease: Decodable {
     }
 }
 
-private struct GitHubReleaseAsset: Decodable {
+struct GitHubReleaseAsset: Decodable {
     let name: String
     let browserDownloadURL: URL
     let digest: String?
@@ -194,7 +194,7 @@ final class UpdateManager: ObservableObject {
         UserDefaults.standard.set(Date().timeIntervalSince1970, forKey: lastCheckKey)
     }
 
-    nonisolated private static func prepare(
+    nonisolated static func prepare(
         archive: URL, asset: GitHubReleaseAsset,
         expectedVersion: String, expectedBundleID: String
     ) throws -> (workspace: URL, app: URL) {
@@ -217,12 +217,33 @@ final class UpdateManager: ObservableObject {
                 throw UpdateError.invalidBundle
             }
             try run("/usr/bin/codesign", ["--verify", "--deep", "--strict", app.path])
-            try run("/usr/bin/lipo", ["-verify_arch", "x86_64", executable.path])
+            let architectures = try executableArchitectures(at: executable)
+            guard architectures.contains("x86_64") else { throw UpdateError.invalidBundle }
             return (workspace, app)
         } catch {
             try? fm.removeItem(at: workspace)
             throw error
         }
+    }
+
+    /// lipo -archs handles both thin x86_64 Mach-O executables and fat
+    /// binaries. The previous -verify_arch invocation failed on released
+    /// Intel-only packages even though they were correctly built for x86_64.
+    nonisolated private static func executableArchitectures(at executable: URL) throws -> Set<String> {
+        let process = Process()
+        process.executableURL = URL(fileURLWithPath: "/usr/bin/lipo")
+        process.arguments = ["-archs", executable.path]
+        let output = Pipe()
+        process.standardOutput = output
+        process.standardError = FileHandle.nullDevice
+        try process.run()
+        let data = output.fileHandleForReading.readDataToEndOfFile()
+        process.waitUntilExit()
+        guard process.terminationStatus == 0 else {
+            throw UpdateError.commandFailed("lipo -archs")
+        }
+        return Set(String(decoding: data, as: UTF8.self)
+            .split(whereSeparator: \.isWhitespace).map(String.init))
     }
 
     nonisolated private static func run(_ command: String, _ args: [String]) throws {
