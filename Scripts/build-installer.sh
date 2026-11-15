@@ -7,7 +7,7 @@ APP="$BUILD_DIR/LabelDesk.app"
 VERSION="$(/usr/libexec/PlistBuddy -c 'Print :CFBundleShortVersionString' "$ROOT/LabelDesk/Resources/Info.plist")"
 DMG="$BUILD_DIR/LabelDesk-${VERSION}.dmg"
 MACOS_DIR="$APP/Contents/MacOS"
-SOURCE_FILES=("$ROOT/LabelDesk/App/LabelDeskApp.swift" "$ROOT/LabelDesk/App/WebLabelDeskBridge.swift")
+SOURCE_FILES=("$ROOT/LabelDesk/App/LabelDeskApp.swift" "$ROOT/LabelDesk/App/WebLabelDeskBridge.swift" "$ROOT/LabelDesk/App/UpdateManager.swift")
 MODULE_CACHE="$ROOT/.build/module-cache"
 SWIFTC_OPTIONS=()
 
