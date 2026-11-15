@@ -15,9 +15,9 @@ private struct QueueContent: View {
     var body: some View {
         VStack(alignment: .leading, spacing: 7) {
             HStack(spacing: 12) {
-                Label(store.status, systemImage: store.rasterVerified ? "checkmark.circle" : "exclamationmark.triangle")
+                Label(store.status, systemImage: (store.rasterVerified && store.registrationVerified) ? "checkmark.circle" : "exclamationmark.triangle")
                     .font(.caption)
-                    .foregroundStyle(store.rasterVerified ? Color.secondary : Color.orange)
+                    .foregroundStyle((store.rasterVerified && store.registrationVerified) ? Color.secondary : Color.orange)
                 Spacer()
                 Stepper("Copies: \(store.copies)", value: $store.copies, in: 1...99)
                     .frame(width: 150)
@@ -40,6 +40,17 @@ private struct QueueContent: View {
                         .foregroundStyle(.orange)
                     if store.rasterProbePending {
                         Button("Raster TEST looks correct") { store.confirmRasterProbe() }
+                    }
+                }
+            }
+
+            if store.rasterVerified && !store.registrationVerified {
+                HStack(spacing: 12) {
+                    Text("New feed calibration is unverified. Press Feed TEST, then confirm next-label alignment before printing batches.")
+                        .font(.caption)
+                        .foregroundStyle(.orange)
+                    if store.feedTestPending {
+                        Button("Feed TEST aligned") { store.confirmFeedTest() }
                     }
                 }
             }
