@@ -4,7 +4,7 @@ on:
   push:
     branches:
       - main
-      - feature/folder-quickprint-0.7
+      - fix/updater-lipo-0.7.1
   workflow_dispatch:
 
 permissions:
@@ -86,6 +86,20 @@ jobs:
             -o build/raster-smoke
           ./build/raster-smoke
 
+      - name: Verify update with the real Intel ZIP
+        shell: bash
+        env:
+          APP_VERSION: ${{ steps.version.outputs.value }}
+        run: |
+          set -euo pipefail
+          SDK_PATH="$(xcrun --sdk macosx --show-sdk-path)"
+          swiftc -target x86_64-apple-macosx15.0 -sdk "$SDK_PATH" \
+            -parse-as-library -framework AppKit -framework Combine -framework CryptoKit \
+            LabelDesk/App/UpdateManager.swift \
+            Tests/UpdaterPackageSmokeTest.swift \
+            -o build/updater-package-smoke
+          ./build/updater-package-smoke "build/LabelDesk-${APP_VERSION}-intel.zip" "$APP_VERSION"
+
       - name: Verify automatic update replacement and rollback
         shell: bash
         run: zsh Tests/UpdaterSmoke.sh
@@ -150,4 +164,4 @@ jobs:
             --repo "$GITHUB_REPOSITORY" \
             --target "$GITHUB_SHA" \
             --title "LabelDesk ${APP_VERSION}" \
-            --notes "Intel macOS 15+. Persistent folder library, one base template per folder, variable text quick-fill mode, true printer preview, list batch queues, and legacy template compatibility. Includes original editor, USB-RS232 printing and updater. Ad-hoc signed; not notarized."
+            --notes "Intel macOS 15+. Fix updater architecture verification for thin Intel binaries. Test real ZIP extraction, signature, Intel architecture and checksum, preserving folders and printing. Ad-hoc signed; not notarized."
