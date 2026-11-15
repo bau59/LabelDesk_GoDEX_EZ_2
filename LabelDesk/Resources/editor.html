@@ -85,6 +85,10 @@ input{user-select:text}
 .actions{display:flex;gap:6px;flex-wrap:wrap}
 .empty{color:var(--muted);font-size:12px;line-height:1.6;padding:13px 7px}
 strong{font-size:14px;display:block;margin-bottom:14px}
+.text-align-controls{display:grid;grid-template-columns:repeat(3,minmax(0,1fr));gap:6px}
+.text-align-controls button{font-size:19px;padding:7px;border-radius:8px}
+.text-align-controls button.current{background:#eaf0ff;border-color:#7799eb;color:#2147ae;font-weight:bold}
+
 .hint{margin-top:12px;color:var(--muted);line-height:1.55;font-size:12px}
 .warn{color:var(--warning);font-size:11px;line-height:1.5;margin-top:7px}
 .dividerline{border-top:1px solid var(--line);margin:16px 0}
@@ -204,6 +208,7 @@ function renderCanvas(){
    if(e.kind==="text"){
      visual.textContent=e.value||"";
      visual.style.fontSize=(e.fontSize*zoom/2.8346457)+"px";visual.style.fontWeight=e.isBold?"700":"400";
+     visual.style.textAlign=e.textAlignment||"left";
      visual.style.transform="rotate("+(e.rotation||0)+"deg)";
    } else if(e.kind==="barcode"){
      const svg=barcodeSVG(e.value,e.widthMM,e.heightMM,e.showsHumanReadable);
@@ -327,6 +332,18 @@ function renderProps(){
  if(e.kind==="text"){
    root.appendChild(prop("Кегль, pt",numInput(e.fontSize,n=>{e.fontSize=n;},5,52,1)));
    root.appendChild(checkbox("Жирный",e.isBold,n=>{e.isBold=n;}));
+   const alignControls=document.createElement("div");alignControls.className="text-align-controls";
+   for(const [mode,title] of [["left","По левому краю"],["center","По центру"],["right","По правому краю"]]){
+     const button=document.createElement("button");button.type="button";
+     button.textContent={left:"⫷",center:"≡",right:"⫸"}[mode];
+     button.title=title;
+     button.className=(e.textAlignment||"left")===mode?"current":"";
+     button.onclick=()=>{
+       checkpoint();e.textAlignment=mode;renderCanvas();renderProps();commit();
+     };
+     alignControls.appendChild(button);
+   }
+   root.appendChild(prop("Выравнивание текста",alignControls));
    root.appendChild(checkbox("Менять при печати",e.isVariable!==false,n=>{e.isVariable=n;renderLayers();}));
    if(e.isVariable!==false){
      root.appendChild(prop("Название поля в режиме заполнения",
@@ -340,6 +357,18 @@ function renderProps(){
    root.appendChild(checkbox("Подпись под штрихкодом",e.showsHumanReadable,n=>{e.showsHumanReadable=n;}));
    let note=document.createElement("p");note.className="warn";note.textContent="Код 39: A–Z, 0–9, пробел и - . $ / + %. Для сканирования минимум 2 точки на узкий модуль.";root.appendChild(note);
  }
+ let positionActions=document.createElement("div");positionActions.className="actions";
+ for(const [axis,title] of [["x","Блок по центру X"],["y","Блок по центру Y"]]){
+   const button=document.createElement("button");button.type="button";button.textContent=title;
+   button.onclick=()=>{
+     checkpoint();
+     if(axis==="x")e.xMM=Math.max(0,(doc.widthMM-e.widthMM)/2);
+     else e.yMM=Math.max(0,(doc.heightMM-e.heightMM)/2);
+     renderCanvas();renderProps();commit();
+   };
+   positionActions.appendChild(button);
+ }
+ root.appendChild(prop("Расположение блока",positionActions));
  let sep=document.createElement("div");sep.className="dividerline";root.appendChild(sep);
  let actions=document.createElement("div");actions.className="actions";
  let c=document.createElement("button");c.textContent="Дублировать";c.onclick=duplicate;
