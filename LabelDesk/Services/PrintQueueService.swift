@@ -3,7 +3,7 @@ import Foundation
 @MainActor
 final class PrintQueueService: ObservableObject {
     @Published private(set) var jobs: [PrintJob]
-    @Published private(set) var isPaused = false
+    @Published private(set) var isPaused = true
     private let storage: StorageService
     private let port = SerialPortService()
     private let encoder = GodexEZ2Encoder()
@@ -40,7 +40,8 @@ final class PrintQueueService: ObservableObject {
         persist()
     }
 
-    func togglePause() { isPaused.toggle() }
+    func pause() { isPaused = true }
+    func resume() { isPaused = false }
 
     func process(profile: PrinterProfile) {
         guard !isPaused, let index = jobs.firstIndex(where: { $0.state == .pending }) else { return }
@@ -53,7 +54,7 @@ final class PrintQueueService: ObservableObject {
                 for _ in 0..<job.copies { try port.write(data, profile: profile) }
                 await self.finish(job.id, state: .sent, error: nil, profile: profile)
             } catch {
-                await self.finish(job.id, state: .failed, error: error.localizedDescription, profile: profile)
+                await self.finish(job.id, state: .uncertain, error: "Transmission may be incomplete. Inspect printed labels before retrying. " + error.localizedDescription, profile: profile)
             }
         }
     }
