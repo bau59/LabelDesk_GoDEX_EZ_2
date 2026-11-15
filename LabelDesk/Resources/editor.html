@@ -140,7 +140,14 @@ const typeNames={text:"Текст",barcode:"Code 39",line:"Линия",rectangle
 const patterns={"0":"nnnwwnwnn","1":"wnnwnnnnw","2":"nnwwnnnnw","3":"wnwwnnnnn","4":"nnnwwnnnw","5":"wnnwwnnnn","6":"nnwwwnnnn","7":"nnnwnnwnw","8":"wnnwnnwnn","9":"nnwwnnwnn","A":"wnnnnwnnw","B":"nnwnnwnnw","C":"wnwnnwnnn","D":"nnnnwwnnw","E":"wnnnwwnnn","F":"nnwnwwnnn","G":"nnnnnwwnw","H":"wnnnnwwnn","I":"nnwnnwwnn","J":"nnnnwwwnn","K":"wnnnnnnww","L":"nnwnnnnww","M":"wnwnnnnwn","N":"nnnnwnnww","O":"wnnnwnnwn","P":"nnwnwnnwn","Q":"nnnnnnwww","R":"wnnnnnwwn","S":"nnwnnnwwn","T":"nnnnwnwwn","U":"wwnnnnnnw","V":"nwwnnnnnw","W":"wwwnnnnnn","X":"nwnnwnnnw","Y":"wwnnwnnnn","Z":"nwwnwnnnn","-":"nwnnnnwnw",".":"wwnnnnwnn"," ":"nwwnnnwnn","$":"nwnwnwnnn","/":"nwnwnnnwn","+":"nwnnnwnwn","%":"nnnwnwnwn","*":"nwnnwnwnn"};
 const clone=o=>JSON.parse(JSON.stringify(o));
 function uid(){return "xxxxxxxx-xxxx-4xxx-yxxx-xxxxxxxxxxxx".replace(/[xy]/g,function(c){let r=Math.floor(Math.random()*16);return (c==="x"?r:(r&3|8)).toString(16)});}
-function send(type,payload){if(window.webkit&&window.webkit.messageHandlers&&window.webkit.messageHandlers.labelDesk){window.webkit.messageHandlers.labelDesk.postMessage(Object.assign({type:type},payload||{}));}}
+function send(type,payload){
+ const message=Object.assign({type:type},payload||{});
+ if(window.parent!==window){
+   window.parent.postMessage(Object.assign({source:"labeldesk-editor"},message),"*");
+ }else if(window.webkit&&window.webkit.messageHandlers&&window.webkit.messageHandlers.labelDesk){
+   window.webkit.messageHandlers.labelDesk.postMessage(message);
+ }
+}
 function commit(){if(!doc)return;send("document",{json:JSON.stringify(doc),selected:selected});}
 function checkpoint(){if(!doc)return;history.push(clone(doc));if(history.length>80)history.shift();future=[];}
 function restore(list,to){if(!list.length||!doc)return;to.push(clone(doc));doc=list.pop();selected=doc.elements.some(e=>e.id===selected)?selected:null;draw();commit();}
@@ -422,6 +429,13 @@ document.addEventListener("keydown",function(ev){
    return;
  }
  if(!editable&&(ev.key==="Delete"||ev.key==="Backspace")){ev.preventDefault();remove();}
+});
+// Embedded editor receives JSON from the outer HTML application.
+window.addEventListener("message",function(event){
+ if(event.source!==window.parent || event.data?.source!=="labeldesk-app")return;
+ if(event.data.type==="load" && event.data.document){
+   window.labelDeskLoad(event.data.document);
+ }
 });
 send("ready");
 })();

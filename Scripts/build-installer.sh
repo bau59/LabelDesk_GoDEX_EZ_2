@@ -7,7 +7,7 @@ APP="$BUILD_DIR/LabelDesk.app"
 VERSION="$(/usr/libexec/PlistBuddy -c 'Print :CFBundleShortVersionString' "$ROOT/LabelDesk/Resources/Info.plist")"
 DMG="$BUILD_DIR/LabelDesk-${VERSION}.dmg"
 MACOS_DIR="$APP/Contents/MacOS"
-SOURCE_FILES=("$ROOT"/LabelDesk/App/*.swift(N) "$ROOT"/LabelDesk/Models/*.swift(N) "$ROOT"/LabelDesk/Services/*.swift(N) "$ROOT"/LabelDesk/Views/*.swift(N))
+SOURCE_FILES=("$ROOT/LabelDesk/App/LabelDeskApp.swift" "$ROOT/LabelDesk/App/WebLabelDeskBridge.swift" "$ROOT/LabelDesk/App/UpdateManager.swift")
 MODULE_CACHE="$ROOT/.build/module-cache"
 SWIFTC_OPTIONS=()
 
@@ -31,7 +31,7 @@ print "[LabelDesk] 2/5 Preparing build folder…"
 rm -rf "$BUILD_DIR"
 mkdir -p "$MACOS_DIR" "$MODULE_CACHE"
 
-print "[LabelDesk] 3/5 Compiling editor, raster and print queue…"
+print "[LabelDesk] 3/5 Compiling minimal native WebKit bridge…"
 START_TIME=$SECONDS
 swiftc \
   "${SWIFTC_OPTIONS[@]}" \
@@ -50,7 +50,10 @@ print "[LabelDesk] 4/5 Creating and signing the app bundle…"
 mkdir -p "$APP/Contents/Resources"
 cp "$ROOT/LabelDesk/Resources/Info.plist" "$APP/Contents/Info.plist"
 cp "$ROOT/Scripts/install-update.sh" "$APP/Contents/Resources/install-update.sh"
-cp "$ROOT/LabelDesk/Resources/editor.html" "$APP/Contents/Resources/editor.html"
+for file in app.html app.js editor.html raster.js; do
+  cp "$ROOT/LabelDesk/Resources/$file" "$APP/Contents/Resources/$file"
+done
+cp "$ROOT/Scripts/printer.sh" "$APP/Contents/Resources/printer.sh"
 codesign --force --deep --sign - "$APP"
 print "[LabelDesk] 5/5 Creating the disk image…"
 hdiutil create -volname LabelDesk -srcfolder "$APP" -ov -format UDZO "$DMG"

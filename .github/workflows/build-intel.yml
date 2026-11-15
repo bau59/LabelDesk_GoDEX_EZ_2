@@ -8,6 +8,7 @@ on:
       - fix/verified-line-printing
       - fix/line-feed-and-raster-size-094
       - fix/ez2-job-tear-feed-095
+      - rewrite/web-shell-driver
   workflow_dispatch:
 
 permissions:
@@ -55,6 +56,10 @@ jobs:
           zsh Scripts/build-installer.sh
           test -f build/LabelDesk.app/Contents/Resources/install-update.sh
           test -f build/LabelDesk.app/Contents/Resources/editor.html
+          test -f build/LabelDesk.app/Contents/Resources/app.html
+          test -f build/LabelDesk.app/Contents/Resources/app.js
+          test -f build/LabelDesk.app/Contents/Resources/raster.js
+          test -f build/LabelDesk.app/Contents/Resources/printer.sh
           BIN="build/LabelDesk.app/Contents/MacOS/LabelDesk"
           test -f "$BIN"
           test "$(lipo -archs "$BIN")" = "x86_64"
@@ -113,6 +118,10 @@ jobs:
           set -euo pipefail
           python3 -c "import pathlib,re; s=pathlib.Path('LabelDesk/Resources/editor.html').read_text(); m=re.search(r'<script>(.*?)</script>',s,re.S); assert m; pathlib.Path('/tmp/label-editor.js').write_text(m.group(1))"
           node --check /tmp/label-editor.js
+          node --check LabelDesk/Resources/raster.js
+          node --check LabelDesk/Resources/app.js
+          node Tests/WebRasterSmoke.js
+          zsh -n Scripts/printer.sh
 
       - name: Test selected-layer resize geometry
         shell: bash
@@ -179,4 +188,4 @@ jobs:
             --repo "$GITHUB_REPOSITORY" \
             --target "$GITHUB_SHA" \
             --title "LabelDesk ${APP_VERSION}" \
-            --notes "Intel macOS 15+. End each print job with a tested blank buffered EZ-2 label (F0/q040/M01/B/A11 SPACE/CR/E/P01), after a configurable delay. Keep Line Mode serial output across copies, close it before buffered separator, then reopen with F0/q040/M01 for the next job. No forced-distance f29/f11. Reverse ESC Rnn remains disabled. Physical verification of the combined workflow required. Ad-hoc signed; not notarized."
+            --notes "LabelDesk 1.0.1 for Intel macOS 15+. Rewritten WebKit + vanilla JavaScript UI and editable local zsh serial driver, no Node/Python dependency. Keeps existing templates, folders, queue and settings JSON. Original secure GitHub updater is preserved in native toolbar, with signed Intel ZIP and SHA-256 verification plus rollback. Printed one and three copies were physically confirmed in preview 1.0.0; inter-job separator remains unverified. Ad-hoc signed, not notarized."
