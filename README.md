@@ -1,6 +1,6 @@
 # LabelDesk — original GoDEX EZ-2 on macOS (WebKit + zsh)
 
-**1.0.4 WebKit/zsh release (barcode generator and isolated native-mode test).** No Node.js, Python, pip, npm, HTTP server or external dependencies are needed on the user's Mac. The system frameworks AppKit/WebKit and system commands `/bin/zsh`, `/bin/stty`, `/bin/cat` and `printf` handle the application and RS-232.
+**1.0.5 WebKit/zsh release (CP866 resident text printing and food templates).** No Node.js, Python, pip, npm, HTTP server or external dependencies are needed on the user's Mac. The system frameworks AppKit/WebKit and system commands `/bin/zsh`, `/bin/stty`, `/bin/cat` and `printf` handle the application and RS-232.
 
 ## Runtime layout
 
@@ -12,8 +12,14 @@ After the initial macOS installation, the following files are copied into the us
 │   ├── app.html       # all screens
 │   ├── app.js         # library, quick fill, saved queue
 │   ├── editor.html    # original editor, same layer/geometry UI
-│   ├── raster.js      # canvas renderer and ESC Gnn encoder
-│   └── printer.sh     # editable macOS RS-232 driver
+│   ├── raster.js      # original ESC Gnn raster
+│   ├── barcodes.js    # Code39/128/EAN generator
+│   ├── native.js      # isolated one-label diagnostic
+│   ├── text-engine.js # resident CP866 compiler
+│   ├── food-presets.js# four seeded food-container samples
+│   ├── printer-text.sh# buffered text transport
+│   ├── printer-native.sh # native diagnostic transport
+│   └── printer.sh     # original raster driver
 ├── templates/          # existing UUID JSON templates, untouched
 ├── folders.json        # existing logical folders, untouched
 ├── queue.json          # existing queue and job history, untouched
@@ -49,6 +55,62 @@ New labels use the stored media dimensions. Saved template JSON files are **neve
 
 **Safety:** The current printing transport is still verified only for **38-mm label height plus 2-mm gap** (`ESC q040`, 280 raster rows). Settings for other media sizes can be saved and used to prepare templates, but sending them to the printer is blocked until a matching transport protocol has been physically verified. Changing settings does not silently change motor commands. Width changes within the supported template bounds do not alter the fixed motor pitch.
 
+## CP866 text printing and food-container starter labels (1.0.5)
+
+**Physical tests on the user's actual EZ-2 established:**
+CP866 Russian uppercase/lowercase and Ё/ё in resident fonts A11/A12/A21/A0n,
+multiple lines separated by CR, M01/M10/M20/M30 horizontal margins, V/v
+inverse text, CP866 line-drawing characters, and firmware Code39, Code128
+and EAN13 barcode output. These tests used the verified 58×38 mm / 2 mm
+gap roll and separate one-label buffered P01 jobs.
+Barcode scanner readability, multi-copy Pnn/pnnn and compound text+barcode
+labels are **not yet physically verified**; use a small test job first.
+
+**Newly created documents use `printMode:"text"`:** the printer's sequential
+buffered line mode with built-in CP866 fonts (A00…A04, A11…A48), Mnn left
+margins and auto-wrapped text. Text and barcode blocks are printed top-to-bottom
+in the stored element order (bottom-to-top in the editor's reversed layer
+panel); **there is no arbitrary Y coordinate** in this protocol.
+The editor displays an approximate layout, prevents dragging/resizing text
+lines, and permits a mode switch in its toolbar. Switch to raster if precise
+XY placement, rectangles, images or unsupported characters are required.
+Existing templates without a `printMode` keep using the original working
+`printer.sh` Gnn raster driver without conversion or mutation.
+
+**One buffered command per text job**: `ESC F0 q040 M01`,
+optional `?n/X2` barcode selector, `ESC B`, CP866 rows terminated by CR,
+`ESC E`, and `ESC P01…P99` (1–99 copies) or `ESC p100…p200 CR LF`
+(100–200 copies). The exact syntax for Pnn/pnnn follows the original
+2002 manual. The new `printer-text.sh` streams this packet at 9600 8N1,
+without a startup T3, extra FF or a blank separator. The native mode and
+raster mode are explicitly separated in the Swift bridge; malformed packets
+and unsafe label layouts are rejected before opening the port.
+The established `printer.sh` is unchanged.
+
+**Food samples are added once, non-destructively** as four independent folders
+with editable base templates, each 58×38 mm + 2 mm gap:
+
+1. **Еда · Состав** — dish name, ingredients, allergens, net weight,
+   preparation time, use-by time, storage temperature, batch,
+   manufacturer and address.
+2. **Еда · КБЖУ** — product, nutrition per 100 g (energy, proteins,
+   fats, carbohydrates), weight, ingredients, allergens, dates and maker.
+3. **Еда · Фасовка** — fast packing sticker with weight, preparation/use-by
+   dates, storage, batch, ingredients and allergens.
+4. **Еда · Партия и ШК** — dates, net weight, lot, manufacturer and
+   firmware Code128 at the bottom.
+
+The one-time import stores regular UUID template files and `folders.json`
+references; it records `foodPresetsPack:"food-v1"` in existing settings.
+Reopening or updating never replaces modified user templates or recreates
+deleted samples. Existing folders, templates, settings and queued jobs
+are left untouched. Bracketed fields such as `[ИНГРЕДИЕНТЫ]` are deliberately
+**not printable until filled**, so examples cannot accidentally be used
+as real food labels. Replace these with actual recipe, validated nutrition,
+shelf-life, temperature and legal manufacturer data. These examples are not
+a legal-compliance certification; requirements depend on the jurisdiction
+and product.
+
 ## Original EZ-2 built-in text and barcode features (1.0.4)
 
 Reference: the original *EZ-2/4 Manual*, April 2002, P/N 920-010210-00,
@@ -65,8 +127,9 @@ vertically 1–8), `ESC A0n` (8×10-dot text variants),
 `ESC {DATA}` / `ESC |DATA}` (barcode with/without human-readable text),
 `ESC Mnn` (left margin), and `ESC Gnn` (graphics). The original manual explicitly lists
 Code128 B/C, Interleaved 2 of 5, Code39, Code93 and Codabar. Modern EZPL `L`, `R`, `A` arbitrary-coordinate drawing commands are **not documented for this hardware**.
-The printer's original 8-bit font page provides ASCII/CP437 symbols including box-drawing
-characters, but **not UTF-8 Cyrillic**.
+The printer's 8-bit font also supports **CP866 Russian Cyrillic** including Ё/ё,
+confirmed on the user's actual printer in physical testing. This does not imply
+UTF-8 support: bytes must be converted to CP866 before sending.
 
 The HTML editor now creates new text, barcode, and line blocks across the **verified
 printable width** (55 mm on a 58-mm roll, not beyond the tested graphics head), keeping

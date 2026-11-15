@@ -22,7 +22,13 @@
   // their own dimensions and are never rewritten by a media-setting change.
   const newDocument=()=>({schemaVersion:1,id:uuid(),folderID:null,name:"Новая этикетка",
     widthMM:media().widthMM,heightMM:media().heightMM,gapMM:media().gapMM,
-    elements:[],updatedAt:stamp()});
+    printMode:"text",elements:[],updatedAt:stamp()});
+  // Only explicitly marked line-layout documents use native CP866 commands.
+  // Existing documents without printMode retain their proven raster behavior.
+  const isTextDoc=doc=>doc?.printMode==="text";
+  const encodeJob=(doc,copies=1)=>isTextDoc(doc)
+    ?EZ2Text.build(doc,copies)
+    :EZ2Raster.encode(doc,state.profile.rasterThreshold);
 
   let nextRequest=1;
   const requests=new Map();
@@ -113,7 +119,8 @@
     const folder=findFolder(doc?.folderID);
     $("editorContext").textContent=doc?
       (folder?folder.name+"  /  ":"")+"Макет: "+doc.name+" · "+
-      doc.widthMM+"×"+doc.heightMM+" мм"+
+      doc.widthMM+"×"+doc.heightMM+" мм · "+
+      (isTextDoc(doc)?"Текст CP866 (порядок строк)":"Растр (точные координаты)")+
       (state.dirty?" · Не сохранён":" · Сохранён"):
       "Базовый макет не найден. Выберите шаблон или создайте новый.";
     $("editorCompatibility").textContent=check.ok ? "" :
@@ -486,9 +493,26 @@
         $("quickSize").textContent="Предпросмотр доступен, передача в принтер заблокирована.";
         return;
       }
-      const packet=EZ2Raster.encode(doc,state.profile.rasterThreshold);
-      $("quickSize").textContent=packet.widthBytes*8+" точек × "+packet.rows+" строк · "+packet.size+" байт в порт";
-      $("previewError").textContent="";
+      if(isTextDoc(doc)){
+        const plan=EZ2Text.plan(doc,{allowPlaceholders:true});
+        $("quickSize").textContent="Текст CP866 · "+plan.rows.length+
+          " печатных строк · порядок сверху вниз. Изображение — приблизительный эскиз.";
+        try{
+          EZ2Text.build(doc,1);
+          $("queueQuick").disabled=false;
+          $("queueBatch").disabled=!variableFields(doc).length;
+          $("previewError").textContent="";
+        }catch(err){
+          $("queueQuick").disabled=true;
+          $("queueBatch").disabled=true;
+          $("previewError").textContent=err.message;
+        }
+      }else{
+        const packet=EZ2Raster.encode(doc,state.profile.rasterThreshold);
+        $("quickSize").textContent="Растровая печать · "+packet.widthBytes*8+
+          " точек × "+packet.rows+" строк · "+packet.size+" байт";
+        $("previewError").textContent="";
+      }
     }catch(e){
       $("previewError").textContent=e.message;
       $("quickSize").textContent="Печать этого макета заблокирована.";
@@ -507,7 +531,7 @@
     if(!EZ2Raster.transportReady(media())){
       throw new Error("Этот размер рулона ещё не поддерживается транспортом. Измените настройки перед печатью.");
     }
-    EZ2Raster.encode(doc,state.profile.rasterThreshold);
+    encodeJob(doc,n);
     state.jobs.push({id:uuid(),document:clone(doc),copies:n,addedAt:stamp(),
       state:"pending",errorMessage:null});
     await persistQueue();renderQueue();
@@ -533,7 +557,7 @@
         const check=compatibility(doc);
         if(!check.ok)throw new Error("Несовместим с рулоном. "+check.reason);
         if(!EZ2Raster.transportReady(media()))throw new Error("Размер рулона пока не поддерживается печатью.");
-        EZ2Raster.encode(doc,state.profile.rasterThreshold);
+        encodeJob(doc,1);
         toAdd.push({id:uuid(),document:doc,copies:1,addedAt:stamp(),
           state:"pending",errorMessage:null});
       }
@@ -550,6 +574,8 @@
     $("queueRows").innerHTML=active.length?active.map(job=>{
       const check=compatibility(job.document);
       return '<tr><td>'+esc(job.document?.name||"Этикетка")+
+        '<div class="muted" style="font-size:10px">'+
+        (isTextDoc(job.document)?"Текст CP866":"Растр")+'</div>'+
       '<div class="muted" style="font-size:10px">'+esc(String(job.id).slice(0,8))+'</div></td>'+
       '<td>'+esc(job.copies)+'</td><td>'+esc(stateName[job.state]||job.state)+
       (!check.ok?'<div class="media-incompatible">⚠ Несовместим: '+esc(check.reason)+'</div>':'')+
@@ -583,28 +609,32 @@
     if(!state.profile.portPath){note("Выберите RS-232 порт в настройках",true);return;}
     if(!one&&!window.confirm("Отправить "+jobs.length+" совместимых заданий? Несовместимые останутся в очереди."))return;
     state.running=true;state.stopRequested=false;renderQueue();
-    let first=true;
+    let firstRaster=true;
     for(const job of (one?jobs.slice(0,1):jobs)){
       if(state.stopRequested)break;
-      let raster;
-      try{raster=EZ2Raster.encode(job.document,state.profile.rasterThreshold);}
+      let packet;
+      const textMode=isTextDoc(job.document);
+      try{packet=encodeJob(job.document,Number(job.copies));}
       catch(e){
         job.state="failed";job.errorMessage=e.message;
-        await persistQueue();log("Ошибка растра: "+e.message);break;
+        await persistQueue();log("Ошибка компиляции: "+e.message);break;
       }
       job.state="sending";job.errorMessage=null;
       await persistQueue();renderQueue();
-      log("Печать "+job.document.name+", копий "+job.copies+", G"+raster.widthBytes+
-          " × "+raster.rows+", "+raster.size+" байт");
+      log("Печать "+job.document.name+", копий "+job.copies+", режим "+
+          (textMode?"ТЕКСТ CP866, "+packet.rows+" строк":"РАСТР G"+packet.widthBytes+" × "+packet.rows)+
+          ", "+packet.size+" байт");
       try{
         const result=await native("printJob",{
-          base64:raster.base64,
+          base64:packet.base64,
+          textMode,
           copies:Number(job.copies),
-          first,
+          first:!textMode&&firstRaster,
           port:state.profile.portPath,
           delay:Number(state.profile.labelIntervalSeconds)
         });
-        first=false;job.state="sent";job.errorMessage=null;
+        if(!textMode)firstRaster=false;
+        job.state="sent";job.errorMessage=null;
         log(result?.output||"В порт передано; физическая печать не подтверждена");
       }catch(e){
         job.state="uncertain";job.errorMessage=e.message;
@@ -705,6 +735,28 @@
       note("Рулон сохранён: "+checked.widthMM+"×"+checked.heightMM+" мм, зазор "+checked.gapMM+" мм");
     }catch(e){note(e.message,true);}
   }
+  async function installFoodPresets(){
+    const pack=window.EZ2FoodPresets;
+    if(!pack || state.settingsSnapshot.foodPresetsPack===pack.version)return;
+    const samples=pack.build();
+    // Stable identifiers + a settings marker prevent duplicate import and
+    // ensure never to overwrite a food sample edited by the user.
+    for(const doc of samples.templates){
+      if(state.templates.some(t=>keySame(t.id,doc.id)))continue;
+      await native("saveTemplate",{document:JSON.stringify(doc)});
+      state.templates.push(clone(doc));
+    }
+    const additions=samples.folders.filter(f=>
+      !state.folders.some(existing=>keySame(existing.id,f.id)));
+    if(additions.length){
+      const folders=[...state.folders,...additions];
+      await native("saveData",{key:"folders",json:JSON.stringify(folders)});
+      state.folders=folders;
+    }
+    const settings={...state.settingsSnapshot,foodPresetsPack:pack.version};
+    await native("saveData",{key:"settings",json:JSON.stringify(settings)});
+    state.settingsSnapshot=settings;
+  }
   async function bootstrap(){
     try {
       const info=await native("loadAll");
@@ -717,8 +769,16 @@
       state.profile={...defaultProfile(),...(info.settings?.profile||{})};
       state.settingsSnapshot=info.settings||{schemaVersion:1,snapToGrid:true};
       state.runtimePath=info.runtimePath||"";
+      const hadUserTemplates=state.templates.length>0;
+      const originalFirst=state.templates.slice().sort((a,b)=>
+        String(b.updatedAt||"").localeCompare(String(a.updatedAt||"")))[0];
+      try{await installFoodPresets();}
+      catch(error){note("Готовые шаблоны не установлены: "+error.message,true);}
       state.templates.sort((a,b)=>String(b.updatedAt||"").localeCompare(String(a.updatedAt||"")));
-      state.current=state.templates.length?clone(state.templates[0]):newDocument();
+      state.current=(hadUserTemplates&&originalFirst)?clone(originalFirst):
+        (state.templates.find(t=>t.starterPack==="food-v1") ?
+          clone(state.templates.find(t=>t.starterPack==="food-v1")):
+          (state.templates.length?clone(state.templates[0]):newDocument()));
       state.selectedID=state.current.id;
       state.folderFilter="all";
       state.selectedFolderID=null;

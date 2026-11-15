@@ -121,6 +121,12 @@ strong{font-size:14px;display:block;margin-bottom:14px}
      <button data-add="line">+ Линия</button>
      <button data-add="rectangle">+ Рамка</button>
      <div class="divider"></div>
+     <label>Печать
+       <select id="printModeSelect" style="width:165px">
+         <option value="text">Текст CP866</option>
+         <option value="raster">Растр</option>
+       </select>
+     </label>
      <button id="undo" title="Отменить · ⌘Z">↶</button>
      <button id="redo" title="Повторить · ⌘⇧Z">↷</button>
      <label>Масштаб <select id="zoom"><option value="fit" selected>Вписать</option><option value="6">6×</option><option value="8">8×</option><option value="10">10×</option><option value="12">12×</option><option value="16">16×</option></select></label>
@@ -135,13 +141,14 @@ strong{font-size:14px;display:block;margin-bottom:14px}
  </aside>
 </div>
 <script src="barcodes.js"></script>
+<script src="text-engine.js"></script>
 <script>
 (function(){
 "use strict";
 let doc=null, selected=null, zoom=8, zoomMode="fit", history=[], future=[], snap=true;
 let printerMedia={widthMM:58,heightMM:38,gapMM:2};
 const $=id=>document.getElementById(id);
-const typeNames={text:"Текст",barcode:"Code 39",line:"Линия",rectangle:"Рамка"};
+const typeNames={text:"Текст",barcode:"Штрихкод",line:"Линия",rectangle:"Рамка"};
 const patterns={"0":"nnnwwnwnn","1":"wnnwnnnnw","2":"nnwwnnnnw","3":"wnwwnnnnn","4":"nnnwwnnnw","5":"wnnwwnnnn","6":"nnwwwnnnn","7":"nnnwnnwnw","8":"wnnwnnwnn","9":"nnwwnnwnn","A":"wnnnnwnnw","B":"nnwnnwnnw","C":"wnwnnwnnn","D":"nnnnwwnnw","E":"wnnnwwnnn","F":"nnwnwwnnn","G":"nnnnnwwnw","H":"wnnnnwwnn","I":"nnwnnwwnn","J":"nnnnwwwnn","K":"wnnnnnnww","L":"nnwnnnnww","M":"wnwnnnnwn","N":"nnnnwnnww","O":"wnnnwnnwn","P":"nnwnwnnwn","Q":"nnnnnnwww","R":"wnnnnnwwn","S":"nnwnnnwwn","T":"nnnnwnwwn","U":"wwnnnnnnw","V":"nwwnnnnnw","W":"wwwnnnnnn","X":"nwnnwnnnw","Y":"wwnnwnnnn","Z":"nwwnwnnnn","-":"nwnnnnwnw",".":"wwnnnnwnn"," ":"nwwnnnwnn","$":"nwnwnwnnn","/":"nwnwnnnwn","+":"nwnnnwnwn","%":"nnnwnwnwn","*":"nwnnwnwnn"};
 const clone=o=>JSON.parse(JSON.stringify(o));
 function uid(){return "xxxxxxxx-xxxx-4xxx-yxxx-xxxxxxxxxxxx".replace(/[xy]/g,function(c){let r=Math.floor(Math.random()*16);return (c==="x"?r:(r&3|8)).toString(16)});}
@@ -160,6 +167,10 @@ function selectedObj(){return doc&&doc.elements.find(e=>e.id===selected);}
 function setSelected(id){if(!doc||!doc.elements.some(e=>e.id===id))return;selected=id;draw();}
 function newElem(kind){
  if(!doc)return;
+ if(kind==="rectangle"&&doc.printMode==="text"){
+   if(!window.confirm("Прямоугольник требует растровой печати. Перевести весь макет в растр?"))return;
+   doc.printMode="raster";
+ }
  const full=Math.min(55,doc.widthMM), last=doc.elements.reduce((n,e)=>Math.max(n,e.yMM+e.heightMM),0);
  const defaults={text:[0,3,full,7,"Текст"],barcode:[0,12,full,13,"1234567890"],
    line:[0,20,full,0.4,""],rectangle:[0,3,full,18,""]}[kind];
@@ -169,7 +180,8 @@ function newElem(kind){
  }
  let e={id:uid(),kind:kind,xMM:dims[0],yMM:dims[1],widthMM:dims[2],heightMM:dims[3],
    value:dims[4],fontSize:12,rotation:0,showsHumanReadable:true,isBold:false,
-   isVariable:kind==="text"||kind==="barcode",fieldName:"",barcodeType:"CODE128",renderMode:"auto",deviceFont:"A11"};
+   isVariable:kind==="text"||kind==="barcode",fieldName:"",barcodeType:"CODE128",
+   renderMode:doc.printMode==="text"?"device":"auto",deviceFont:doc.printMode==="text"?"A00":"A11"};
  e.widthMM=Math.max(1,Math.min(e.widthMM,doc.widthMM-e.xMM));
  e.yMM=Math.min(e.yMM,Math.max(0,doc.heightMM-e.heightMM));
  checkpoint();doc.elements.push(e);selected=e.id;draw();commit();
@@ -180,7 +192,9 @@ function moveLayer(delta){
  checkpoint();let item=doc.elements.splice(index,1)[0];doc.elements.splice(dest,0,item);draw();commit();
 }
 function remove(){if(!selected||!doc)return;checkpoint();doc.elements=doc.elements.filter(e=>e.id!==selected);selected=null;draw();commit();}
-function duplicate(){const e=selectedObj();if(!e)return;checkpoint();let copy=clone(e);copy.id=uid();copy.xMM=Math.min(Math.max(0,doc.widthMM-copy.widthMM),copy.xMM+1);copy.yMM=Math.min(Math.max(0,doc.heightMM-copy.heightMM),copy.yMM+1);doc.elements.push(copy);selected=copy.id;draw();commit();}
+function duplicate(){const e=selectedObj();if(!e)return;checkpoint();let copy=clone(e);copy.id=uid();
+ if(doc.printMode==="text"){copy.xMM=0;copy.widthMM=Math.min(55,doc.widthMM);}
+ else {copy.xMM=Math.min(Math.max(0,doc.widthMM-copy.widthMM),copy.xMM+1);copy.yMM=Math.min(Math.max(0,doc.heightMM-copy.heightMM),copy.yMM+1);}doc.elements.push(copy);selected=copy.id;draw();commit();}
 function labelFor(e){const variable=((e.kind==="text"||e.kind==="barcode")&&e.isVariable!==false)?" • перем.":"";return typeNames[e.kind]+variable+" · "+(e.value||"");}
 function renderLayers(){
  const root=$("layers");root.replaceChildren();
@@ -235,14 +249,40 @@ function renderCanvas(){
  el.style.width=(width*zoom)+"px";el.style.height=(height*zoom)+"px";
  $("grid").style.backgroundImage="linear-gradient(to right,#0000000d 1px,transparent 1px),linear-gradient(to bottom,#0000000d 1px,transparent 1px)";
  $("grid").style.backgroundSize=zoom+"px "+zoom+"px";
+ const flowPositions=new Map();
+ const textMode=doc.printMode==="text";
+ if(textMode && window.EZ2Text){
+   try{
+     const layout=window.EZ2Text.plan(doc,{allowPlaceholders:true});
+     let at=0;
+     for(const row of layout.rows){
+       const key=row.element.id;
+       if(!flowPositions.has(key))flowPositions.set(key,{top:at,height:0});
+       const height=row.kind==="barcode"?120:row.font.heightDots;
+       flowPositions.get(key).height+=height;at+=height;
+     }
+   }catch(error){
+     // Keep the editable source visible even while it contains invalid data.
+   }
+ }
  doc.elements.forEach(function(e){
    let node=document.createElement("div");node.className="obj"+(selected===e.id?" sel":"");node.dataset.id=e.id;
-   node.style.left=(e.xMM*zoom)+"px";node.style.top=(e.yMM*zoom)+"px";
-   node.style.width=Math.max(3,e.widthMM*zoom)+"px";node.style.height=Math.max(3,e.heightMM*zoom)+"px";
+   const flow=flowPositions.get(e.id);
+   node.style.left=((textMode?0:e.xMM)*zoom)+"px";
+   node.style.top=(flow?flow.top/8*zoom:e.yMM*zoom)+"px";
+   node.style.width=Math.max(3,(textMode?Math.min(55,doc.widthMM):e.widthMM)*zoom)+"px";
+   node.style.height=Math.max(3,(flow?flow.height/8:e.heightMM)*zoom)+"px";
    let visual=document.createElement("div");visual.className="visual "+e.kind;
    if(e.kind==="text"){
-     visual.textContent=e.value||"";
-     visual.style.fontSize=(e.fontSize*zoom/2.8346457)+"px";visual.style.fontWeight=e.isBold?"700":"400";
+     visual.textContent=String(e.prefix||"")+String(e.value||"");
+     let nativeHeight=null;
+     if(textMode&&window.EZ2Text){
+       try{nativeHeight=window.EZ2Text.font(e.deviceFont||"A00").heightDots;}catch(_e){}
+     }
+     visual.style.fontSize=nativeHeight?
+       Math.max(7,(nativeHeight/8*zoom*0.8))+"px":
+       (e.fontSize*zoom/2.8346457)+"px";
+     visual.style.fontWeight=e.isBold?"700":"400";
      visual.style.textAlign=e.textAlignment||"left";
      visual.style.transform="rotate("+(e.rotation||0)+"deg)";
    } else if(e.kind==="barcode"){
@@ -257,7 +297,7 @@ function renderCanvas(){
      }
    }
    node.appendChild(visual);
-   if(selected===e.id){
+   if(selected===e.id && !textMode){
      for(const corner of ["nw","ne","sw","se"]){
        const handle=document.createElement("div");
        handle.className="resize-handle "+corner;
@@ -266,7 +306,8 @@ function renderCanvas(){
        node.appendChild(handle);
      }
    }
-   node.title=selected===e.id?"Перетащите объект · углы изменяют размер":"Щёлкните или перетащите для выбора слоя";
+   node.title=textMode?"Текстовый режим: порядок строк меняется стрелками в панели слоёв":
+     selected===e.id?"Перетащите объект · углы изменяют размер":"Щёлкните или перетащите для выбора слоя";
    node.addEventListener("click",ev=>{ev.stopPropagation();});
    node.addEventListener("dblclick",ev=>{
      ev.stopPropagation();
@@ -274,7 +315,10 @@ function renderCanvas(){
      const field=$("field-value");
      if(field){field.focus();field.select();}
    });
-   node.addEventListener("pointerdown",ev=>startManipulation(ev,e.id,"move"));
+   node.addEventListener("pointerdown",ev=>{
+     if(textMode){ev.stopPropagation();setSelected(e.id);}
+     else startManipulation(ev,e.id,"move");
+   });
    el.appendChild(node);
  });
  // Neutral marking for the independently verified ESC G55 raster limit.
@@ -387,26 +431,54 @@ function renderProps(){
                         prop("Высота, мм",numInput(doc.heightMM,n=>{doc.heightMM=Math.round(n);},10,100,1))));
    root.appendChild(prop("Зазор, мм",numInput(doc.gapMM,n=>{doc.gapMM=Math.round(n);},0,10,1)));
    let note=document.createElement("p");note.className="hint";note.textContent=doc.widthMM>55?"Ширина ленты — "+doc.widthMM+" мм. Заштрихованные справа "+(doc.widthMM-55).toFixed(1)+" мм НЕ печатаются ESC G. Печатная графика — 0…55 мм.":"Материал — до 60 мм, графика ESC G — до 55 мм. Выберите слой для редактирования.";;root.appendChild(note);
+   const mode=document.createElement("select");
+   for(const [id,title] of [["text","Штатный текст CP866 (строки)"],["raster","Растр (точные X/Y)"]]){
+     const opt=document.createElement("option");opt.value=id;opt.textContent=title;mode.appendChild(opt);
+   }
+   mode.value=doc.printMode||"raster";
+   mode.addEventListener("change",()=>{
+     checkpoint();doc.printMode=mode.value;draw();commit();
+   });
+   root.appendChild(prop("Способ печати",mode));
+   const desc=document.createElement("p");desc.className="hint";
+   desc.textContent=doc.printMode==="text"?
+     "Печать встроенным шрифтом CP866. Строки идут по порядку слоёв снизу вверх в списке. Точные координаты Y принтер не поддерживает; размеры в эскизе приблизительные.":
+     "Растровый режим сохраняет координаты и размещение объектов.";
+   root.appendChild(desc);
    root.appendChild(checkbox("Привязка к сетке 1 мм",snap,n=>{snap=n;}));
    return;
  }
  let h=document.createElement("strong");h.textContent=typeNames[e.kind];root.appendChild(h);
  if(e.kind==="text"||e.kind==="barcode")root.appendChild(prop(e.kind==="text"?"Текст":"Данные штрихкода",textInput(e.value,v=>{e.value=v;},e.kind==="text","field-value")));
+ if(e.prefix){
+   const prefix=document.createElement("p");prefix.className="hint";
+   prefix.textContent="Постоянная подпись: «"+e.prefix+"». В заполнении меняется только значение.";
+   root.appendChild(prefix);
+ }
+ if(doc.printMode!=="text"){
  root.appendChild(pair(prop("X, мм",numInput(e.xMM,n=>{e.xMM=Math.min(n,Math.max(0,doc.widthMM-e.widthMM));},0,60,0.125)),
                        prop("Y, мм",numInput(e.yMM,n=>{e.yMM=Math.min(n,Math.max(0,doc.heightMM-e.heightMM));},0,100,0.125))));
  root.appendChild(pair(prop("Ширина, мм",numInput(e.widthMM,n=>{e.widthMM=Math.min(n,doc.widthMM-e.xMM);},0.125,60,0.125)),
                        prop("Высота, мм",numInput(e.heightMM,n=>{e.heightMM=Math.min(n,doc.heightMM-e.yMM);},0.125,100,0.125))));
+ }else{
+   const flow=document.createElement("p");flow.className="hint";
+   flow.textContent="Строки печатаются последовательно. Для смены порядка используйте стрелки в списке слоёв. X/Y не редактируются.";
+   root.appendChild(flow);
+ }
  if(e.kind==="text"){
-   root.appendChild(prop("Кегль, pt (для растра)",numInput(e.fontSize,n=>{e.fontSize=n;},5,52,1)));
-   const modes=document.createElement("select");
-   for(const [id,label] of [["auto","Авто — растр, пока встроенные команды не проверены"],
-      ["device","Встроенный ASCII/CP437 — пробная печать"]]){
-     let opt=document.createElement("option");opt.value=id;opt.textContent=label;modes.appendChild(opt);
+   if(doc.printMode!=="text")
+     root.appendChild(prop("Кегль, pt (для растра)",numInput(e.fontSize,n=>{e.fontSize=n;},5,52,1)));
+   if(doc.printMode!=="text"){
+     const modes=document.createElement("select");
+     for(const [id,label] of [["auto","Растровый текст"],
+        ["device","Штатный шрифт — диагностический тест"]]){
+       let opt=document.createElement("option");opt.value=id;opt.textContent=label;modes.appendChild(opt);
+     }
+     modes.value=e.renderMode||"auto";
+     modes.addEventListener("change",()=>{checkpoint();e.renderMode=modes.value;renderProps();commit();});
+     root.appendChild(prop("Способ вывода (растр)",modes));
    }
-   modes.value=e.renderMode||"auto";
-   modes.addEventListener("change",()=>{checkpoint();e.renderMode=modes.value;renderProps();commit();});
-   root.appendChild(prop("Способ вывода",modes));
-   if(e.renderMode==="device"){
+   if(doc.printMode==="text"||e.renderMode==="device"){
      const fonts=document.createElement("select");
      for(const preset of ["A11","A12","A13","A14","A21","A22","A31","A41","A00","A01","A02","A03","A04"]){
        const opt=document.createElement("option");opt.value=preset;opt.textContent=preset;fonts.appendChild(opt);
@@ -415,7 +487,7 @@ function renderProps(){
      fonts.addEventListener("change",()=>{checkpoint();e.deviceFont=fonts.value;commit();});
      root.appendChild(prop("Встроенный размер EZ-2 (ESC)",fonts));
      const warn=document.createElement("p");warn.className="warn";
-     warn.textContent="Встроенный шрифт EZ-2: ASCII и символы рамок CP437. Кириллица остаётся растровой. Для проверки одной этикетки используйте отдельную кнопку в разделе «Заполнение».";
+     warn.textContent="GoDEX EZ-2: CP866, включая русские буквы и Ё/ё, подтверждён. Режим печатает последовательными строками; расположение по Y ориентировочное.";
      root.appendChild(warn);
    }
    const symbols=document.createElement("div");symbols.className="symbol-palette";
@@ -426,7 +498,8 @@ function renderProps(){
      symbols.appendChild(button);
    }
    root.appendChild(prop("Символы рамок (CP437)",symbols));
-   root.appendChild(checkbox("Жирный",e.isBold,n=>{e.isBold=n;}));
+   if(doc.printMode!=="text")
+     root.appendChild(checkbox("Жирный",e.isBold,n=>{e.isBold=n;}));
    const alignControls=document.createElement("div");alignControls.className="text-align-controls";
    for(const [mode,title] of [["left","По левому краю"],["center","По центру"],["right","По правому краю"]]){
      const button=document.createElement("button");button.type="button";
@@ -447,7 +520,7 @@ function renderProps(){
    let rotation=document.createElement("select");
    for(let angle of [0,90,180,270]){let opt=document.createElement("option");opt.value=angle;opt.textContent=angle+"°";rotation.append(opt);}rotation.value=e.rotation;
    rotation.addEventListener("change",()=>{checkpoint();e.rotation=Number(rotation.value);renderCanvas();commit();});
-   root.appendChild(prop("Поворот",rotation));
+   if(doc.printMode!=="text")root.appendChild(prop("Поворот",rotation));
  } else if(e.kind==="barcode"){
    const kind=document.createElement("select");
    for(const [id,label] of [["CODE128","Code 128 (автоматически B/C)"],["CODE39","Code 39"],
@@ -485,7 +558,7 @@ function renderProps(){
    };
    positionActions.appendChild(button);
  }
- root.appendChild(prop("Расположение блока",positionActions));
+ if(doc.printMode!=="text")root.appendChild(prop("Расположение блока",positionActions));
  if(e.kind==="text"||e.kind==="barcode"||e.kind==="line"){
    const full=document.createElement("button");full.type="button";
    full.textContent="На всю ширину печати";
@@ -493,7 +566,7 @@ function renderProps(){
      checkpoint();e.xMM=0;e.widthMM=Math.min(55,doc.widthMM);
      renderCanvas();renderProps();commit();
    };
-   root.appendChild(prop("Ширина блока",full));
+   if(doc.printMode!=="text")root.appendChild(prop("Ширина блока",full));
  }
  let sep=document.createElement("div");sep.className="dividerline";root.appendChild(sep);
  let actions=document.createElement("div");actions.className="actions";
@@ -504,6 +577,10 @@ function renderProps(){
 function draw(){
  if(!doc)return;
  $("docname").value=doc.name;
+ $("printModeSelect").value=doc.printMode||"raster";
+ $("foot").textContent=doc.printMode==="text"?
+   "Текст CP866: порядок слоёв определяет порядок строк. Стрелки меняют порядок; Y автоматически задаётся принтером. Эскиз приблизительный.":
+   "Растр: перемещайте и масштабируйте объекты, точные координаты X/Y будут сохранены.";
  renderLayers();renderCanvas();renderProps();
  $("undo").disabled=!history.length;$("redo").disabled=!future.length;
 }
@@ -525,6 +602,10 @@ $("docname").addEventListener("focus",()=>{if(doc)checkpoint();});
 $("docname").addEventListener("input",function(){if(!doc)return;doc.name=this.value;commit();});
 $("label").addEventListener("click",ev=>{ev.stopPropagation();});
 $("zoom").addEventListener("change",function(){zoomMode=this.value;if(zoomMode!=="fit")zoom=Number(this.value);renderCanvas();});
+$("printModeSelect").addEventListener("change",function(){
+ if(!doc)return;
+ checkpoint();doc.printMode=this.value;draw();commit();
+});
 window.addEventListener("resize",()=>{if(zoomMode==="fit")renderCanvas();});
 $("up").onclick=()=>moveLayer(1);$("down").onclick=()=>moveLayer(-1);
 $("clone").onclick=duplicate;$("remove").onclick=remove;
@@ -536,6 +617,7 @@ document.addEventListener("keydown",function(ev){
  if((ev.metaKey||ev.ctrlKey)&&ev.key.toLowerCase()==="z"){ev.preventDefault();if(ev.shiftKey)$("redo").click();else $("undo").click();return;}
  if(!editable&&selected&&["ArrowLeft","ArrowRight","ArrowUp","ArrowDown"].includes(ev.key)){
    ev.preventDefault();
+   if(doc?.printMode==="text")return;
    const e=selectedObj();if(!e)return;
    const step=ev.shiftKey?1:(snap?1:0.125);
    const dx=ev.key==="ArrowLeft"?-step:ev.key==="ArrowRight"?step:0;

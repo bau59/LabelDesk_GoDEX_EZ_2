@@ -59,7 +59,7 @@ const html=fs.readFileSync("LabelDesk/Resources/editor.html","utf8");
 assert.match(html,/barcodeType:"CODE128"/,"New barcode element defaults to Code128");
 assert.match(html,/const full=Math\.min\(55,doc.widthMM\)/,"New block width defaults to print width");
 assert.match(html,/EAN-13 \(с контрольной цифрой\)/);
-assert.match(html,/Встроенный ASCII/);
+assert.match(html,/Текст CP866/);
 const app=fs.readFileSync("LabelDesk/Resources/app.html","utf8");
 assert.match(app,/<script src="barcodes.js"><\/script>/);
 assert.match(app,/<script src="native.js"><\/script>/);

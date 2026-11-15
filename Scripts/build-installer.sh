@@ -50,12 +50,13 @@ print "[LabelDesk] 4/5 Creating and signing the app bundle…"
 mkdir -p "$APP/Contents/Resources"
 cp "$ROOT/LabelDesk/Resources/Info.plist" "$APP/Contents/Info.plist"
 cp "$ROOT/Scripts/install-update.sh" "$APP/Contents/Resources/install-update.sh"
-for file in app.html app.js editor.html barcodes.js native.js raster.js; do
+for file in app.html app.js editor.html barcodes.js native.js text-engine.js food-presets.js raster.js; do
 
   cp "$ROOT/LabelDesk/Resources/$file" "$APP/Contents/Resources/$file"
 done
 cp "$ROOT/Scripts/printer.sh" "$APP/Contents/Resources/printer.sh"
 cp "$ROOT/Scripts/printer-native.sh" "$APP/Contents/Resources/printer-native.sh"
+cp "$ROOT/Scripts/printer-text.sh" "$APP/Contents/Resources/printer-text.sh"
 codesign --force --deep --sign - "$APP"
 print "[LabelDesk] 5/5 Creating the disk image…"
 hdiutil create -volname LabelDesk -srcfolder "$APP" -ov -format UDZO "$DMG"
