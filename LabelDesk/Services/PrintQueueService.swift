@@ -136,24 +136,25 @@ final class PrintQueueService: ObservableObject {
                     return
                 }
             }
-            // Job is not complete until the tear-off advance has been
-            // transmitted. This happens once per job, not after every copy.
+            // One sensor-mediated buffered blank label AFTER all copies.
+            // Keep this separate from the Line Mode raster session.
             do {
-                await diagnostics.record("tear feed begin", jobID: job.id,
-                    details: "ESC f29 + ESC f11, one blank label (40mm)")
-                try port.advanceAfterJob(encoder.jobTearFeedCommands(),
-                                         intervalSeconds: profile.labelIntervalSeconds) { stage in
+                await diagnostics.record("blank separator begin", jobID: job.id,
+                    details: "buffered space label: F0 q040 M01 B A11 [space] CR E P01")
+                try port.advanceAfterJob(encoder.blankSeparatorCommands(),
+                                         intervalSeconds: profile.labelIntervalSeconds,
+                                         profile: profile) { stage in
                     Task { @MainActor in
-                        diagnostics.record("tear feed", jobID: job.id, details: stage)
+                        diagnostics.record("blank separator", jobID: job.id, details: stage)
                     }
                 }
-                await diagnostics.record("tear feed sent", jobID: job.id,
-                    details: "40mm serial TX drained; physical position not confirmed")
+                await diagnostics.record("blank separator sent", jobID: job.id,
+                    details: "buffered P01 TX drained; physical position not confirmed")
             } catch {
                 await diagnostics.record("tear feed FAILED", jobID: job.id,
                     details: error.localizedDescription)
                 await self.finish(job.id, state: .uncertain,
-                    error: "Изображение передано, но протяжка для отрыва не завершена. Проверьте бумагу перед повтором. " + error.localizedDescription,
+                    error: "Изображение передано, но пустая разделительная этикетка могла не выйти. Проверьте бумагу перед повтором. " + error.localizedDescription,
                     profile: profile)
                 return
             }
