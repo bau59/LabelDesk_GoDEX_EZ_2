@@ -11,20 +11,28 @@ Native macOS application for preparing and sending label jobs to a GoDEX EZ-2 ov
 
 The physical printer protocol has deliberately not been extended beyond the documented and already verified text test. The editor, print queue, raster (`ESC G`) output and calibration remain as future source-code scaffolding, but are not compiled into this phase. Validate raster bit order, line framing and media motion with hardware before enabling them.
 
-## Build an installable app
+## Download an Intel macOS build
 
-The included macOS Command Line Tools are enough; full Xcode is not required. Run:
+Open the [Build Intel macOS workflow](https://github.com/bau59/LabelDesk_GoDEX_EZ_2/actions/workflows/build-intel.yml), select the latest successful run, and download the `LabelDesk-0.1.0-macOS-Intel` artifact. It contains an `x86_64` app ZIP and a DMG for macOS 15 or later. The workflow runs on the `macos-15-intel` GitHub-hosted runner when `main` changes and can be started manually using **Run workflow**.
+
+The build is ad-hoc signed, not Apple Developer ID notarized. macOS Gatekeeper may show a warning for files downloaded from GitHub; use Control-click → Open if you trust this build. Only the Phase 1 TEST-print app is compiled into these packages.
+
+## Build locally
+
+The macOS SDK and Swift compiler are required. From the repository root, run:
 
 ```sh
-./Scripts/build-installer.sh
+zsh Scripts/build-installer.sh
 ```
+
+The script is invoked with `zsh` because its Git file mode is not executable.
 
 The script creates `build/LabelDesk.app` and `build/LabelDesk-0.1.0.dmg`. The app is ad-hoc signed for local installation; macOS may require opening it with Control-click → Open on first launch. It targets Intel (`x86_64`) Macs running macOS 15 or later.
 
 If a build fails, repeat it in diagnostic mode:
 
 ```sh
-LABELDESK_DEBUG=1 ./Scripts/build-installer.sh
+LABELDESK_DEBUG=1 zsh Scripts/build-installer.sh
 ```
 
 The script compiles only the Phase 1 app and keeps the system-module cache in `.build/module-cache`, making repeat builds faster.
