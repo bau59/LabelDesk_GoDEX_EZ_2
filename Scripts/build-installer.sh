@@ -55,6 +55,7 @@ for file in app.html app.js editor.html barcodes.js native.js raster.js; do
   cp "$ROOT/LabelDesk/Resources/$file" "$APP/Contents/Resources/$file"
 done
 cp "$ROOT/Scripts/printer.sh" "$APP/Contents/Resources/printer.sh"
+cp "$ROOT/Scripts/printer-native.sh" "$APP/Contents/Resources/printer-native.sh"
 codesign --force --deep --sign - "$APP"
 print "[LabelDesk] 5/5 Creating the disk image…"
 hdiutil create -volname LabelDesk -srcfolder "$APP" -ov -format UDZO "$DMG"
