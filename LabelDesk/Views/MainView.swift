@@ -44,6 +44,7 @@ struct MainView: View {
             Button("Calibration", systemImage: "scope") { store.showCalibration = true }
             Button("Print TEST", systemImage: "bolt.fill") { store.sendTest() }
             Button("Raster TEST", systemImage: "square.dashed") { store.sendRasterProbe() }
+            Button("Font TEST", systemImage: "textformat.abc") { store.sendFontTest() }
             Button("Feed TEST", systemImage: "arrow.down.to.line") { store.sendFeedTest() }
                 .buttonStyle(.borderedProminent)
         }
