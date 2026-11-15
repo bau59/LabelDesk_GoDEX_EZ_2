@@ -156,6 +156,19 @@ enum EZ2CalibrationVariant: String, CaseIterable, Identifiable {
 }
 
 enum EZ2CalibrationPattern {
+    /// The legacy FEED text test is deliberately built as a normal raster label
+    /// so all diagnostics can share the same serial path and ESC header.
+    static func feedText(for source: LabelDocument) -> LabelDocument {
+        var sample = source
+        sample.elements = [
+            LabelElement(kind: .text, xMM: 1, yMM: 1,
+                         widthMM: min(15, source.widthMM - 2),
+                         heightMM: min(7, source.heightMM - 2),
+                         value: "FEED", fontSize: 10)
+        ]
+        return sample
+    }
+
     static func make(for source: LabelDocument,
                      variant: EZ2CalibrationVariant = .frame) -> LabelDocument {
         var sample = source
