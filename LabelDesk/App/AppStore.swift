@@ -107,7 +107,7 @@ final class AppStore: ObservableObject {
             return
         }
         let folderID = UUID()
-        var base = document
+        var base = (mode == .quick ? (quickDocument ?? document) : document)
         base.id = UUID()
         base.folderID = folderID
         base.name = "Базовый шаблон"
