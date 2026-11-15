@@ -427,18 +427,30 @@
     return doc;
   }
   function renderQuick(){
-    const base=baseTemplate();if(!base)return;
+    const base=baseTemplate();
+    if(!base){
+      $("quickTemplateName").textContent="Базовый шаблон не назначен";
+      $("quickCompatibility").textContent="Выберите в боковой панели шаблон и нажмите «Назначить» в настройках папки.";
+      $("quickFields").innerHTML="";
+      $("batchField").innerHTML="";
+      $("quickPreview").removeAttribute("src");
+      $("previewError").textContent="";
+      $("quickSize").textContent="";
+      $("queueQuick").disabled=true;
+      $("queueBatch").disabled=true;
+      return;
+    }
     $("quickTemplateName").textContent=base.name;
     const check=compatibility(base);
     $("quickCompatibility").textContent=check.ok?"":("⚠ Несовместим с рулоном. "+check.reason);
     $("queueQuick").disabled=!canPrint(base);
-    $("queueBatch").disabled=!canPrint(base);
     const fields=variableFields(base);
+    $("queueBatch").disabled=!canPrint(base)||!fields.length;
     $("quickFields").innerHTML=fields.length?fields.map(f=>
       '<div class="field"><label for="fill-'+esc(f.id)+'">'+esc(f.name)+'</label>'+
       '<textarea rows="3" id="fill-'+esc(f.id)+'" data-field="'+esc(f.id)+'">'+
       esc(Object.hasOwn(state.quickValues,f.id)?state.quickValues[f.id]:f.value)+'</textarea></div>').join("")
-      :'<p class="muted">В этом шаблоне нет переменных текстовых полей.</p>';
+      :'<p class="muted">В этом шаблоне нет переменных текстовых полей. Можно печатать его без заполнения.</p>';
     $("batchField").innerHTML=fields.map(f=>'<option value="'+esc(f.id)+'">'+esc(f.name)+'</option>').join("");
     refreshPreview();
   }
@@ -654,9 +666,11 @@
       state.profile={...defaultProfile(),...(info.settings?.profile||{})};
       state.settingsSnapshot=info.settings||{schemaVersion:1,snapToGrid:true};
       state.runtimePath=info.runtimePath||"";
+      state.templates.sort((a,b)=>String(b.updatedAt||"").localeCompare(String(a.updatedAt||"")));
       state.current=state.templates.length?clone(state.templates[0]):newDocument();
       state.selectedID=state.current.id;
-      state.selectedFolderID=state.current.folderID||null;
+      state.folderFilter="all";
+      state.selectedFolderID=null;
       renderLibrary();renderQueue();renderSettings();syncEditor();
       await refreshPorts();
       selectView("editor");note("LabelDesk готов. Драйвер редактируется без пересборки.");
@@ -664,32 +678,50 @@
   }
 
   document.body.addEventListener("click",async ev=>{
-    const view=ev.target.closest("[data-view]");if(view){selectView(view.dataset.view);return;}
-    const t=ev.target.closest("[data-template]");if(t){selectTemplate(t.dataset.template);return;}
-    const f=ev.target.closest("[data-folder]");
-    if(f){
-      state.selectedFolderID=f.dataset.folder||null;
-      const folder=selectedFolder();
-      if(folder?.baseTemplateID){const t=findTemplate(folder.baseTemplateID);if(t){
-        state.current=clone(t);state.selectedID=t.id;state.quickValues={};state.dirty=false;syncEditor();
-      }}
-      renderLibrary();if(state.view==="quick")renderQuick();return;
+    const view=ev.target.closest("[data-view]");
+    if(view){selectView(view.dataset.view);return;}
+    const action=ev.target.closest("[data-library-action]");
+    if(action){
+      const command=action.dataset.libraryAction;
+      if(command==="set-base")await assignBase();
+      else if(command==="fill-base")selectView("quick");
+      else if(command==="edit-base"){
+        const base=selectedFolder()&&findTemplate(selectedFolder().baseTemplateID);
+        if(base)selectTemplate(base.id);
+      }
+      else if(command==="rename-folder")await renameFolder();
+      else if(command==="delete-folder")await deleteFolder();
+      else if(command==="edit-selected")selectTemplate(state.selectedID);
+      else if(command==="duplicate-selected")await duplicateCurrent();
+      else if(command==="move-selected")await moveSelected();
+      else if(command==="delete-selected")await deleteCurrent();
+      return;
     }
+    const t=ev.target.closest("[data-template]");
+    if(t){selectTemplate(t.dataset.template);return;}
+    const f=ev.target.closest("[data-folder]");
+    if(f){selectFolder(f.dataset.folder);return;}
     const cancel=ev.target.closest("[data-cancel]");
-    if(cancel){const j=state.jobs.find(j=>keySame(j.id,cancel.dataset.cancel));if(j){j.state="cancelled";await persistQueue();renderQueue();}return;}
+    if(cancel){
+      const j=state.jobs.find(j=>keySame(j.id,cancel.dataset.cancel));
+      if(j){j.state="cancelled";await persistQueue();renderQueue();}
+      return;
+    }
     const retry=ev.target.closest("[data-retry]");
     if(retry){
       const j=state.jobs.find(j=>keySame(j.id,retry.dataset.retry));
       if(j&&window.confirm("Проверьте бумагу! Повтор может напечатать дубль. Продолжить?")){
         j.state="pending";j.errorMessage=null;await persistQueue();renderQueue();
-      }return;
+      }
     }
   });
   $("saveTemplate").addEventListener("click",saveCurrent);
   $("newTemplate").addEventListener("click",makeCurrent);
-  $("duplicateTemplate").addEventListener("click",duplicateCurrent);
-  $("deleteTemplate").addEventListener("click",deleteCurrent);
   $("addFolder").addEventListener("click",addFolder);
+  $("templateSearch").addEventListener("input",ev=>{
+    state.librarySearch=ev.target.value||"";
+    renderLibrary();
+  });
   $("quickReset").addEventListener("click",()=>{state.quickValues={};renderQuick();});
   $("queueQuick").addEventListener("click",addQuick);
   $("queueBatch").addEventListener("click",addBatch);
