@@ -179,4 +179,4 @@ jobs:
             --repo "$GITHUB_REPOSITORY" \
             --target "$GITHUB_SHA" \
             --title "LabelDesk ${APP_VERSION}" \
-          --notes "Intel macOS 15+. Send one documented 40mm label pitch forward (ESC f29 + ESC f11) at the end of each queue job, after all copies and a configurable delay, to leave a blank label for tearing. Keep the Line Mode port open, record feed stages, stop on uncertainty without retrying. Original 2002 manual also documents ESC Rnn reverse 01-29mm but automatic reverse is disabled pending physical testing. Needs physical verification of forward feed. Ad-hoc signed; not notarized."
+            --notes "Intel macOS 15+. End each print job with a tested blank buffered EZ-2 label (F0/q040/M01/B/A11 SPACE/CR/E/P01), after a configurable delay. Keep Line Mode serial output across copies, close it before buffered separator, then reopen with F0/q040/M01 for the next job. No forced-distance f29/f11. Reverse ESC Rnn remains disabled. Physical verification of the combined workflow required. Ad-hoc signed; not notarized."
