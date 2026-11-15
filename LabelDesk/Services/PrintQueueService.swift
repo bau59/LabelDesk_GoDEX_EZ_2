@@ -136,6 +136,28 @@ final class PrintQueueService: ObservableObject {
                     return
                 }
             }
+            // Job is not complete until the tear-off advance has been
+            // transmitted. This happens once per job, not after every copy.
+            do {
+                await diagnostics.record("tear feed begin", jobID: job.id,
+                    details: "ESC f29 + ESC f11, one blank label (40mm)")
+                try port.advanceAfterJob(encoder.jobTearFeedCommands(),
+                                         intervalSeconds: profile.labelIntervalSeconds) { stage in
+                    Task { @MainActor in
+                        diagnostics.record("tear feed", jobID: job.id, details: stage)
+                    }
+                }
+                await diagnostics.record("tear feed sent", jobID: job.id,
+                    details: "40mm serial TX drained; physical position not confirmed")
+            } catch {
+                await diagnostics.record("tear feed FAILED", jobID: job.id,
+                    details: error.localizedDescription)
+                await self.finish(job.id, state: .uncertain,
+                    error: "Изображение передано, но протяжка для отрыва не завершена. Проверьте бумагу перед повтором. " + error.localizedDescription,
+                    profile: profile)
+                return
+            }
+
             await diagnostics.record("sent to port", jobID: job.id,
                 details: "copies=\(job.copies) totalElapsed=\(String(format: "%.2f", Date().timeIntervalSince(started)))s. Printer has not confirmed paper output.")
             await self.finish(job.id, state: .sent, error: nil, profile: profile)
