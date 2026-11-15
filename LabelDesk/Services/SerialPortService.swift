@@ -7,6 +7,7 @@ enum SerialPortError: LocalizedError {
     case configurationFailed(String)
     case writeFailed(String)
     case invalidRaster
+    case noActiveSeries
 
     var errorDescription: String? {
         switch self {
@@ -15,6 +16,7 @@ enum SerialPortError: LocalizedError {
         case .configurationFailed(let detail): "Не удалось настроить RS-232: \(detail)"
         case .writeFailed(let detail): "Ошибка передачи RS-232: \(detail)"
         case .invalidRaster: "Неверная структура графических команд EZ-2."
+        case .noActiveSeries: "Нет открытой последовательной серии для протяжки ленты."
         }
     }
 }
@@ -119,6 +121,43 @@ final class SerialPortService {
             try drain(linePort)
             previousLabelSentAt = Date()
             onProgress?("TX drained; physical print is not acknowledged")
+        } catch {
+            resetLocked()
+            throw error
+        }
+    }
+
+    /// After the LAST copy of a queue job, advance exactly one blank-label
+    /// pitch. This is intentionally separate from per-copy FF.
+    /// ESC fnn (01...29 mm) is documented on the original 2002 EZ-2.
+    func advanceAfterJob(_ commands: Data, intervalSeconds: Double,
+                         onProgress: ((String) -> Void)? = nil) throws {
+        lock.lock()
+        defer { lock.unlock() }
+
+        guard seriesInitialized, linePort >= 0 else {
+            throw SerialPortError.noActiveSeries
+        }
+        // Never send an arbitrary motor command or more than one pitch.
+        guard Array(commands) == [0x1B, 0x66, 0x32, 0x39,
+                                  0x1B, 0x66, 0x31, 0x31] else {
+            throw SerialPortError.writeFailed("Неверная команда протяжки.")
+        }
+
+        do {
+            if let previous = previousLabelSentAt {
+                let remaining = intervalSeconds - Date().timeIntervalSince(previous)
+                if remaining > 0 {
+                    onProgress?("waiting before tear feed \(String(format: "%.2f", remaining))s")
+                    Thread.sleep(forTimeInterval: remaining)
+                }
+            }
+
+            onProgress?("tear feed: ESC f29 + ESC f11 = 40mm (one blank label)")
+            try sendBytes(commands, to: linePort, chunkSize: 4)
+            try drain(linePort)
+            previousLabelSentAt = Date()
+            onProgress?("tear feed transmitted; physical paper position NOT confirmed")
         } catch {
             resetLocked()
             throw error
