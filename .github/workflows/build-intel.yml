@@ -10,6 +10,7 @@ on:
       - fix/ez2-job-tear-feed-095
       - rewrite/web-shell-driver
       - fix/media-settings-template-compatibility-102
+      - fix/sidebar-workflow-and-ui-103
   workflow_dispatch:
 
 permissions:
@@ -123,6 +124,7 @@ jobs:
           node --check LabelDesk/Resources/app.js
           node Tests/WebRasterSmoke.js
           node Tests/MediaCompatibilitySmoke.js
+          node Tests/SidebarWorkflowSmoke.js
           zsh -n Scripts/printer.sh
 
       - name: Test selected-layer resize geometry
