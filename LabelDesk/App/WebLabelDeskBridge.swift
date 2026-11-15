@@ -169,6 +169,34 @@ final class WebLabelDeskBridge: NSObject, WKScriptMessageHandler, WKNavigationDe
                           userInfo: [NSLocalizedDescriptionKey: "Invalid serial job arguments"])
         }
         let nativeTrial = (body["nativeTrial"] as? Bool) ?? false
+        let textMode = (body["textMode"] as? Bool) ?? false
+        guard !(nativeTrial && textMode) else {
+            throw NSError(domain: "LabelDesk", code: 16,
+                          userInfo: [NSLocalizedDescriptionKey: "Multiple serial print modes"])
+        }
+        if textMode {
+            let head = Data([0x1B, 0x46, 0x30, 0x1B, 0x71, 0x30, 0x34, 0x30,
+                             0x1B, 0x4D, 0x30, 0x31])
+            let end: Data
+            if copies <= 99 {
+                end = Data([0x1B, 0x45, 0x1B, 0x50,
+                            UInt8(48 + copies / 10), UInt8(48 + copies % 10)])
+            } else {
+                end = Data([0x1B, 0x45, 0x1B, 0x70,
+                            UInt8(48 + copies / 100),
+                            UInt8(48 + (copies / 10) % 10),
+                            UInt8(48 + copies % 10), 0x0D, 0x0A])
+            }
+            // Payload length and framing checked before opening the device.
+            // F0/q040/M01 + optional barcode selector + B...E + Pnn/pnnn.
+            guard !first, packet.count <= 8192,
+                  packet.starts(with: head), packet.suffix(end.count) == end,
+                  !packet.contains(0x0C) else {
+                throw NSError(domain: "LabelDesk", code: 17,
+                              userInfo: [NSLocalizedDescriptionKey:
+                                  "Invalid CP866 buffered-label packet"])
+            }
+        }
         if nativeTrial {
             // Isolated hardware test, never used by normal queue printing.
             let head = Data([0x1B, 0x46, 0x30, 0x1B, 0x71, 0x30, 0x34, 0x30,
@@ -189,7 +217,9 @@ final class WebLabelDeskBridge: NSObject, WKScriptMessageHandler, WKNavigationDe
         let process = Process()
         process.executableURL = URL(fileURLWithPath: "/bin/zsh")
         process.arguments = [
-            runtime.appendingPathComponent(nativeTrial ? "printer-native.sh" : "printer.sh").path, port,
+            runtime.appendingPathComponent(
+                textMode ? "printer-text.sh" : (nativeTrial ? "printer-native.sh" : "printer.sh")
+            ).path, port,
             spool.path, String(copies), first ? "1" : "0", String(delay)
         ]
         let pipe = Pipe()
