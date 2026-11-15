@@ -10,20 +10,21 @@ struct LabelDocument: Codable, Identifiable, Equatable {
     var elements: [LabelElement] = []
     var updatedAt = Date()
 
-    var printableWidthMM: Double { min(widthMM, 56) }
-    var isWithinPrinterWidth: Bool { widthMM <= 60 }
+    var printableWidthMM: Double { min(widthMM, 55) }
+    var isWithinPrinterWidth: Bool { widthMM <= 55 }
 }
 
 struct LabelPreset: Identifiable, Hashable {
     let widthMM: Double
     let heightMM: Double
 
-    var id: String { "\\(widthMM)x\\(heightMM)" }
-    var title: String { "\\(Int(widthMM)) × \\(Int(heightMM)) mm" }
+    var id: String { "\(widthMM)x\(heightMM)" }
+    var title: String { "\(Int(widthMM)) × \(Int(heightMM)) mm" }
 
     static let standard = [
         LabelPreset(widthMM: 30, heightMM: 20), LabelPreset(widthMM: 40, heightMM: 20),
         LabelPreset(widthMM: 40, heightMM: 30), LabelPreset(widthMM: 50, heightMM: 25),
-        LabelPreset(widthMM: 50, heightMM: 30), LabelPreset(widthMM: 50, heightMM: 40)
+        LabelPreset(widthMM: 50, heightMM: 30), LabelPreset(widthMM: 50, heightMM: 40),
+        LabelPreset(widthMM: 55, heightMM: 30)
     ]
 }

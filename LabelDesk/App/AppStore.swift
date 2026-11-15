@@ -8,6 +8,8 @@ final class AppStore: ObservableObject {
     @Published var templates: [LabelDocument] = []
     @Published var status = "No serial port selected"
     @Published var copies = 1
+    @Published var rasterProbePending = false
+    @Published var rasterVerified = UserDefaults.standard.bool(forKey: "ez2RasterVerified")
     @Published var showSettings = false
     @Published var showCalibration = false
     @Published var showQueue = false
@@ -21,10 +23,14 @@ final class AppStore: ObservableObject {
     let queue: PrintQueueService
 
     init() {
-        settings = storage.loadSettings()
+        var loadedSettings = storage.loadSettings()
+        if loadedSettings.profile.portPath.isEmpty {
+            loadedSettings.profile.portPath = UserDefaults.standard.string(forKey: "serialPort") ?? ""
+        }
+        settings = loadedSettings
         templates = storage.listDocuments()
         queue = PrintQueueService(storage: storage)
-        if !settings.profile.portPath.isEmpty { status = "Ready: \\(settings.profile.portPath)" }
+        if !settings.profile.portPath.isEmpty { status = "Ready: \(settings.profile.portPath)" }
     }
 
     var selectedElement: LabelElement? { document.elements.first { $0.id == selectedElementID } }
@@ -52,14 +58,14 @@ final class AppStore: ObservableObject {
         do {
             try storage.saveDocument(document)
             templates = storage.listDocuments()
-            status = "Saved \\(document.name)"
+            status = "Saved \(document.name)"
         } catch { alert = AppAlert(title: "Could not save", message: error.localizedDescription) }
     }
 
     func saveSettings() {
         do {
             try storage.saveSettings(settings)
-            status = settings.profile.portPath.isEmpty ? "No serial port selected" : "Ready: \\(settings.profile.portPath)"
+            status = settings.profile.portPath.isEmpty ? "No serial port selected" : "Ready: \(settings.profile.portPath)"
         } catch { alert = AppAlert(title: "Could not save settings", message: error.localizedDescription) }
     }
 
@@ -111,13 +117,84 @@ final class AppStore: ObservableObject {
         selectedElementID = nil
     }
 
+    func enqueue() {
+        do {
+            try LabelRasterizer.validate(document)
+            queue.enqueue(document: document, copies: copies)
+            if !queue.isPaused && rasterVerified { queue.process(profile: settings.profile) }
+            status = "Added to queue"
+        } catch {
+            alert = AppAlert(title: "Label cannot be printed", message: error.localizedDescription)
+        }
+    }
+
+    func startQueue() {
+        guard rasterVerified else {
+            alert = AppAlert(title: "Verify graphics first",
+                             message: "Press Raster TEST and verify the small square on paper. Normal labels use ESC G and are disabled until you confirm this test.")
+            return
+        }
+        guard !settings.profile.portPath.isEmpty else {
+            alert = AppAlert(title: "Choose serial port", message: "Open printer settings and select the USB–RS232 port.")
+            return
+        }
+        queue.resume()
+        queue.process(profile: settings.profile)
+    }
+
+    func pauseQueue() { queue.pause() }
+
+    func sendRasterProbe() {
+        let profile = settings.profile
+        guard !profile.portPath.isEmpty else {
+            alert = AppAlert(title: "Choose serial port", message: "Select the USB–RS232 port in Printer settings.")
+            return
+        }
+        alert = AppAlert(title: "Print a graphics test?",
+                         message: "Sends 40 graphic rows (a small letter L with an isolated upper-right mark) using ESC G. It may advance one label. Confirm paper is loaded.",
+                         action: { [weak self] in self?.performRasterProbe(profile: profile) })
+    }
+
+    private func performRasterProbe(profile: PrinterProfile) {
+        status = "Sending raster probe…"
+        rasterProbePending = false
+        let data = encoder.rasterProbe()
+        Task.detached { [serialPort] in
+            do {
+                try serialPort.write(data, profile: profile)
+                await MainActor.run {
+                    self.rasterProbePending = true
+                    self.status = "Raster probe sent; confirm paper result"
+                }
+            } catch {
+                await MainActor.run {
+                    self.status = "Raster probe failed"
+                    self.alert = AppAlert(title: "Could not send graphics test", message: error.localizedDescription)
+                }
+            }
+        }
+    }
+
+    func confirmRasterProbe() {
+        guard rasterProbePending else { return }
+        alert = AppAlert(title: "Confirm graphics test",
+                         message: "Did the printer produce a black L with a small, separate upper-right mark, without garbled text or runaway feeding? Confirm only if the output was correct.",
+                         action: { [weak self] in
+            guard let self = self else { return }
+            self.rasterVerified = true
+            self.rasterProbePending = false
+            UserDefaults.standard.set(true, forKey: "ez2RasterVerified")
+            self.status = "Graphics verified; label printing enabled"
+        })
+    }
+
     func sendTest() {
         let profile = settings.profile
         guard !profile.portPath.isEmpty else {
             alert = AppAlert(title: "Select a port first", message: "Open Printer settings and choose the USB–RS232 device.")
             return
         }
-        alert = AppAlert(title: "Print TEST?", message: "This sends the verified TEST command to \\(profile.portPath). Ensure paper is loaded.", action: { [weak self] in
+        alert = AppAlert(title: "Print TEST?", message: "This sends the verified TEST command to \(profile.portPath). Ensure paper is loaded.", action: { [weak self] in
             self?.performTest(profile: profile)
         })
     }

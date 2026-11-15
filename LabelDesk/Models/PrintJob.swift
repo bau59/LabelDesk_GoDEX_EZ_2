@@ -13,5 +13,5 @@ struct PrintJob: Codable, Identifiable, Equatable {
     var state: PrintJobState = .pending
     var errorMessage: String?
 
-    var title: String { "\\(document.name) × \\(copies)" }
+    var title: String { "\(document.name) × \(copies)" }
 }

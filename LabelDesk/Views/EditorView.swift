@@ -2,32 +2,50 @@ import SwiftUI
 
 struct EditorView: View {
     @EnvironmentObject private var store: AppStore
-    @State private var zoom = 5.0
+    @State private var zoom = 6.0
 
     var body: some View {
         VStack(spacing: 8) {
             HStack {
-                TextField("Layout name", text: $store.document.name)
+                TextField("Label name", text: $store.document.name)
                     .textFieldStyle(.roundedBorder)
-                    .frame(maxWidth: 230)
-                Spacer()
-                Text("\\(Int(store.document.widthMM)) × \\(Int(store.document.heightMM)) mm")
+                    .frame(maxWidth: 220)
+                Spacer(minLength: 8)
+                Text("\(Int(store.document.widthMM)) × \(Int(store.document.heightMM)) mm")
                     .foregroundStyle(.secondary)
-                Slider(value: $zoom, in: 2...10) { Text("Zoom") }.frame(width: 130)
+                Slider(value: $zoom, in: 3...10) { Text("Zoom") }
+                    .frame(width: 120)
             }
             .padding([.top, .horizontal], 12)
 
             GeometryReader { reader in
                 ScrollView([.horizontal, .vertical]) {
                     LabelCanvas(scale: zoom)
-                        .padding(max(40, reader.size.width / 4))
+                        .padding(max(30, reader.size.width / 5))
                 }
                 .background(Color(nsColor: .windowBackgroundColor))
             }
-            if !store.document.isWithinPrinterWidth {
-                Label("Material width exceeds the printer’s 60 mm limit", systemImage: "exclamationmark.triangle.fill")
-                    .foregroundStyle(.orange).padding(.bottom, 8)
+
+            HStack {
+                Label("203 dpi · 8 dots/mm · 56 mm head · 55 mm graphics", systemImage: "info.circle")
+                Spacer()
+                if let issue = validateIssue {
+                    Text(issue).foregroundStyle(.orange)
+                }
             }
+            .font(.caption)
+            .foregroundStyle(.secondary)
+            .padding(.horizontal, 12)
+            .padding(.bottom, 8)
+        }
+    }
+
+    private var validateIssue: String? {
+        do {
+            try LabelRasterizer.validate(store.document)
+            return nil
+        } catch {
+            return error.localizedDescription
         }
     }
 }
@@ -37,37 +55,80 @@ private struct LabelCanvas: View {
     let scale: Double
 
     var body: some View {
-        let document = store.document
+        let doc = store.document
+        let width = CGFloat(min(55, max(10, doc.widthMM)) * scale)
+        let height = CGFloat(min(100, max(10, doc.heightMM)) * scale)
+        let preview = try? LabelRasterizer().rasterize(doc, profile: store.settings.profile)
+
         ZStack(alignment: .topLeading) {
-            GridView(width: document.widthMM * scale, height: document.heightMM * scale, step: scale)
-            Rectangle().stroke(.secondary, lineWidth: 1)
-            Rectangle()
-                .fill(Color.orange.opacity(0.06))
-                .frame(width: CGFloat(min(document.printableWidthMM, document.widthMM) * scale), height: CGFloat(document.heightMM * scale))
-            ForEach(document.elements) { element in
-                CanvasElement(element: element, scale: scale, isSelected: store.selectedElementID == element.id)
-                    .position(x: CGFloat((element.xMM + element.widthMM / 2) * scale), y: CGFloat((element.yMM + max(element.heightMM, 1) / 2) * scale))
-                    .gesture(drag(for: element))
-                    .onTapGesture { store.selectedElementID = element.id }
+            if let raster = preview {
+                Image(nsImage: raster.image)
+                    .resizable()
+                    .interpolation(.none)
+                    .frame(width: width, height: height)
+            } else {
+                Rectangle().fill(.white).frame(width: width, height: height)
+                Text("Invalid label size or object bounds")
+                    .foregroundStyle(.red)
+                    .padding(12)
+            }
+            GridView(width: Double(width), height: Double(height), step: scale)
+                .allowsHitTesting(false)
+
+            ForEach(doc.elements) { item in
+                DraggableOutline(item: item, scale: scale,
+                                 maxWidthMM: doc.widthMM, maxHeightMM: doc.heightMM,
+                                 isSelected: store.selectedElementID == item.id)
+                    .position(
+                        x: CGFloat((item.xMM + item.widthMM / 2) * scale),
+                        y: CGFloat((item.yMM + item.heightMM / 2) * scale)
+                    )
             }
         }
-        .frame(width: CGFloat(document.widthMM * scale), height: CGFloat(document.heightMM * scale), alignment: .topLeading)
+        .frame(width: width, height: height, alignment: .topLeading)
         .background(.white)
-        .shadow(color: .black.opacity(0.16), radius: 4)
+        .clipped()
+        .overlay { Rectangle().stroke(.gray, lineWidth: 1) }
+        .shadow(color: .black.opacity(0.15), radius: 5)
     }
+}
 
-    private func drag(for element: LabelElement) -> some Gesture {
-        DragGesture(minimumDistance: 1)
-            .onChanged { value in
-                var moved = element
-                let x = element.xMM + Double(value.translation.width) / scale
-                let y = element.yMM + Double(value.translation.height) / scale
-                let step = store.settings.snapToGrid ? 1.0 : 0.1
-                moved.xMM = max(0, (x / step).rounded() * step)
-                moved.yMM = max(0, (y / step).rounded() * step)
-                store.updateElement(moved)
-            }
-            .onEnded { _ in store.selectedElementID = element.id }
+private struct DraggableOutline: View {
+    @EnvironmentObject private var store: AppStore
+    let item: LabelElement
+    let scale: Double
+    let maxWidthMM: Double
+    let maxHeightMM: Double
+    let isSelected: Bool
+
+    @State private var dragStart: LabelElement?
+
+    var body: some View {
+        Rectangle()
+            .fill(Color.black.opacity(0.001))
+            .contentShape(Rectangle())
+            .overlay { Rectangle().stroke(isSelected ? Color.accentColor : .clear, lineWidth: 1.4) }
+            .frame(width: CGFloat(max(4, item.widthMM * scale)),
+                   height: CGFloat(max(4, item.heightMM * scale)))
+            .onTapGesture { store.selectedElementID = item.id }
+            .gesture(
+                DragGesture(minimumDistance: 2)
+                    .onChanged { value in
+                        if dragStart == nil {
+                            dragStart = item
+                            store.selectedElementID = item.id
+                            store.checkpoint()
+                        }
+                        guard var moved = dragStart else { return }
+                        let snap = store.settings.snapToGrid ? 1.0 : 0.125
+                        let x = moved.xMM + Double(value.translation.width) / scale
+                        let y = moved.yMM + Double(value.translation.height) / scale
+                        moved.xMM = min(maxWidthMM - moved.widthMM, max(0, (x / snap).rounded() * snap))
+                        moved.yMM = min(maxHeightMM - moved.heightMM, max(0, (y / snap).rounded() * snap))
+                        store.updateElement(moved)
+                    }
+                    .onEnded { _ in dragStart = nil }
+            )
     }
 }
 
@@ -78,48 +139,20 @@ private struct GridView: View {
 
     var body: some View {
         Canvas { context, _ in
-            guard step > 0 else { return }
+            guard step > 0, width > 0, height > 0 else { return }
             for x in stride(from: 0.0, through: width, by: step) {
-                context.stroke(Path(CGRect(x: CGFloat(x), y: 0, width: 0, height: CGFloat(height))), with: .color(.gray.opacity(x.truncatingRemainder(dividingBy: step * 5) == 0 ? 0.20 : 0.08)))
+                var path = Path()
+                path.move(to: CGPoint(x: x, y: 0))
+                path.addLine(to: CGPoint(x: x, y: height))
+                context.stroke(path, with: .color(.gray.opacity(0.10)), lineWidth: 0.5)
             }
             for y in stride(from: 0.0, through: height, by: step) {
-                context.stroke(Path(CGRect(x: 0, y: CGFloat(y), width: CGFloat(width), height: 0)), with: .color(.gray.opacity(y.truncatingRemainder(dividingBy: step * 5) == 0 ? 0.20 : 0.08)))
+                var path = Path()
+                path.move(to: CGPoint(x: 0, y: y))
+                path.addLine(to: CGPoint(x: width, y: y))
+                context.stroke(path, with: .color(.gray.opacity(0.10)), lineWidth: 0.5)
             }
         }
-        .frame(width: CGFloat(width), height: CGFloat(height))
-    }
-}
-
-private struct CanvasElement: View {
-    let element: LabelElement
-    let scale: Double
-    let isSelected: Bool
-
-    var body: some View {
-        content
-            .frame(width: CGFloat(max(element.widthMM * scale, 2)), height: CGFloat(max(element.heightMM * scale, 2)), alignment: .topLeading)
-            .rotationEffect(.degrees(Double(element.rotation)))
-            .overlay { if isSelected { Rectangle().stroke(.accent, lineWidth: 1) } }
-    }
-
-    @ViewBuilder private var content: some View {
-        switch element.kind {
-        case .text:
-            Text(element.value).font(.system(size: CGFloat(element.fontSize * scale / 3), weight: element.isBold ? .bold : .regular)).lineLimit(nil)
-        case .barcode:
-            VStack(spacing: 1) {
-                HStack(spacing: 1) {
-                    ForEach(Array(element.value.utf8.enumerated()), id: \.offset) { index, byte in
-                        Rectangle().fill(.black).frame(width: CGFloat(Double(Int(byte) % 3 + 1) * scale / 3))
-                        if index % 2 == 0 { Spacer(minLength: CGFloat(scale / 4)) }
-                    }
-                }
-                if element.showsHumanReadable { Text(element.value).font(.system(size: CGFloat(max(7, scale)))) }
-            }
-        case .line:
-            Rectangle().fill(.black)
-        case .rectangle:
-            Rectangle().stroke(.black, lineWidth: 1)
-        }
+        .frame(width: width, height: height)
     }
 }

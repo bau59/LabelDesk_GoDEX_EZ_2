@@ -4,7 +4,7 @@ on:
   push:
     branches:
       - main
-      - feature/github-updates
+      - feature/editor-raster-0.3
   workflow_dispatch:
 
 permissions:
@@ -57,6 +57,22 @@ jobs:
           test -f "build/LabelDesk-${APP_VERSION}.dmg"
           ditto -c -k --keepParent build/LabelDesk.app "build/LabelDesk-${APP_VERSION}-intel.zip"
 
+      - name: Verify ESC graphics packet and raster size
+        shell: bash
+        run: |
+          set -euo pipefail
+          SDK_PATH="$(xcrun --sdk macosx --show-sdk-path)"
+          swiftc -target x86_64-apple-macosx15.0 -sdk "$SDK_PATH" \
+            -parse-as-library -framework AppKit \
+            LabelDesk/Models/LabelDocument.swift \
+            LabelDesk/Models/LabelElement.swift \
+            LabelDesk/Models/PrinterProfile.swift \
+            LabelDesk/Services/LabelRasterizer.swift \
+            LabelDesk/Services/GodexEZ2Encoder.swift \
+            Tests/RasterEncoderSmokeTest.swift \
+            -o build/raster-smoke
+          ./build/raster-smoke
+
       - name: Upload Intel packages
         uses: actions/upload-artifact@v4
         with:
@@ -98,4 +114,4 @@ jobs:
             --repo "$GITHUB_REPOSITORY" \
             --target "$GITHUB_SHA" \
             --title "LabelDesk ${APP_VERSION}" \
-            --notes "Intel macOS 15+. Serial TEST printing and GitHub release update checking. Ad-hoc signed; not notarized."
+            --notes "Intel macOS 15+. Editor, exact monochrome preview, Code 39, persistent queue, graphical ESC G test, and GitHub release update checking. Verify raster mode physically before printing layouts. Ad-hoc signed; not notarized."
