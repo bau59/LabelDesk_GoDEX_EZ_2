@@ -9,7 +9,15 @@ struct MainView: View {
             Divider()
             HSplitView {
                 TemplateLibraryView().frame(minWidth: 150, idealWidth: 178, maxWidth: 220)
-                EditorView().frame(minWidth: 740, maxWidth: .infinity)
+                Group {
+                    if store.mode == .quick && store.activeFolder != nil {
+                        QuickPrintView()
+                            .id(store.selectedFolderID)
+                    } else {
+                        EditorView()
+                    }
+                }
+                .frame(minWidth: 740, maxWidth: .infinity)
             }
             Divider()
             PrintQueueView()
@@ -38,7 +46,15 @@ struct MainView: View {
         HStack(spacing: 10) {
             Button("New", systemImage: "doc.badge.plus") { store.newDocument() }
             Button("Save", systemImage: "square.and.arrow.down") { store.saveDocument() }
+                .disabled(store.mode == .quick)
             Divider().frame(height: 20)
+            Picker("Режим", selection: $store.mode) {
+                Text("Редактор").tag(LabelDeskMode.editor)
+                Text("Заполнение").tag(LabelDeskMode.quick)
+            }
+            .pickerStyle(.segmented)
+            .frame(width: 225)
+            .disabled(store.activeFolder == nil)
             Spacer(minLength: 6)
             Button("Settings", systemImage: "gearshape") { store.showSettings = true }
             Button("Calibration", systemImage: "scope") { store.showCalibration = true }
