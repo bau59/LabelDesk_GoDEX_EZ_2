@@ -37,6 +37,14 @@ Existing settings JSON remains readable, but obsolete Q, X/Y, transport/pacing, 
 
 The encoder rejects non-white content below the tested 35-mm printing height rather than silently clipping it. The physical media height remains 38 mm. Printable graphic width is limited to 55 mm by the historical `ESC G55` protocol.
 
+## Version 0.9.5 — tear-off feed after each job
+
+After all copies of a **PrintJob** have been transmitted (including their `FF`), the application waits the configured `labelIntervalSeconds` and issues **`ESC f29` followed by `ESC f11`** on the existing Line Mode RS-232 connection. The documented EZ-2 `ESC fnn` forwards paper by 01–29 mm per command, so these two commands total **40 mm**, equal to this roll's one 38 mm label + 2 mm gap. No blank raster is sent. The next job (if any) waits the configured interval after the feed.
+
+This happens **once per job, not per copy**. On a feed/transmission error the job becomes uncertain and the queue stops without retrying. Because the connected printer supplies no verified physical completion response, this behavior is **not yet physically confirmed** and must first be tested with one job and one additional queued job.
+
+The April 2002 EZ-2 manual also documents **`ESC Rnn`** for reverse feeding 01–29 mm, but it is **not used** by LabelDesk: reversing adhesive label stock may misregister or jam the mechanism and has not been tested.
+
 ## Usage
 
 1. Connect the printer and select the `/dev/cu.*` RS-232 port in **Настройки**.
