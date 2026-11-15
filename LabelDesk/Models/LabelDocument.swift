@@ -24,6 +24,7 @@ struct LabelPreset: Identifiable, Hashable {
     static let standard = [
         LabelPreset(widthMM: 30, heightMM: 20), LabelPreset(widthMM: 40, heightMM: 20),
         LabelPreset(widthMM: 40, heightMM: 30), LabelPreset(widthMM: 50, heightMM: 25),
-        LabelPreset(widthMM: 50, heightMM: 30), LabelPreset(widthMM: 50, heightMM: 40)
+        LabelPreset(widthMM: 50, heightMM: 30), LabelPreset(widthMM: 50, heightMM: 40),
+        LabelPreset(widthMM: 55, heightMM: 30)
     ]
 }

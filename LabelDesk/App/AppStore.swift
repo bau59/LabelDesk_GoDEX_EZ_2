@@ -120,6 +120,7 @@ final class AppStore: ObservableObject {
         do {
             try LabelRasterizer.validate(document)
             queue.enqueue(document: document, copies: copies)
+            if !queue.isPaused && rasterVerified { queue.process(profile: settings.profile) }
             status = "Added to queue"
         } catch {
             alert = AppAlert(title: "Label cannot be printed", message: error.localizedDescription)

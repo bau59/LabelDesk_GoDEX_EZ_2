@@ -44,7 +44,8 @@ final class PrintQueueService: ObservableObject {
     func resume() { isPaused = false }
 
     func process(profile: PrinterProfile) {
-        guard !isPaused, let index = jobs.firstIndex(where: { $0.state == .pending }) else { return }
+        guard !isPaused, !jobs.contains(where: { $0.state == .sending }),
+              let index = jobs.firstIndex(where: { $0.state == .pending }) else { return }
         jobs[index].state = .sending
         persist()
         let job = jobs[index]

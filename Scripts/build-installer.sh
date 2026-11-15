@@ -7,7 +7,7 @@ APP="$BUILD_DIR/LabelDesk.app"
 VERSION="$(/usr/libexec/PlistBuddy -c 'Print :CFBundleShortVersionString' "$ROOT/LabelDesk/Resources/Info.plist")"
 DMG="$BUILD_DIR/LabelDesk-${VERSION}.dmg"
 MACOS_DIR="$APP/Contents/MacOS"
-SOURCE_FILES=("$ROOT/LabelDesk/App/LabelDeskApp.swift" "$ROOT/LabelDesk/App/UpdateManager.swift")
+SOURCE_FILES=("$ROOT"/LabelDesk/App/*.swift(N) "$ROOT"/LabelDesk/Models/*.swift(N) "$ROOT"/LabelDesk/Services/*.swift(N) "$ROOT"/LabelDesk/Views/*.swift(N))
 MODULE_CACHE="$ROOT/.build/module-cache"
 SWIFTC_OPTIONS=()
 
@@ -31,7 +31,7 @@ print "[LabelDesk] 2/5 Preparing build folder…"
 rm -rf "$BUILD_DIR"
 mkdir -p "$MACOS_DIR" "$MODULE_CACHE"
 
-print "[LabelDesk] 3/5 Compiling the Phase 1 TEST-print app…"
+print "[LabelDesk] 3/5 Compiling editor, raster and print queue…"
 START_TIME=$SECONDS
 swiftc \
   "${SWIFTC_OPTIONS[@]}" \

@@ -6,13 +6,15 @@ import Darwin
 struct LabelDeskApp: App {
     @StateObject private var printer = PrinterModel()
     @StateObject private var updater = UpdateManager()
+    @StateObject private var store = AppStore()
 
     var body: some Scene {
         WindowGroup {
-            ContentView()
+            MainView()
+                .environmentObject(store)
                 .environmentObject(printer)
                 .environmentObject(updater)
-                .frame(minWidth: 460, minHeight: 310)
+                .frame(minWidth: 1020, minHeight: 690)
         }
     }
 }
