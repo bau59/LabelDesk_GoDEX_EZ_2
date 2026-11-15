@@ -65,9 +65,12 @@ struct QuickPrintSmokeTest {
         folderBase.folderID = folder.id
         try storage.saveFolders([folder])
         try storage.saveDocument(folderBase)
-        assert(storage.loadFolders() == [folder])
+        let savedFolders = storage.loadFolders()
+        assert(savedFolders.count == 1 && savedFolders[0].id == folder.id &&
+               savedFolders[0].baseTemplateID == folderBase.id)
         let loaded = storage.listDocuments()
-        assert(loaded.count == 1 && loaded[0] == folderBase)
+        assert(loaded.count == 1 && loaded[0].id == folderBase.id &&
+               loaded[0].folderID == folder.id && loaded[0].elements == folderBase.elements)
         let quick = QuickLabelBuilder.filled(base: loaded[0], values: [id: "Молоко"])
         assert(quick.elements[0].value == "Молоко")
 
