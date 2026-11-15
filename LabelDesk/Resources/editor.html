@@ -60,7 +60,8 @@ input{user-select:text}
 .obj:not(.sel){cursor:pointer}
 .obj:not(.sel):hover{outline:2px dashed #8ca7ed;outline-offset:1px}
 .obj.sel{cursor:move}
-.printzone{position:absolute;top:0;bottom:0;z-index:4;pointer-events:none;border-left:2px dashed #dc6473;background:repeating-linear-gradient(135deg,#e1667833 0px,#e1667833 5px,#e1667810 5px,#e1667810 10px)}
+.printzone{position:absolute;top:0;bottom:0;z-index:4;pointer-events:none;border-left:2px dashed #8293a9;background:repeating-linear-gradient(135deg,#95a4b530 0px,#95a4b530 5px,#95a4b509 5px,#95a4b509 10px)}
+.mediazone{position:absolute;z-index:4;pointer-events:none;border-left:2px dashed #dc6473;border-top:2px dashed #dc6473;background:repeating-linear-gradient(135deg,#e1667833 0px,#e1667833 5px,#e1667810 5px,#e1667810 10px)}
 
 .obj.sel:hover{outline:2px solid #345cd3}
 .obj:active{cursor:grabbing}
@@ -135,6 +136,7 @@ strong{font-size:14px;display:block;margin-bottom:14px}
 (function(){
 "use strict";
 let doc=null, selected=null, zoom=8, zoomMode="fit", history=[], future=[], snap=true;
+let printerMedia={widthMM:58,heightMM:38,gapMM:2};
 const $=id=>document.getElementById(id);
 const typeNames={text:"Текст",barcode:"Code 39",line:"Линия",rectangle:"Рамка"};
 const patterns={"0":"nnnwwnwnn","1":"wnnwnnnnw","2":"nnwwnnnnw","3":"wnwwnnnnn","4":"nnnwwnnnw","5":"wnnwwnnnn","6":"nnwwwnnnn","7":"nnnwnnwnw","8":"wnnwnnwnn","9":"nnwwnnwnn","A":"wnnnnwnnw","B":"nnwnnwnnw","C":"wnwnnwnnn","D":"nnnnwwnnw","E":"wnnnwwnnn","F":"nnwnwwnnn","G":"nnnnnwwnw","H":"wnnnnwwnn","I":"nnwnnwwnn","J":"nnnnwwwnn","K":"wnnnnnnww","L":"nnwnnnnww","M":"wnwnnnnwn","N":"nnnnwnnww","O":"wnnnwnnwn","P":"nnwnwnnwn","Q":"nnnnnnwww","R":"wnnnnnwwn","S":"nnwnnnwwn","T":"nnnnwnwwn","U":"wwnnnnnnw","V":"nwwnnnnnw","W":"wwwnnnnnn","X":"nwnnwnnnw","Y":"wwnnwnnnn","Z":"nwwnwnnnn","-":"nwnnnnwnw",".":"wwnnnnwnn"," ":"nwwnnnwnn","$":"nwnwnwnnn","/":"nwnwnnnwn","+":"nwnnnwnwn","%":"nnnwnwnwn","*":"nwnnwnwnn"};
@@ -195,7 +197,7 @@ function barcodeSVG(value,width,height,readable){
  return svg;
 }
 function renderCanvas(){
- const el=$("label");el.querySelectorAll(".obj,.printzone").forEach(n=>n.remove());if(!doc)return;
+ const el=$("label");el.querySelectorAll(".obj,.printzone,.mediazone").forEach(n=>n.remove());if(!doc)return;
  if(zoomMode==="fit"){
    const desk=$("desk");
    const usableWidth=Math.max(220,desk.clientWidth-100);
@@ -245,12 +247,31 @@ function renderCanvas(){
    node.addEventListener("pointerdown",ev=>startManipulation(ev,e.id,"move"));
    el.appendChild(node);
  });
+ // Neutral marking for the independently verified ESC G55 raster limit.
+ // It is NOT the edge of the physical label and not the incompatibility marker.
  if(width>55){
    const limited=document.createElement("div");limited.className="printzone";
    limited.style.left=(55*zoom)+"px";
    limited.style.width=((width-55)*zoom)+"px";
-   limited.title="Правый край материала: ESC G не печатает дальше 55 мм";
+   limited.title="Предел растровой печати ESC G55 — 55 мм; это не граница рулона";
    el.appendChild(limited);
+ }
+ // Red hatching follows the ACTUAL roll dimensions configured in Settings.
+ if(width>printerMedia.widthMM){
+   const beyond=document.createElement("div");beyond.className="mediazone";
+   beyond.style.left=(printerMedia.widthMM*zoom)+"px";
+   beyond.style.width=((width-printerMedia.widthMM)*zoom)+"px";
+   beyond.style.top="0";beyond.style.bottom="0";
+   beyond.title="Шаблон шире рулона, указанного в настройках";
+   el.appendChild(beyond);
+ }
+ if(height>printerMedia.heightMM){
+   const beyond=document.createElement("div");beyond.className="mediazone";
+   beyond.style.left="0";beyond.style.right="0";
+   beyond.style.top=(printerMedia.heightMM*zoom)+"px";
+   beyond.style.height=((height-printerMedia.heightMM)*zoom)+"px";
+   beyond.title="Шаблон выше рулона, указанного в настройках";
+   el.appendChild(beyond);
  }
 }
 // Geometry is kept pure so native CI can test corner resizing without a WebView.
@@ -397,6 +418,13 @@ function draw(){
  renderLayers();renderCanvas();renderProps();
  $("undo").disabled=!history.length;$("redo").disabled=!future.length;
 }
+window.labelDeskSetMedia=function(media){
+ if(!media)return;
+ const w=Number(media.widthMM),h=Number(media.heightMM),g=Number(media.gapMM);
+ if(!Number.isFinite(w)||!Number.isFinite(h)||!Number.isFinite(g))return;
+ printerMedia={widthMM:w,heightMM:h,gapMM:g};
+ if(doc)renderCanvas();
+};
 window.labelDeskLoad=function(next){
  if(!next||!Array.isArray(next.elements))return;
  const previousSelected=selected?.toLowerCase();
@@ -434,6 +462,7 @@ document.addEventListener("keydown",function(ev){
 window.addEventListener("message",function(event){
  if(event.source!==window.parent || event.data?.source!=="labeldesk-app")return;
  if(event.data.type==="load" && event.data.document){
+   if(event.data.media)window.labelDeskSetMedia(event.data.media);
    window.labelDeskLoad(event.data.document);
  }
 });
