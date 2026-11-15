@@ -168,6 +168,20 @@ final class WebLabelDeskBridge: NSObject, WKScriptMessageHandler, WKNavigationDe
             throw NSError(domain: "LabelDesk", code: 5,
                           userInfo: [NSLocalizedDescriptionKey: "Invalid serial job arguments"])
         }
+        let nativeTrial = (body["nativeTrial"] as? Bool) ?? false
+        if nativeTrial {
+            // Isolated hardware test, never used by normal queue printing.
+            let head = Data([0x1B, 0x46, 0x30, 0x1B, 0x71, 0x30, 0x34, 0x30,
+                             0x1B, 0x4D, 0x30, 0x31])
+            let tail = Data([0x1B, 0x45, 0x1B, 0x50, 0x30, 0x31])
+            guard copies == 1, !first, packet.count <= 512,
+                  packet.starts(with: head), packet.suffix(tail.count) == tail,
+                  !packet.contains(0x0C) else {
+                throw NSError(domain: "LabelDesk", code: 15,
+                              userInfo: [NSLocalizedDescriptionKey:
+                                  "Invalid isolated native font / barcode packet"])
+            }
+        }
         let spool = root.appendingPathComponent("spool", isDirectory: true)
             .appendingPathComponent(UUID().uuidString + ".bin")
         try packet.write(to: spool, options: .atomic)
@@ -175,7 +189,7 @@ final class WebLabelDeskBridge: NSObject, WKScriptMessageHandler, WKNavigationDe
         let process = Process()
         process.executableURL = URL(fileURLWithPath: "/bin/zsh")
         process.arguments = [
-            runtime.appendingPathComponent("printer.sh").path, port,
+            runtime.appendingPathComponent(nativeTrial ? "printer-native.sh" : "printer.sh").path, port,
             spool.path, String(copies), first ? "1" : "0", String(delay)
         ]
         let pipe = Pipe()
