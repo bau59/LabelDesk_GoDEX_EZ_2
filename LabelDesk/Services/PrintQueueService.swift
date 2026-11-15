@@ -77,6 +77,7 @@ final class PrintQueueService: ObservableObject {
     /// By default a one-job diagnostic run stops after the current job.
     /// Full batch printing requires a distinct explicit user action.
     func resume(onlyOne: Bool = false) {
+        port.beginSeries()
         stopAfterCurrent = onlyOne
         isPaused = false
         diagnostics.record("queue started", details: onlyOne ? "mode=one-job" : "mode=full-batch")
@@ -91,7 +92,7 @@ final class PrintQueueService: ObservableObject {
         let job = jobs[index]
         let diagnostics = self.diagnostics
         diagnostics.record("encode begin", jobID: job.id,
-            details: "port=\(profile.portPath) baud=\(profile.baudRate) flow=\(profile.flowControl.rawValue) Q=\(GodexEZ2Encoder.effectiveQ(for: job.document, profile: profile)) autoQ=\(profile.automaticTopOfForm) speed=S\(profile.printSpeed.rawValue + 1) rasterTx=\(profile.rasterTransport.rawValue) darkness=\(profile.density) sensor=\(profile.sensorMode.rawValue) copies=\(job.copies)")
+            details: "port=\(profile.portPath) 9600-8N1 G55 rows=280 interval=\(profile.labelIntervalSeconds)s copies=\(job.copies)")
 
         Task.detached { [port, encoder, diagnostics] in
             let data: Data
@@ -115,7 +116,7 @@ final class PrintQueueService: ObservableObject {
                 await diagnostics.record("serial begin", jobID: job.id,
                     details: "copy=\(copy)/\(job.copies), port=\(profile.portPath)")
                 do {
-                    try port.write(data, profile: profile, rasterTransport: profile.rasterTransport) { stage in
+                    try port.sendLabel(data, startup: encoder.startupCommands(), profile: profile) { stage in
                         Task { @MainActor in
                             diagnostics.record("serial", jobID: job.id, details: "copy=\(copy) \(stage)")
                         }

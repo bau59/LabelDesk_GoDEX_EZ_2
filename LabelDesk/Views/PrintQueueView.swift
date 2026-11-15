@@ -24,7 +24,7 @@ private struct QueueWorkspace: View {
     private var pending: Int { queue.jobs.filter { $0.state == .pending }.count }
     private var sending: Bool { queue.jobs.contains { $0.state == .sending } }
     private var finished: Int { queue.jobs.filter { $0.state == .sent }.count }
-    private var isReady: Bool { store.rasterVerified && store.registrationVerified }
+    private var isReady: Bool { !store.settings.profile.portPath.isEmpty }
     private var displayedJobs: [PrintJob] {
         queue.jobs.filter {
             showHistory ? [.sent, .cancelled].contains($0.state)
@@ -64,32 +64,10 @@ private struct QueueWorkspace: View {
                 }
 
                 if !isReady {
-                    VStack(alignment: .leading, spacing: 10) {
-                        Label("Требуется проверка принтера", systemImage: "exclamationmark.triangle")
-                            .font(.system(size: 14, weight: .semibold))
-                            .foregroundStyle(DeskPalette.ink)
-                        if !store.rasterVerified {
-                            Text("Проверьте Raster TEST на бумаге, прежде чем отправлять макеты.")
-                                .foregroundStyle(DeskPalette.secondary)
-                            HStack(spacing: 10) {
-                                Button("Raster TEST") { store.sendRasterProbe() }
-                                if store.rasterProbePending {
-                                    Button("Растр правильный") { store.confirmRasterProbe() }
-                                }
-                            }
-                        } else if !store.registrationVerified {
-                            Text("Проверьте Feed TEST и позицию начала следующей наклейки.")
-                                .foregroundStyle(DeskPalette.secondary)
-                            HStack(spacing: 10) {
-                                Button("Feed TEST") { store.sendFeedTest() }
-                                if store.feedTestPending {
-                                    Button("Подача правильная") { store.confirmFeedTest() }
-                                }
-                            }
-                        }
-                    }
-                    .font(.system(size: 12))
-                    .deskSurface()
+                    Text("Выберите RS-232 порт в настройках принтера.")
+                        .font(.system(size: 12))
+                        .foregroundStyle(DeskPalette.secondary)
+                        .deskSurface()
                 }
 
                 VStack(alignment: .leading, spacing: 14) {
@@ -138,7 +116,7 @@ private struct QueueWorkspace: View {
                             .disabled(!sending && pending == 0)
                         }
                         Spacer()
-                        Text("USB–RS232 · \(store.settings.profile.flowControl.rawValue)")
+                        Text(String(format: "RS-232 · интервал %.1f с", store.settings.profile.labelIntervalSeconds))
                             .font(.system(size: 11))
                             .foregroundStyle(DeskPalette.secondary)
                     }
@@ -189,7 +167,7 @@ private struct QueueWorkspace: View {
             Button("Отправить \(pending) заданий") { store.startQueue() }
             Button("Отмена", role: .cancel) {}
         } message: {
-            Text("Принтер EZ-2 не возвращает приложению подтверждение напечатанной этикетки. Если бумага не движется, задания всё равно могут получить статус «Передано в порт». Сначала безопаснее проверить одно задание.")
+            Text("Перед очередью печатается одна стартовая этикетка T3, затем задания идут построчно. Принтер не подтверждает физическое завершение печати; сначала проверьте одну серию.")
         }
         .alert("Повторить передачу?", isPresented: $showResendConfirm) {
             Button("Добавить повторное задание") {

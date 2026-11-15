@@ -17,21 +17,13 @@ final class AppStore: ObservableObject {
     @Published var quickValues: [UUID: String] = [:]
     @Published var status = "No serial port selected"
     @Published var copies = 1
-    @Published var rasterProbePending = false
-    @Published var feedTestPending = false
-    @Published var diagnosticRunning = false
-    @Published var registrationVerified = UserDefaults.standard.bool(forKey: "ez2V05FeedConfirmed")
-    @Published var rasterVerified = UserDefaults.standard.bool(forKey: "ez2RasterVerified")
     @Published var showSettings = false
-    @Published var showCalibration = false
     @Published var showQueue = false
     @Published var alert: AppAlert?
     @Published var undoStack: [LabelDocument] = []
     @Published var redoStack: [LabelDocument] = []
 
     let storage = StorageService()
-    let serialPort = SerialPortService()
-    let encoder = GodexEZ2Encoder()
     let queue: PrintQueueService
 
     init() {
@@ -43,13 +35,6 @@ final class AppStore: ObservableObject {
         templates = storage.listDocuments()
         folders = storage.loadFolders()
         queue = PrintQueueService(storage: storage)
-        // The 0.8.2 automatic Q table changes stop positioning for labels
-        // that are not 26 mm tall. Previously verified feed must be rechecked.
-        if settings.profile.automaticTopOfForm
-            && !UserDefaults.standard.bool(forKey: "ez2V082AutoQConfirmed") {
-            registrationVerified = false
-            UserDefaults.standard.set(false, forKey: "ez2V05FeedConfirmed")
-        }
         if !settings.profile.portPath.isEmpty { status = "Ready: \(settings.profile.portPath)" }
         if let raw = UserDefaults.standard.string(forKey: "labeldeskLastFolder"),
            let id = UUID(uuidString: raw),
@@ -277,7 +262,7 @@ final class AppStore: ObservableObject {
             try LabelRasterizer.validate(filled)
             filled.name = activeFolder?.name ?? filled.name
             queue.enqueue(document: filled, copies: copies)
-            if !queue.isPaused && rasterVerified && registrationVerified {
+            if !queue.isPaused {
                 queue.process(profile: settings.profile)
             }
             status = "Этикетка добавлена в очередь"
@@ -313,7 +298,7 @@ final class AppStore: ObservableObject {
             return
         }
         for document in documents { queue.enqueue(document: document, copies: copies) }
-        if !queue.isPaused && rasterVerified && registrationVerified {
+        if !queue.isPaused {
             queue.process(profile: settings.profile)
         }
         status = "В очередь добавлено \(documents.count) этикеток"
@@ -357,25 +342,17 @@ final class AppStore: ObservableObject {
     }
 
     func saveSettings() {
-        // Material registration must be rechecked after changing sensor or Q.
-        let oldProfile = storage.loadSettings().profile
-        if oldProfile.xOffsetMM != settings.profile.xOffsetMM
-            || oldProfile.yOffsetMM != settings.profile.yOffsetMM {
+        let previous = storage.loadSettings().profile
+        if previous.portPath != settings.profile.portPath
+            || previous.labelIntervalSeconds != settings.profile.labelIntervalSeconds {
             queue.pause()
-        }
-        if oldProfile.topOfFormDots != settings.profile.topOfFormDots
-            || oldProfile.sensorMode != settings.profile.sensorMode
-            || oldProfile.automaticTopOfForm != settings.profile.automaticTopOfForm {
-            registrationVerified = false
-            feedTestPending = false
-            queue.pause()
-            UserDefaults.standard.set(false, forKey: "ez2V05FeedConfirmed")
-            UserDefaults.standard.set(false, forKey: "ez2V082AutoQConfirmed")
         }
         do {
             try storage.saveSettings(settings)
-            status = settings.profile.portPath.isEmpty ? "No serial port selected" : "Ready: \(settings.profile.portPath)"
-        } catch { alert = AppAlert(title: "Could not save settings", message: error.localizedDescription) }
+            status = settings.profile.portPath.isEmpty ? "Порт не выбран" : "Готово: \(settings.profile.portPath)"
+        } catch {
+            alert = AppAlert(title: "Ошибка сохранения", message: error.localizedDescription)
+        }
     }
 
     func add(_ element: LabelElement) {
@@ -430,7 +407,7 @@ final class AppStore: ObservableObject {
         do {
             try LabelRasterizer.validate(document)
             queue.enqueue(document: document, copies: copies)
-            if !queue.isPaused && rasterVerified && registrationVerified { queue.process(profile: settings.profile) }
+            if !queue.isPaused { queue.process(profile: settings.profile) }
             status = "Added to queue"
         } catch {
             alert = AppAlert(title: "Label cannot be printed", message: error.localizedDescription)
@@ -438,18 +415,8 @@ final class AppStore: ObservableObject {
     }
 
     func startQueue(onlyOne: Bool = false) {
-        guard rasterVerified else {
-            alert = AppAlert(title: "Verify graphics first",
-                             message: "Press Raster TEST and verify the small square on paper. Normal labels use ESC G and are disabled until you confirm this test.")
-            return
-        }
-        guard registrationVerified else {
-            alert = AppAlert(title: "Verify label advance",
-                             message: "Print one Feed TEST and confirm that the printer advances to the next label. Existing raster jobs stopped at the end of the picture.")
-            return
-        }
         guard !settings.profile.portPath.isEmpty else {
-            alert = AppAlert(title: "Choose serial port", message: "Open printer settings and select the USB–RS232 port.")
+            alert = AppAlert(title: "Порт не выбран", message: "Выберите USB–RS232 порт в настройках.")
             return
         }
         queue.resume(onlyOne: onlyOne)
@@ -458,292 +425,6 @@ final class AppStore: ObservableObject {
 
     func pauseQueue() { queue.pause() }
 
-    /// Apply media dimensions and a printer profile together. The current
-    /// template is explicitly saved only after the new dimensions validate.
-    @discardableResult
-    func applyCalibration(widthMM: Double, heightMM: Double, gapMM: Double,
-                          profile: PrinterProfile) -> Bool {
-        var updated = document
-        updated.widthMM = widthMM
-        updated.heightMM = heightMM
-        updated.gapMM = gapMM
-        do {
-            try LabelRasterizer.validate(updated)
-            guard (-8...8).contains(profile.xOffsetMM),
-                  (-8...8).contains(profile.yOffsetMM) else {
-                throw LabelRenderError.invalidElement("Поправки X/Y должны быть в пределах −8…+8 мм")
-            }
-            let previousDocument = document
-            var nextSettings = settings
-            nextSettings.profile = profile
-            try storage.saveDocument(updated)
-            do {
-                try storage.saveSettings(nextSettings)
-            } catch {
-                try? storage.saveDocument(previousDocument)
-                throw error
-            }
-
-            let oldProfile = settings.profile
-            let mediaChanged = document.widthMM != widthMM
-                || document.heightMM != heightMM || document.gapMM != gapMM
-            let feedChanged = mediaChanged
-                || oldProfile.topOfFormDots != profile.topOfFormDots
-                || oldProfile.automaticTopOfForm != profile.automaticTopOfForm
-                || oldProfile.sensorMode != profile.sensorMode
-
-            document = updated
-            settings = nextSettings
-            templates = storage.listDocuments()
-            if activeFolder?.baseTemplateID == document.id { prepareQuickValues() }
-
-            if feedChanged {
-                registrationVerified = false
-                feedTestPending = false
-                UserDefaults.standard.set(false, forKey: "ez2V05FeedConfirmed")
-                UserDefaults.standard.set(false, forKey: "ez2V082AutoQConfirmed")
-            }
-            queue.pause()
-            queue.diagnostics.record("calibration saved", details:
-                "size=\(widthMM)x\(heightMM) gap=\(gapMM) x=\(profile.xOffsetMM) y=\(profile.yOffsetMM) autoQ=\(profile.automaticTopOfForm) Q=\(GodexEZ2Encoder.effectiveQ(for: updated, profile: profile))")
-            status = feedChanged ? "Параметры сохранены — требуется Feed TEST" :
-                "Поправки сохранены — проверьте калибровочную рамку"
-            return true
-        } catch {
-            alert = AppAlert(title: "Не удалось сохранить калибровку",
-                             message: error.localizedDescription)
-            return false
-        }
-    }
-
-    /// Explicit single-label calibration test. Uses the SAME raster encoder
-    /// and transport as the regular queue; leaves user templates untouched.
-    func sendCalibrationPattern(variant: EZ2CalibrationVariant = .frame) {
-        let profile = settings.profile
-        guard !profile.portPath.isEmpty else {
-            alert = AppAlert(title: "Порт не выбран", message: "Выберите USB–RS232 порт в настройках.")
-            return
-        }
-        let sample = EZ2CalibrationPattern.make(for: document, variant: variant)
-        let packet: Data
-        do {
-            packet = try encoder.nativeCommands(for: sample, profile: profile)
-        } catch {
-            alert = AppAlert(title: "Ошибка калибровочного макета", message: error.localizedDescription)
-            return
-        }
-        alert = AppAlert(
-            title: "Напечатать «\(variant.label)»?",
-            message: "Одна этикетка. Все тесты (включая FEED) используют одинаковые ESC Q/q/S/M, число строк и выбранный режим RS-232. Отличается только рисунок. Не меняйте настройки между тестами; сравните положение штрихов на бумаге.",
-            action: { [weak self] in
-                self?.performRasterDiagnostic(data: packet, profile: profile,
-                                              type: variant.rawValue, feedTest: false)
-            }
-        )
-    }
-
-    func sendFeedTest() {
-        let profile = settings.profile
-        guard !profile.portPath.isEmpty else {
-            alert = AppAlert(title: "Порт не выбран", message: "Выберите USB–RS232 порт в настройках.")
-            return
-        }
-        let sample = EZ2CalibrationPattern.feedText(for: document)
-        let data: Data
-        do {
-            data = try encoder.nativeCommands(for: sample, profile: profile)
-        } catch {
-            alert = AppAlert(title: "Ошибка теста начала", message: error.localizedDescription)
-            return
-        }
-        alert = AppAlert(
-            title: "Печать одного FEED TEST?",
-            message: "Это короткая надпись в начале наклейки, а не проверка всей длины. Будет использован тот же способ передачи, что и для рамки. Не меняйте Q, зазор или X/Y между проверками.",
-            action: { [weak self] in
-                self?.performRasterDiagnostic(data: data, profile: profile,
-                                              type: "feed-text", feedTest: true)
-            }
-        )
-    }
-
-    /// One shared serial path for FEED / top / bottom / full frame.
-    /// The code and physical format header are identical; only raster content
-    /// changes. This avoids comparing a burst transmission with a paced one.
-    private func performRasterDiagnostic(data: Data, profile: PrinterProfile,
-                                         type: String, feedTest: Bool) {
-        guard !diagnosticRunning,
-              !queue.jobs.contains(where: { $0.state == .sending }) else {
-            alert = AppAlert(title: "Принтер занят",
-                             message: "Дождитесь завершения текущей передачи перед следующим тестом.")
-            return
-        }
-        diagnosticRunning = true
-        if feedTest { feedTestPending = false }
-        queue.pause()
-        status = "Передача \(type)…"
-
-        let diagnostics = queue.diagnostics
-        let prefix = data.prefix(22).map { String(format: "%02X", $0) }.joined(separator: " ")
-        diagnostics.record("raster check begin", details:
-            "type=\(type) port=\(profile.portPath) size=\(document.widthMM)x\(document.heightMM) gap=\(document.gapMM) flow=\(profile.flowControl.rawValue) transport=\(profile.rasterTransport.rawValue) Q=\(GodexEZ2Encoder.effectiveQ(for: document, profile: profile)) speed=\(profile.printSpeed.rawValue + 1) bytes=\(data.count) prefix=\(prefix)")
-        Task.detached { [serialPort, diagnostics] in
-            do {
-                try serialPort.write(data, profile: profile, rasterTransport: profile.rasterTransport) { stage in
-                    Task { @MainActor in
-                        diagnostics.record("raster check serial", details: "type=\(type) \(stage)")
-                    }
-                }
-                await diagnostics.record("raster check sent", details:
-                    "type=\(type) bytes=\(data.count); port drained, PAPER NOT VERIFIED")
-                await MainActor.run {
-                    self.diagnosticRunning = false
-                    if feedTest { self.feedTestPending = true }
-                    self.status = "Передано \(type). Проверьте фактическое положение на бумаге."
-                }
-            } catch {
-                await diagnostics.record("raster check FAILED", details:
-                    "type=\(type) \(error.localizedDescription)")
-                await MainActor.run {
-                    self.diagnosticRunning = false
-                    self.status = "Ошибка передачи \(type)"
-                    self.alert = AppAlert(title: "Ошибка передачи", message: error.localizedDescription)
-                }
-            }
-        }
-    }
-
-    func confirmFeedTest() {
-        guard feedTestPending else { return }
-        alert = AppAlert(
-            title: "Did paper reach the next label?",
-            message: "Подтвердите только если FEED реально напечатался и начало наклейки определилось правильно. Это НЕ проверяет печать у нижнего края: для неё используйте отдельный «Контроль конца».",
-            action: { [weak self] in
-                guard let self else { return }
-                self.feedTestPending = false
-                self.registrationVerified = true
-                UserDefaults.standard.set(true, forKey: "ez2V05FeedConfirmed")
-                UserDefaults.standard.set(true, forKey: "ez2V082AutoQConfirmed")
-                self.status = "Graphics and label advance verified"
-            }
-        )
-    }
-
-    func sendRasterProbe() {
-        let profile = settings.profile
-        guard !profile.portPath.isEmpty else {
-            alert = AppAlert(title: "Choose serial port", message: "Select the USB–RS232 port in Printer settings.")
-            return
-        }
-        alert = AppAlert(title: "Print a graphics test?",
-                         message: "Sends 40 graphic rows (a small letter L with an isolated upper-right mark) using ESC G. It may advance one label. Confirm paper is loaded.",
-                         action: { [weak self] in self?.performRasterProbe(profile: profile) })
-    }
-
-    private func performRasterProbe(profile: PrinterProfile) {
-        status = "Sending raster probe…"
-        rasterProbePending = false
-        let data = encoder.rasterProbe()
-        let diagnostics = queue.diagnostics
-        diagnostics.record("test begin", details: "type=RASTER TEST port=\(profile.portPath) flow=\(profile.flowControl.rawValue) bytes=\(data.count)")
-        Task.detached { [serialPort, diagnostics] in
-            do {
-                try serialPort.write(data, profile: profile) { stage in
-                    Task { @MainActor in diagnostics.record("test serial", details: "type=RASTER TEST \(stage)") }
-                }
-                await diagnostics.record("test sent to port", details: "type=RASTER TEST bytes=\(data.count); physical output not confirmed")
-                await MainActor.run {
-                    self.rasterProbePending = true
-                    self.status = "Raster probe sent; confirm paper result"
-                }
-            } catch {
-                await diagnostics.record("test FAILED", details: "type=RASTER TEST \(error.localizedDescription)")
-                await MainActor.run {
-                    self.status = "Raster probe failed"
-                    self.alert = AppAlert(title: "Could not send graphics test", message: error.localizedDescription)
-                }
-            }
-        }
-    }
-
-    func confirmRasterProbe() {
-        guard rasterProbePending else { return }
-        alert = AppAlert(title: "Confirm graphics test",
-                         message: "Did the printer produce a black L with a small, separate upper-right mark, without garbled text or runaway feeding? Confirm only if the output was correct.",
-                         action: { [weak self] in
-            guard let self = self else { return }
-            self.rasterVerified = true
-            self.rasterProbePending = false
-            UserDefaults.standard.set(true, forKey: "ez2RasterVerified")
-            self.status = "Graphics verified; label printing enabled"
-        })
-    }
-
-    func sendFontTest() {
-        let profile = settings.profile
-        guard !profile.portPath.isEmpty else {
-            alert = AppAlert(title: "Select a port", message: "Choose the USB–RS232 port in settings.")
-            return
-        }
-        alert = AppAlert(
-            title: "Print native ASCII font test?",
-            message: "Prints one label using the EZ-2 built-in 8×10 and 16×26 ASCII fonts. Paper should be loaded. This test does not enable hybrid printing.",
-            action: { [weak self] in self?.performFontTest(profile: profile) }
-        )
-    }
-
-    private func performFontTest(profile: PrinterProfile) {
-        status = "Sending built-in font test…"
-        let data = encoder.nativeFontProbe(profile: profile)
-        let diagnostics = queue.diagnostics
-        diagnostics.record("test begin", details: "type=FONT TEST port=\(profile.portPath) flow=\(profile.flowControl.rawValue) bytes=\(data.count)")
-        Task.detached { [serialPort, diagnostics] in
-            do {
-                try serialPort.write(data, profile: profile) { stage in
-                    Task { @MainActor in diagnostics.record("test serial", details: "type=FONT TEST \(stage)") }
-                }
-                await diagnostics.record("test sent to port", details: "type=FONT TEST bytes=\(data.count); physical output not confirmed")
-                await MainActor.run {
-                    self.status = "Native font TEST sent — inspect the printed label"
-                }
-            } catch {
-                await diagnostics.record("test FAILED", details: "type=FONT TEST \(error.localizedDescription)")
-                await MainActor.run {
-                    self.status = "Native font TEST failed"
-                    self.alert = AppAlert(title: "Font test could not be sent", message: error.localizedDescription)
-                }
-            }
-        }
-    }
-
-    func sendTest() {
-        let profile = settings.profile
-        guard !profile.portPath.isEmpty else {
-            alert = AppAlert(title: "Select a port first", message: "Open Printer settings and choose the USB–RS232 device.")
-            return
-        }
-        alert = AppAlert(title: "Print TEST?", message: "This sends the verified TEST command to \(profile.portPath). Ensure paper is loaded.", action: { [weak self] in
-            self?.performTest(profile: profile)
-        })
-    }
-
-    private func performTest(profile: PrinterProfile) {
-        status = "Sending TEST…"
-        let data = encoder.testLabel(profile: profile)
-        let diagnostics = queue.diagnostics
-        diagnostics.record("test begin", details: "type=PRINT TEST port=\(profile.portPath) flow=\(profile.flowControl.rawValue) bytes=\(data.count)")
-        Task.detached { [serialPort, diagnostics] in
-            do {
-                try serialPort.write(data, profile: profile) { stage in
-                    Task { @MainActor in diagnostics.record("test serial", details: "type=PRINT TEST \(stage)") }
-                }
-                await diagnostics.record("test sent to port", details: "type=PRINT TEST bytes=\(data.count); physical output not confirmed")
-                await MainActor.run { self.status = "TEST sent to serial port (physical print not confirmed)" }
-            } catch {
-                await diagnostics.record("test FAILED", details: "type=PRINT TEST \(error.localizedDescription)")
-                await MainActor.run { self.status = "TEST failed"; self.alert = AppAlert(title: "TEST was not sent", message: error.localizedDescription) }
-            }
-        }
-    }
 }
 
 struct AppAlert: Identifiable {

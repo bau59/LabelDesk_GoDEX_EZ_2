@@ -2,6 +2,7 @@
 set -euo pipefail
 ROOT="${0:A:h:h}"
 APP="$ROOT/build/LabelDesk.app"
+EXPECTED_VERSION="$(/usr/libexec/PlistBuddy -c "Print :CFBundleShortVersionString" "$APP/Contents/Info.plist")"
 TESTDIR="$(/usr/bin/mktemp -d)"
 trap '/bin/rm -rf "$TESTDIR"' EXIT
 /bin/mkdir -p "$TESTDIR/current" "$TESTDIR/new" "$TESTDIR/workspace-good" "$TESTDIR/workspace-bad"
@@ -15,7 +16,7 @@ export LABELDESK_UPDATE_SKIP_LAUNCH=1
   "$TESTDIR/new/LabelDesk.app" \
   "$TESTDIR/workspace-good"
 VERSION="$(/usr/libexec/PlistBuddy -c "Print :CFBundleShortVersionString" "$TESTDIR/current/LabelDesk.app/Contents/Info.plist")"
-[[ "$VERSION" == "0.9.2" ]] || { print -u2 "Update failed to replace old version"; exit 1; }
+[[ "$VERSION" == "$EXPECTED_VERSION" ]] || { print -u2 "Update failed to replace old version"; exit 1; }
 /usr/bin/codesign --verify --deep --strict "$TESTDIR/current/LabelDesk.app"
 # A damaged signed bundle must never overwrite the installed app.
 /bin/mkdir -p "$TESTDIR/broken"
@@ -29,5 +30,5 @@ if /bin/zsh "$ROOT/Scripts/install-update.sh" 99999999 \
   exit 1
 fi
 VERSION="$(/usr/libexec/PlistBuddy -c "Print :CFBundleShortVersionString" "$TESTDIR/current/LabelDesk.app/Contents/Info.plist")"
-[[ "$VERSION" == "0.9.2" ]] || { print -u2 "Original app was lost"; exit 1; }
+[[ "$VERSION" == "$EXPECTED_VERSION" ]] || { print -u2 "Original app was lost"; exit 1; }
 print "Detached updater passed replacement and invalid-signature rollback tests."
