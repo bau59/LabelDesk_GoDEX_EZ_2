@@ -13,34 +13,60 @@ private struct QueueContent: View {
     @ObservedObject var queue: PrintQueueService
 
     var body: some View {
-        VStack(spacing: 6) {
-            HStack {
-                Label(store.status, systemImage: store.status.hasPrefix("Ready") ? "checkmark.circle" : "circle")
-                    .foregroundStyle(store.status.hasPrefix("TEST failed") ? .red : .secondary)
+        VStack(alignment: .leading, spacing: 7) {
+            HStack(spacing: 12) {
+                Label(store.status, systemImage: store.rasterVerified ? "checkmark.circle" : "exclamationmark.triangle")
+                    .font(.caption)
+                    .foregroundStyle(store.rasterVerified ? .secondary : .orange)
                 Spacer()
-                Stepper("Copies: \(store.copies)", value: $store.copies, in: 1...999).frame(width: 135)
-                Button("Add to queue") { queue.enqueue(document: store.document, copies: store.copies) }
-                Button(queue.isPaused ? "Resume" : "Start") { queue.togglePause(); queue.process(profile: store.settings.profile) }
+                Stepper("Copies: \(store.copies)", value: $store.copies, in: 1...99)
+                    .frame(width: 150)
+                Button("Add label") { store.enqueue() }
+                Button(queue.isPaused ? "Start queue" : "Pause") {
+                    if queue.isPaused {
+                        store.startQueue()
+                    } else {
+                        store.pauseQueue()
+                    }
+                }
+                .buttonStyle(.borderedProminent)
                 Button("Clear completed") { queue.clearCompleted() }
             }
-            .padding(.horizontal, 12)
-            .padding(.top, 8)
+
+            if !store.rasterVerified {
+                HStack(spacing: 12) {
+                    Text("Full labels use unverified ESC G graphics. First print Raster TEST, inspect the paper, then confirm.")
+                        .font(.caption)
+                        .foregroundStyle(.orange)
+                    if store.rasterProbePending {
+                        Button("Raster TEST looks correct") { store.confirmRasterProbe() }
+                    }
+                }
+            }
+
             if queue.jobs.isEmpty {
-                Text("Print queue is empty").foregroundStyle(.secondary).frame(maxWidth: .infinity, alignment: .leading).padding(.horizontal, 12)
+                Text("Queue is empty").foregroundStyle(.secondary)
+                    .font(.caption)
             } else {
                 List(queue.jobs) { job in
-                    HStack {
-                        Text(job.title)
+                    HStack(spacing: 10) {
+                        Text(job.title).lineLimit(1)
                         Spacer()
-                        Text(job.state.rawValue.capitalized).foregroundStyle(job.state == .failed || job.state == .uncertain ? .red : .secondary)
-                        if job.state == .pending { Button("Cancel") { queue.cancel(job.id) } }
-                        if job.state == .failed || job.state == .uncertain { Button("Retry") { queue.retry(job.id) } }
+                        Text(job.state.rawValue.capitalized)
+                            .foregroundStyle(job.state == .failed || job.state == .uncertain ? .red : .secondary)
+                        if job.state == .pending {
+                            Button("Cancel") { queue.cancel(job.id) }
+                        } else if job.state == .failed || job.state == .uncertain {
+                            Button("Retry") { queue.retry(job.id) }
+                        }
                     }
-                    if let error = job.errorMessage { Text(error).font(.caption).foregroundStyle(.red) }
+                    if let error = job.errorMessage {
+                        Text(error).font(.caption).foregroundStyle(.red)
+                    }
                 }
-                .frame(height: 110)
+                .frame(height: 125)
             }
         }
-        .padding(.bottom, 8)
+        .padding(12)
     }
 }
