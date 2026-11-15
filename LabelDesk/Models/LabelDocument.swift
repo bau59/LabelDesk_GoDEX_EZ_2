@@ -5,9 +5,9 @@ struct LabelDocument: Codable, Identifiable, Equatable {
     var id = UUID()
     var folderID: UUID?
     var name: String = "Untitled label"
-    var widthMM: Double = 40
-    var heightMM: Double = 30
-    var gapMM: Double = 3
+    var widthMM: Double = 58
+    var heightMM: Double = 38
+    var gapMM: Double = 2
     var elements: [LabelElement] = []
     var updatedAt = Date()
 
@@ -27,7 +27,7 @@ struct LabelPreset: Identifiable, Hashable {
         LabelPreset(widthMM: 30, heightMM: 20), LabelPreset(widthMM: 40, heightMM: 20),
         LabelPreset(widthMM: 40, heightMM: 30), LabelPreset(widthMM: 50, heightMM: 25),
         LabelPreset(widthMM: 50, heightMM: 30), LabelPreset(widthMM: 50, heightMM: 40),
-        LabelPreset(widthMM: 55, heightMM: 30),
+        LabelPreset(widthMM: 55, heightMM: 30), LabelPreset(widthMM: 58, heightMM: 38),
         LabelPreset(widthMM: 56, heightMM: 30), LabelPreset(widthMM: 60, heightMM: 30)
     ]
 }
