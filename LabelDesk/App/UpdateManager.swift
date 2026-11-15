@@ -157,10 +157,11 @@ final class UpdateManager: ObservableObject {
             }
 
             status = "Verifying Intel update…"
+            let requestedVersion = latestVersion
             let result = try await Task.detached(priority: .userInitiated) {
                 try Self.prepare(
                     archive: download, asset: asset,
-                    expectedVersion: self.latestVersion, expectedBundleID: "com.localsoft.LabelDesk"
+                    expectedVersion: requestedVersion, expectedBundleID: "com.localsoft.LabelDesk"
                 )
             }.value
             workspace = result.workspace
