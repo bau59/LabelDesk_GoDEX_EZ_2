@@ -47,7 +47,7 @@ input{user-select:text}
 .tools label{margin-left:auto;white-space:nowrap;display:flex;align-items:center;gap:7px;color:var(--muted);font-weight:500}
 .tools select{width:77px;padding:7px 5px}
 #desk{flex:1;min-height:0;overflow:auto;display:flex;justify-content:center;align-items:flex-start;padding:56px 40px 70px;background:radial-gradient(circle at 48% 35%,#fbfcff,#edf2f9 82%)}
-#label{position:relative;flex-shrink:0;background:#fff;color:#000;border:1px solid #b6c1d1;box-shadow:0 18px 40px #23314623;overflow:hidden}
+#label{position:relative;flex-shrink:0;background:#fff;color:#000;border:1px solid #b6c1d1;box-shadow:0 18px 40px #23314623;overflow:visible}
 #grid{position:absolute;inset:0;pointer-events:none;z-index:1}
 .obj{position:absolute;z-index:2;cursor:move;overflow:visible;touch-action:none}
 .obj .visual{width:100%;height:100%;overflow:hidden;pointer-events:none;white-space:pre-wrap;overflow-wrap:anywhere}
@@ -57,8 +57,14 @@ input{user-select:text}
 .resize-handle.ne{right:-6px;top:-6px;cursor:nesw-resize}
 .resize-handle.sw{left:-6px;bottom:-6px;cursor:nesw-resize}
 .resize-handle.se{right:-6px;bottom:-6px;cursor:nwse-resize}
-.obj:not(.sel){cursor:default}
+.obj:not(.sel){cursor:pointer}
+.obj:not(.sel):hover{outline:2px dashed #8ca7ed;outline-offset:1px}
 .obj.sel{cursor:move}
+.obj.sel:hover{outline:2px solid #345cd3}
+.obj:active{cursor:grabbing}
+.layer{cursor:pointer}
+#label{cursor:crosshair}
+#desk{align-items:center}
 .layer:focus-visible{outline:2px solid #64a2ff}
 .obj .visual.text{line-height:1.04;color:#000;word-break:break-word}
 .obj .visual.line{background:#000}
@@ -108,10 +114,10 @@ strong{font-size:14px;display:block;margin-bottom:14px}
      <div class="divider"></div>
      <button id="undo" title="Отменить · ⌘Z">↶</button>
      <button id="redo" title="Повторить · ⌘⇧Z">↷</button>
-     <label>Масштаб <select id="zoom"><option value="4">4×</option><option value="6">6×</option><option value="8" selected>8×</option><option value="10">10×</option><option value="12">12×</option></select></label>
+     <label>Масштаб <select id="zoom"><option value="fit" selected>Вписать</option><option value="6">6×</option><option value="8">8×</option><option value="10">10×</option><option value="12">12×</option><option value="16">16×</option></select></label>
    </div>
    <div id="desk"><div id="label" aria-label="Макет этикетки"><div id="grid"></div></div></div>
-   <div id="foot">Выберите слой слева. Вся правка применяется только к нему. Перетаскивание — движение; угловые маркеры — размер.</div>
+   <div id="foot">Щёлкните по объекту или слою для выбора · перетащите для перемещения · тяните за угол для размера · двойной щелчок — текст · стрелки — точное движение</div>
  </main>
  <aside class="panel right">
    <div class="panelhead">Свойства слоя</div>
@@ -122,7 +128,7 @@ strong{font-size:14px;display:block;margin-bottom:14px}
 <script>
 (function(){
 "use strict";
-let doc=null, selected=null, zoom=8, history=[], future=[], snap=true;
+let doc=null, selected=null, zoom=8, zoomMode="fit", history=[], future=[], snap=true;
 const $=id=>document.getElementById(id);
 const typeNames={text:"Текст",barcode:"Code 39",line:"Линия",rectangle:"Рамка"};
 const patterns={"0":"nnnwwnwnn","1":"wnnwnnnnw","2":"nnwwnnnnw","3":"wnwwnnnnn","4":"nnnwwnnnw","5":"wnnwwnnnn","6":"nnwwwnnnn","7":"nnnwnnwnw","8":"wnnwnnwnn","9":"nnwwnnwnn","A":"wnnnnwnnw","B":"nnwnnwnnw","C":"wnwnnwnnn","D":"nnnnwwnnw","E":"wnnnwwnnn","F":"nnwnwwnnn","G":"nnnnnwwnw","H":"wnnnnwwnn","I":"nnwnnwwnn","J":"nnnnwwwnn","K":"wnnnnnnww","L":"nnwnnnnww","M":"wnwnnnnwn","N":"nnnnwnnww","O":"wnnnwnnwn","P":"nnwnwnnwn","Q":"nnnnnnwww","R":"wnnnnnwwn","S":"nnwnnnwwn","T":"nnnnwnwwn","U":"wwnnnnnnw","V":"nwwnnnnnw","W":"wwwnnnnnn","X":"nwnnwnnnw","Y":"wwnnwnnnn","Z":"nwwnwnnnn","-":"nwnnnnwnw",".":"wwnnnnwnn"," ":"nwwnnnwnn","$":"nwnwnwnnn","/":"nwnwnnnwn","+":"nwnnnwnwn","%":"nnnwnwnwn","*":"nwnnwnwnn"};
@@ -177,6 +183,15 @@ function barcodeSVG(value,width,height,readable){
 }
 function renderCanvas(){
  const el=$("label");el.querySelectorAll(".obj").forEach(n=>n.remove());if(!doc)return;
+ if(zoomMode==="fit"){
+   const desk=$("desk");
+   const usableWidth=Math.max(220,desk.clientWidth-100);
+   const usableHeight=Math.max(160,desk.clientHeight-110);
+   zoom=Math.max(4,Math.min(18,Math.floor(Math.min(
+     usableWidth/Math.max(10,doc.widthMM),
+     usableHeight/Math.max(10,doc.heightMM)
+   ))));
+ }
  let width=Math.max(10,Math.min(60,Number(doc.widthMM)||40)),height=Math.max(10,Math.min(100,Number(doc.heightMM)||30));
  el.style.width=(width*zoom)+"px";el.style.height=(height*zoom)+"px";
  $("grid").style.backgroundImage="linear-gradient(to right,#0000000d 1px,transparent 1px),linear-gradient(to bottom,#0000000d 1px,transparent 1px)";
@@ -205,6 +220,7 @@ function renderCanvas(){
        node.appendChild(handle);
      }
    }
+   node.title=selected===e.id?"Перетащите объект · углы изменяют размер":"Щёлкните или перетащите для выбора слоя";
    node.addEventListener("click",ev=>{ev.stopPropagation();});
    node.addEventListener("dblclick",ev=>{
      ev.stopPropagation();
@@ -238,10 +254,14 @@ function transformRect(original,dx,dy,mode,docWidth,docHeight,step,minimum){
 }
 
 function startManipulation(ev,id,mode){
- // Only the selected layer can move or resize. Canvas clicks never auto-select.
- if(ev.button!==0||!doc||selected!==id)return;
- const item=doc.elements.find(x=>x.id===selected);if(!item)return;
+ // A canvas click is an explicit selection, not an automatic layer guess.
+ if(ev.button!==0||!doc)return;
+ const item=doc.elements.find(x=>x.id===id);if(!item)return;
  ev.preventDefault();ev.stopPropagation();
+ if(selected!==id){
+   selected=id;
+   renderLayers();renderProps();renderCanvas();
+ }
  const original=clone(item),sx=ev.clientX,sy=ev.clientY,step=snap?1:0.125;
  const minimum=item.kind==="line"?0.125:1;
  checkpoint();
@@ -256,11 +276,13 @@ function startManipulation(ev,id,mode){
    window.removeEventListener("pointermove",move);
    window.removeEventListener("pointerup",finish);
    window.removeEventListener("pointercancel",finish);
+   window.removeEventListener("blur",finish);
    renderCanvas();renderProps();renderLayers();commit();
  }
  window.addEventListener("pointermove",move);
  window.addEventListener("pointerup",finish);
  window.addEventListener("pointercancel",finish);
+ window.addEventListener("blur",finish);
 }
 function prop(title,control){
  let div=document.createElement("div");div.className="prop";
@@ -340,7 +362,8 @@ document.querySelectorAll("[data-add]").forEach(b=>b.addEventListener("click",()
 $("docname").addEventListener("focus",()=>{if(doc)checkpoint();});
 $("docname").addEventListener("input",function(){if(!doc)return;doc.name=this.value;commit();});
 $("label").addEventListener("click",ev=>{ev.stopPropagation();});
-$("zoom").addEventListener("change",function(){zoom=Number(this.value);renderCanvas();});
+$("zoom").addEventListener("change",function(){zoomMode=this.value;if(zoomMode!=="fit")zoom=Number(this.value);renderCanvas();});
+window.addEventListener("resize",()=>{if(zoomMode==="fit")renderCanvas();});
 $("up").onclick=()=>moveLayer(1);$("down").onclick=()=>moveLayer(-1);
 $("clone").onclick=duplicate;$("remove").onclick=remove;
 $("undo").onclick=()=>{restore(history,future);$("undo").disabled=!history.length;$("redo").disabled=!future.length;};
@@ -349,6 +372,17 @@ document.addEventListener("keydown",function(ev){
  const editable=["INPUT","TEXTAREA","SELECT"].includes(document.activeElement?.tagName);
  if((ev.metaKey||ev.ctrlKey)&&ev.key.toLowerCase()==="s"){ev.preventDefault();send("save");return;}
  if((ev.metaKey||ev.ctrlKey)&&ev.key.toLowerCase()==="z"){ev.preventDefault();if(ev.shiftKey)$("redo").click();else $("undo").click();return;}
+ if(!editable&&selected&&["ArrowLeft","ArrowRight","ArrowUp","ArrowDown"].includes(ev.key)){
+   ev.preventDefault();
+   const e=selectedObj();if(!e)return;
+   const step=ev.shiftKey?1:(snap?1:0.125);
+   const dx=ev.key==="ArrowLeft"?-step:ev.key==="ArrowRight"?step:0;
+   const dy=ev.key==="ArrowUp"?-step:ev.key==="ArrowDown"?step:0;
+   checkpoint();
+   Object.assign(e,transformRect(clone(e),dx,dy,"move",doc.widthMM,doc.heightMM,snap?1:0.125,1));
+   renderCanvas();renderProps();commit();
+   return;
+ }
  if(!editable&&(ev.key==="Delete"||ev.key==="Backspace")){ev.preventDefault();remove();}
 });
 send("ready");
