@@ -4,7 +4,7 @@ on:
   push:
     branches:
       - main
-      - fix/media-width-sensor-0.9.1
+      - fix/calibration-parity-0.9.2
   workflow_dispatch:
 
 permissions:
@@ -176,4 +176,4 @@ jobs:
             --repo "$GITHUB_REPOSITORY" \
             --target "$GITHUB_SHA" \
             --title "LabelDesk ${APP_VERSION}" \
-            --notes "Intel macOS 15+. Separate 60mm physical media width from documented safe 55mm ESC G printing width. Visually mark the unprintable right band, test printing with 5mm ruler, and require stable mechanical Feed sensor before raster calibration. No unsupported G56 or firmware changes. Original printer queue, profiles and updater preserved. Ad-hoc signed; not notarized."
+            --notes "Intel macOS 15+. FIX inconsistent FEED vs frame transmission: both now share the exact configured raster transport, Q/q/S/M header, complete row count and guarded serial diagnostics. Remove incorrect five-FEED-label gate. Add top/end/frame sequential tests to isolate position drift from long graphics loads without changing saved media parameters or printer protocol. Intact original Print TEST, normal printing queue and updater. Physical proof required. Ad-hoc signed; not notarized."

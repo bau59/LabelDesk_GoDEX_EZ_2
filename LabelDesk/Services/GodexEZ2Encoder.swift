@@ -143,12 +143,51 @@ struct GodexEZ2Encoder {
 /// Physical printable-width test. All strokes stay within the documented
 /// ESC G 55-byte row limit. On 56–60 mm media the unprinted right edge is
 /// intentional and must not be mistaken for a registration failure.
+enum EZ2CalibrationVariant: String, CaseIterable, Identifiable {
+    case top, bottom, frame
+    var id: String { rawValue }
+    var label: String {
+        switch self {
+        case .top: "Контроль начала"
+        case .bottom: "Контроль конца"
+        case .frame: "Полная рамка"
+        }
+    }
+}
+
 enum EZ2CalibrationPattern {
-    static func make(for source: LabelDocument) -> LabelDocument {
+    /// The legacy FEED text test is deliberately built as a normal raster label
+    /// so all diagnostics can share the same serial path and ESC header.
+    static func feedText(for source: LabelDocument) -> LabelDocument {
+        var sample = source
+        sample.elements = [
+            LabelElement(kind: .text, xMM: 1, yMM: 1,
+                         widthMM: min(15, source.widthMM - 2),
+                         heightMM: min(7, source.heightMM - 2),
+                         value: "FEED", fontSize: 10)
+        ]
+        return sample
+    }
+
+    static func make(for source: LabelDocument,
+                     variant: EZ2CalibrationVariant = .frame) -> LabelDocument {
         var sample = source
         sample.id = UUID()
         sample.name = "CALIBRATION"
         let rasterWidth = min(source.widthMM, EZ2Limits.maxRasterWidthMM)
+        // Every diagnostic uses the same full-height raster row count and
+        // Q/q/S/M header. Only the INK changes between the three checks.
+        if variant != .frame {
+            let y = variant == .top ? 2.0 : (source.heightMM - 2.7)
+            sample.elements = [
+                LabelElement(kind: .line, xMM: 2, yMM: y,
+                             widthMM: min(14, rasterWidth - 4),
+                             heightMM: 0.6, value: ""),
+                LabelElement(kind: .line, xMM: 2, yMM: y,
+                             widthMM: 0.6, heightMM: 2, value: "")
+            ]
+            return sample
+        }
         let innerWidth = rasterWidth - 4
         let innerHeight = source.heightMM - 4
         sample.elements = [

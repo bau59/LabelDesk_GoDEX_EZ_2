@@ -7,7 +7,6 @@ struct CalibrationView: View {
     @Environment(\.dismiss) private var dismiss
 
     @State private var step = 0
-    @State private var mechanicalFeedStable = false
     @State private var widthMM: Double = 40
     @State private var heightMM: Double = 30
     @State private var gapMM: Double = 3
@@ -85,19 +84,22 @@ struct CalibrationView: View {
                     .tint(DeskPalette.accent)
                     .disabled(!hasChanges)
 
-                    Button("Feed TEST") { store.sendFeedTest() }
-                        .disabled(hasChanges || !mechanicalFeedStable)
-                        .help("Сначала подтвердите одинаковую подачу физической кнопкой Feed")
+                    Button("FEED: текст") { store.sendFeedTest() }
+                        .disabled(hasChanges || store.diagnosticRunning)
+                        .help("Тест надписи у начала этикетки")
                     if store.feedTestPending {
-                        Button("Подтвердить подачу") { store.confirmFeedTest() }
-                            .disabled(hasChanges || !mechanicalFeedStable)
+                        Button("Подтвердить FEED") { store.confirmFeedTest() }
+                            .disabled(hasChanges || store.diagnosticRunning)
                     }
                     Spacer()
-                    Button("Печать рамки", systemImage: "square.dashed") {
-                        store.sendCalibrationPattern()
+                    Button("Начало") { store.sendCalibrationPattern(variant: .top) }
+                        .disabled(hasChanges || store.diagnosticRunning)
+                    Button("Конец") { store.sendCalibrationPattern(variant: .bottom) }
+                        .disabled(hasChanges || store.diagnosticRunning)
+                    Button("Рамка", systemImage: "square.dashed") {
+                        store.sendCalibrationPattern(variant: .frame)
                     }
-                    .disabled(hasChanges || !mechanicalFeedStable || !store.registrationVerified)
-                    .help("Сначала проверьте 5 одинаковых протяжек кнопкой Feed и подтвердите Feed TEST. Печатает только одну рамку.")
+                    .disabled(hasChanges || store.diagnosticRunning)
                 }
             }
             .padding(19)
@@ -148,7 +150,7 @@ struct CalibrationView: View {
 
             note("Материал может быть до 60 мм. Графическая команда ESC G печатает только первые 55 мм; заштрихованный правый край редактора не попадёт на бумагу. Для ширины ленты 56–60 мм уменьшать макет не требуется.")
             note("Эти значения изменяют текущий шаблон после сохранения. Если его объекты выходят за новые границы, сохранение будет отклонено.")
-            note("Сначала нужна стабильная протяжка на самом принтере: нажмите физическую кнопку Feed пять раз подряд. Каждое нажатие должно перемещать ровно одну наклейку с одинаковой остановкой. При разном результате проверяйте датчик просвета, чистоту и регулировку VR. Не крутите VR наугад: следуйте инструкции именно EZ-2.")
+            note("На конкретном EZ-2 физическая кнопка Feed может продвигать ленту на небольшое расстояние. Это не эквивалент программного FEED TEST и не критерий правильной подачи целой наклейки. Не меняйте VR без отдельной проверки датчика по инструкции именно EZ-2.")
         }
     }
 
@@ -188,25 +190,20 @@ struct CalibrationView: View {
             .font(.system(size: 13))
             .deskSurface()
 
-            VStack(alignment: .leading, spacing: 11) {
-                Text("Сначала датчик, потом ESC Q")
+            VStack(alignment: .leading, spacing: 9) {
+                Text("Сопоставимые контрольные отпечатки")
                     .font(.system(size: 14, weight: .semibold))
                     .foregroundStyle(DeskPalette.ink)
-                Text("1. Проверьте направляющие и расположение просвета над датчиком.")
-                Text("2. Нажмите физическую кнопку Feed 5 раз подряд, без печати из приложения.")
-                Text("3. Если остановка разная или лента перескакивает через наклейки — отрегулируйте/очистите датчик (VR) по руководству EZ-2. Изменение Q и X/Y здесь не поможет.")
-                Text("4. Только при одинаковой подаче разрешайте калибровочную рамку.")
-                Toggle("Пять нажатий Feed подряд дали одинаковую остановку", isOn: $mechanicalFeedStable)
-                    .font(.system(size: 12, weight: .semibold))
+                Text("1. Сохраните размер, зазор, Q и режим передачи.")
+                Text("2. Напечатайте «FEED: текст», затем «Начало», затем «Конец» — не меняя настройки.")
+                Text("3. Если начало совпадает, а конец уходит на соседнюю наклейку, проблема связана с печатью/подачей по всей высоте, а не с X/Y.")
+                Text("4. «Рамка» — окончательная проверка; она отправляет больше графических байт, но тем же способом.")
             }
             .font(.system(size: 12))
             .foregroundStyle(DeskPalette.secondary)
             .deskSurface()
-            if !mechanicalFeedStable {
-                note("Печать калибровочной рамки пока недоступна: сначала подтвердите стабильность механической подачи. Это не электронная проверка датчика — результат оценивается вручную.")
-            }
-                        note("Порядок: сохранить → нажать Feed TEST → убедиться, что лента дошла до начала следующей наклейки → подтвердить подачу. Не подтверждайте, если принтер остановился слишком рано или пропустил наклейку.")
-            note("Если ошибка повторяется на каждой наклейке, проверьте высоту, зазор и механический датчик. При ручной настройке Q изменяйте значение небольшими шагами и повторяйте тест.")
+            note("Механическая кнопка Feed у твоего принтера протягивает лишь небольшой участок ленты. Никакого обязательного теста «пять нажатий = пять наклеек» здесь больше нет.")
+            note("Если положение не повторяется, не подтверждайте правильную подачу и не пытайтесь компенсировать проблему X/Y. Проверяйте также материал и датчик зазора.")
         }
     }
 
@@ -245,7 +242,7 @@ struct CalibrationView: View {
                 }
             }
             .deskSurface()
-            note("Для материала шире 55 мм тестируетcя реальная растровая область до 55 мм, а не вся лента. Если рамка обрывается хаотично по высоте — вернитесь к датчику на этапе 2, не меняйте X/Y.")
+            note("Для материала шире 55 мм тестируется область до 55 мм, а не вся лента. Сначала сравните «Начало» и «Конец» с неизменными параметрами, затем печатайте рамку.")
             note("Если лента начинает печатать на предыдущей наклейке, сначала исправьте датчик и подачу на этапе 2. Здесь исправляется только расположение графики в пределах текущей этикетки.")
         }
     }

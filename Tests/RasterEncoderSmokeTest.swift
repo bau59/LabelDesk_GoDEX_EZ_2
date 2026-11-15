@@ -221,6 +221,42 @@ struct RasterEncoderSmokeTest {
                "55mm and 60mm media use the same safe 55mm printhead ruler")
         let targetPacket = try encoder.nativeCommands(for: target, profile: profile)
         assert(targetPacket.last == 0x0C)
-        print("EZ-2 raster, long-word wrap, text alignment, calibration target, Q/S and legacy compatibility passed.")
+
+        // FEED / top / bottom / frame must match in Q/q/S/M, raster line
+        // count and form-feed termination. Only graphic pixels are different.
+        let cases: [(String, LabelDocument)] = [
+            ("feed-text", EZ2CalibrationPattern.feedText(for: document)),
+            ("top", EZ2CalibrationPattern.make(for: document, variant: .top)),
+            ("bottom", EZ2CalibrationPattern.make(for: document, variant: .bottom)),
+            ("frame", target)
+        ]
+        let commonHeader = Array(targetPacket.prefix(header.count))
+        var encodedLengths: [Int] = []
+        for (name, sample) in cases {
+            let graphics = try LabelRasterizer().rasterize(sample, profile: profile)
+            assert(graphics.heightDots == raster.heightDots,
+                   "\(name) must use all label rows")
+            let bytes = [UInt8](try encoder.nativeCommands(for: sample, profile: profile))
+            encodedLengths.append(bytes.count)
+            assert(Array(bytes.prefix(commonHeader.count)) == commonHeader,
+                   "\(name) has different hardware settings from the frame")
+            var start = commonHeader.count
+            for y in 0..<graphics.heightDots {
+                assert(bytes[start] == 0x1B && bytes[start + 1] == 0x47,
+                       "\(name) missing raster row \(y)")
+                let countString = String(decoding: bytes[(start + 2)..<(start + 4)],
+                                         as: UTF8.self)
+                let length = Int(countString) ?? 0
+                assert((1...55).contains(length))
+                start += 4 + length
+            }
+            assert(start == bytes.count - 1 && bytes.last == 0x0C,
+                   "\(name) must have exactly one final form feed")
+        }
+        assert(encodedLengths[3] > encodedLengths[0],
+               "Full frame must have more bytes than short FEED text")
+        assert(encodedLengths[2] < encodedLengths[3],
+               "End marker must be smaller than a full-height frame")
+        print("EZ-2 raster, shared FEED/top/end/frame protocol, text and legacy compatibility passed.")
     }
 }
