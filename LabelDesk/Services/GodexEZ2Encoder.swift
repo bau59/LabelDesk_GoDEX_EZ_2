@@ -63,6 +63,28 @@ struct GodexEZ2Encoder {
         return Data(data)
     }
 
+    /// Original EZ-2 manual, label-paper Q table (height excludes the gap).
+    /// This is NOT the ESC q command, which receives height + gap in mm.
+    static func labelStopQ(heightMM: Int) -> Int {
+        let special: [Int: Int] = [
+            6:4, 7:48, 8:4, 9:24, 10:64, 11:32, 12:4,
+            13:72, 14:48, 15:24, 16:4, 17:112, 18:96, 19:80,
+            20:64, 21:48, 22:32, 23:16, 24:4, 25:184,
+            26:176, 27:168, 28:160, 29:152, 30:144, 31:136,
+            32:128, 33:120, 34:112, 35:104, 36:96, 37:88,
+            38:80, 39:72, 40:64, 41:56, 42:48, 43:40,
+            44:32, 45:24, 46:16, 47:8, 48:4
+        ]
+        return special[heightMM] ?? (heightMM >= 49 ? 384 : 4)
+    }
+
+    static func effectiveQ(for document: LabelDocument, profile: PrinterProfile) -> Int {
+        if profile.automaticTopOfForm {
+            return labelStopQ(heightMM: Int(document.heightMM.rounded()))
+        }
+        return max(4, min(999, profile.topOfFormDots))
+    }
+
     /// Each raster row is ESC Gnn, followed by nn raw binary bytes (1=black).
     /// ESC G maximum for EZ-2 is 55 bytes. Q/q are not interchangeable.
     func nativeCommands(for document: LabelDocument, profile: PrinterProfile) throws -> Data {
@@ -81,10 +103,11 @@ struct GodexEZ2Encoder {
         // with Q176. Omitting Q in full raster jobs caused paper to stop
         // immediately after the last graphic row on the user's EZ-2.
         // This is the measured working stop-position setting for this roll.
-        command(String(format: "Q%03d", max(4, min(999, profile.topOfFormDots))))
+        command(String(format: "Q%03d", Self.effectiveQ(for: document, profile: profile)))
         command(String(format: "q%03d", totalLength))
-        // EZ-2/4 2002 manual: S0 = 1 ips, S1 = 2 ips.
-        command("S\(profile.printSpeed.rawValue)")
+        // Original EZ-2 manual: S1 = 1 ips, S2 = 2 ips.
+        // Preserve enum 0/1 JSON raw values for existing saved profiles.
+        command("S\(profile.printSpeed.rawValue + 1)")
         switch profile.sensorMode {
         case .unchanged: break
         case .gap: command("F0")
