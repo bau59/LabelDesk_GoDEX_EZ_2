@@ -73,6 +73,10 @@ final class AppStore: ObservableObject {
     func selectFolder(_ id: UUID) {
         guard folders.contains(where: { $0.id == id }) else { return }
         selectedFolderID = id
+        if let base = baseTemplate {
+            document = base
+            selectedElementID = nil
+        }
         mode = .quick
         UserDefaults.standard.set(id.uuidString, forKey: "labeldeskLastFolder")
         prepareQuickValues()
@@ -81,6 +85,9 @@ final class AppStore: ObservableObject {
     func selectUngrouped() {
         selectedFolderID = nil
         mode = .editor
+        document = templates.first(where: { $0.folderID == nil }) ?? LabelDocument()
+        selectedElementID = nil
+        quickValues = [:]
         UserDefaults.standard.removeObject(forKey: "labeldeskLastFolder")
     }
 
