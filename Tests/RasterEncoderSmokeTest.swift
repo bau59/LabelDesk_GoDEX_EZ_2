@@ -67,7 +67,7 @@ struct RasterEncoderSmokeTest {
         } catch EZ2EncodingError.contentBeyondTestedHeight {}
 
         // Old settings remain readable; obsolete Q, pacing and X/Y have no effect.
-        let legacy = #"{\"portPath\":\"/dev/cu.usbserial-1430\",\"baudRate\":9600,\"flowControl\":\"None\",\"rasterTransport\":\"paced\",\"leftMarginMM\":18,\"topOfFormDots\":176}"#
+        let legacy = #"{"portPath":"/dev/cu.usbserial-1430","baudRate":9600,"flowControl":"None","rasterTransport":"paced","leftMarginMM":18,"topOfFormDots":176}"#
         let decoded = try JSONDecoder().decode(PrinterProfile.self, from: Data(legacy.utf8))
         assert(decoded.portPath == "/dev/cu.usbserial-1430")
         assert(decoded.labelIntervalSeconds == 1.5 && decoded.rasterThreshold == 128)
