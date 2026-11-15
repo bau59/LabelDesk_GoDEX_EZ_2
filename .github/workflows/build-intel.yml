@@ -1,0 +1,50 @@
+name: Build Intel macOS
+
+on:
+  push:
+    branches:
+      - main
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+jobs:
+  build-intel:
+    name: Build x86_64 .app and .dmg
+    runs-on: macos-15-intel
+    timeout-minutes: 25
+
+    steps:
+      - name: Check out source
+        uses: actions/checkout@v4
+
+      - name: Verify Intel build environment
+        shell: bash
+        run: |
+          set -euo pipefail
+          test "$(uname -m)" = "x86_64"
+          xcodebuild -version
+          swiftc --version
+
+      - name: Compile and package LabelDesk
+        shell: bash
+        run: |
+          set -euo pipefail
+          zsh Scripts/build-installer.sh
+          BIN="build/LabelDesk.app/Contents/MacOS/LabelDesk"
+          test -f "$BIN"
+          test "$(lipo -archs "$BIN")" = "x86_64"
+          plutil -lint build/LabelDesk.app/Contents/Info.plist
+          codesign --verify --deep --strict build/LabelDesk.app
+          ditto -c -k --keepParent build/LabelDesk.app build/LabelDesk-0.1.0-intel.zip
+
+      - name: Upload Intel packages
+        uses: actions/upload-artifact@v4
+        with:
+          name: LabelDesk-0.1.0-macOS-Intel
+          path: |
+            build/LabelDesk-0.1.0.dmg
+            build/LabelDesk-0.1.0-intel.zip
+          if-no-files-found: error
+          retention-days: 30
