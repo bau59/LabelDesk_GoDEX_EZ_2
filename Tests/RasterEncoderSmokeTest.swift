@@ -219,8 +219,8 @@ struct RasterEncoderSmokeTest {
         let wideCalibration = EZ2CalibrationPattern.make(for: wide)
         try LabelRasterizer.validate(wideCalibration)
         assert(wideCalibration.elements.allSatisfy { $0.xMM + $0.widthMM <= 55.001 })
-        assert(wideCalibration.elements.count > target.elements.count,
-               "60mm media uses the 55mm full-width ruler for test")
+        assert(wideCalibration.elements.count == target.elements.count,
+               "55mm and 60mm media use the same safe 55mm printhead ruler")
         let targetPacket = try encoder.nativeCommands(for: target, profile: profile)
         assert(targetPacket.last == 0x0C)
         print("EZ-2 raster, long-word wrap, text alignment, calibration target, Q/S and legacy compatibility passed.")
