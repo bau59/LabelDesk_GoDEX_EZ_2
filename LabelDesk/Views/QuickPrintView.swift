@@ -7,6 +7,8 @@ struct QuickPrintView: View {
     @EnvironmentObject private var store: AppStore
     @State private var batchText = ""
     @State private var batchFieldID: UUID?
+    @State private var showSaveVariant = false
+    @State private var variantName = ""
 
     var body: some View {
         HStack(spacing: 0) {
@@ -55,6 +57,11 @@ struct QuickPrintView: View {
                                 HStack {
                                     Button("Вернуть текст из шаблона") { store.prepareQuickValues() }
                                     Spacer()
+                                    Button("Сохранить как вариант…") {
+                                        variantName = (store.quickValues[store.quickFields.first?.id ?? UUID()] ?? "")
+                                            .trimmingCharacters(in: .whitespacesAndNewlines)
+                                        showSaveVariant = true
+                                    }
                                 }
                             }
                             .padding(8)
@@ -136,6 +143,27 @@ struct QuickPrintView: View {
             }
             .padding(18)
             .frame(maxWidth: .infinity, maxHeight: .infinity)
+        }
+        .sheet(isPresented: $showSaveVariant) {
+            VStack(alignment: .leading, spacing: 14) {
+                Text("Сохранить вариант этикетки").font(.headline)
+                Text("Базовый шаблон останется без изменений.")
+                    .foregroundStyle(.secondary)
+                TextField("Название варианта", text: $variantName)
+                    .textFieldStyle(.roundedBorder)
+                HStack {
+                    Button("Отмена") { showSaveVariant = false }
+                    Spacer()
+                    Button("Сохранить") {
+                        store.saveQuickVariant(named: variantName)
+                        showSaveVariant = false
+                    }
+                    .buttonStyle(.borderedProminent)
+                    .disabled(variantName.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty)
+                }
+            }
+            .padding(20)
+            .frame(width: 390)
         }
         .onAppear {
             batchFieldID = store.quickFields.first?.id
