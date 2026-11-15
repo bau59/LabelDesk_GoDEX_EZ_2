@@ -12,6 +12,7 @@ struct LabelDocument: Codable, Identifiable, Equatable {
     var updatedAt = Date()
 
     var printableWidthMM: Double { min(widthMM, 55) }
+    var unprintableRightMM: Double { max(0, widthMM - printableWidthMM) }
     var isWithinPrinterWidth: Bool { widthMM <= 55 }
 }
 
@@ -26,7 +27,8 @@ struct LabelPreset: Identifiable, Hashable {
         LabelPreset(widthMM: 30, heightMM: 20), LabelPreset(widthMM: 40, heightMM: 20),
         LabelPreset(widthMM: 40, heightMM: 30), LabelPreset(widthMM: 50, heightMM: 25),
         LabelPreset(widthMM: 50, heightMM: 30), LabelPreset(widthMM: 50, heightMM: 40),
-        LabelPreset(widthMM: 55, heightMM: 30)
+        LabelPreset(widthMM: 55, heightMM: 30),
+        LabelPreset(widthMM: 56, heightMM: 30), LabelPreset(widthMM: 60, heightMM: 30)
     ]
 }
 
