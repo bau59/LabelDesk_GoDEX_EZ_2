@@ -136,6 +136,29 @@ final class PrintQueueService: ObservableObject {
                     return
                 }
             }
+            // One sensor-mediated buffered blank label AFTER all copies.
+            // Keep this separate from the Line Mode raster session.
+            do {
+                await diagnostics.record("blank separator begin", jobID: job.id,
+                    details: "buffered space label: F0 q040 M01 B A11 [space] CR E P01")
+                try port.advanceAfterJob(encoder.blankSeparatorCommands(),
+                                         intervalSeconds: profile.labelIntervalSeconds,
+                                         profile: profile) { stage in
+                    Task { @MainActor in
+                        diagnostics.record("blank separator", jobID: job.id, details: stage)
+                    }
+                }
+                await diagnostics.record("blank separator sent", jobID: job.id,
+                    details: "buffered P01 TX drained; physical position not confirmed")
+            } catch {
+                await diagnostics.record("tear feed FAILED", jobID: job.id,
+                    details: error.localizedDescription)
+                await self.finish(job.id, state: .uncertain,
+                    error: "Изображение передано, но пустая разделительная этикетка могла не выйти. Проверьте бумагу перед повтором. " + error.localizedDescription,
+                    profile: profile)
+                return
+            }
+
             await diagnostics.record("sent to port", jobID: job.id,
                 details: "copies=\(job.copies) totalElapsed=\(String(format: "%.2f", Date().timeIntervalSince(started)))s. Printer has not confirmed paper output.")
             await self.finish(job.id, state: .sent, error: nil, profile: profile)

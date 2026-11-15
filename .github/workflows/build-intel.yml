@@ -7,6 +7,7 @@ on:
       - fix/calibration-parity-0.9.2
       - fix/verified-line-printing
       - fix/line-feed-and-raster-size-094
+      - fix/ez2-job-tear-feed-095
   workflow_dispatch:
 
 permissions:
@@ -178,4 +179,4 @@ jobs:
             --repo "$GITHUB_REPOSITORY" \
             --target "$GITHUB_SHA" \
             --title "LabelDesk ${APP_VERSION}" \
-            --notes "Intel macOS 15+. Fix label feed regression: repeat F0/q040/M01 at the beginning of the Line Mode stream and keep the serial connection open across the batch, matching the successful terminal print test. Compact short text rasters (Gnn, only occupied rows) instead of unconditionally sending 280 full-width rows. Configurable label interval unchanged. Needs physical verification on the EZ-2 before batch use. Ad-hoc signed; not notarized."
+            --notes "Intel macOS 15+. End each print job with a tested blank buffered EZ-2 label (F0/q040/M01/B/A11 SPACE/CR/E/P01), after a configurable delay. Keep Line Mode serial output across copies, close it before buffered separator, then reopen with F0/q040/M01 for the next job. No forced-distance f29/f11. Reverse ESC Rnn remains disabled. Physical verification of the combined workflow required. Ad-hoc signed; not notarized."

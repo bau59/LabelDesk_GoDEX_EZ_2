@@ -7,6 +7,7 @@ enum SerialPortError: LocalizedError {
     case configurationFailed(String)
     case writeFailed(String)
     case invalidRaster
+    case noActiveSeries
 
     var errorDescription: String? {
         switch self {
@@ -15,6 +16,7 @@ enum SerialPortError: LocalizedError {
         case .configurationFailed(let detail): "Не удалось настроить RS-232: \(detail)"
         case .writeFailed(let detail): "Ошибка передачи RS-232: \(detail)"
         case .invalidRaster: "Неверная структура графических команд EZ-2."
+        case .noActiveSeries: "Нет открытой последовательной серии для протяжки ленты."
         }
     }
 }
@@ -119,6 +121,57 @@ final class SerialPortService {
             try drain(linePort)
             previousLabelSentAt = Date()
             onProgress?("TX drained; physical print is not acknowledged")
+        } catch {
+            resetLocked()
+            throw error
+        }
+    }
+
+    /// After all copies of a job, run the confirmed blank buffered label.
+    /// Keep Line Mode on a single port while printing copies; switch to
+    /// buffered mode only after the prior FF has drained and the configured
+    /// interval has elapsed. Closing/reopening isolates the two modes.
+    func advanceAfterJob(_ commands: Data, intervalSeconds: Double,
+                         profile: PrinterProfile,
+                         onProgress: ((String) -> Void)? = nil) throws {
+        lock.lock()
+        defer { lock.unlock() }
+
+        guard seriesInitialized, linePort >= 0 else {
+            throw SerialPortError.noActiveSeries
+        }
+        guard commands == GodexEZ2Encoder().blankSeparatorCommands() else {
+            throw SerialPortError.writeFailed("Неверный пакет пустой этикетки.")
+        }
+
+        do {
+            if let previous = previousLabelSentAt {
+                let remaining = intervalSeconds - Date().timeIntervalSince(previous)
+                if remaining > 0 {
+                    onProgress?("waiting before blank label \(String(format: "%.2f", remaining))s")
+                    Thread.sleep(forTimeInterval: remaining)
+                }
+            }
+
+            // Serial drain has completed in sendLabel. Close the Line Mode
+            // connection before sending the confirmed buffered P01 job.
+            close(linePort)
+            linePort = -1
+
+            onProgress?("blank separator: buffered F0 q040 M01 B A11 [space] CR E P01")
+            let fd = try openConfiguredPort(profile.portPath)
+            do {
+                try sendBytes(commands, to: fd, chunkSize: commands.count)
+                try drain(fd)
+            } catch {
+                close(fd)
+                throw error
+            }
+            close(fd)
+            previousLabelSentAt = Date()
+            // The next job reopens Line Mode and sends its F0/q040/M01 setup;
+            // T3 startup must NOT repeat within the same queue run.
+            onProgress?("blank label command sent; next label position unconfirmed")
         } catch {
             resetLocked()
             throw error

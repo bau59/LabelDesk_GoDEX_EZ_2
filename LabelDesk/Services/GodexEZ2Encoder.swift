@@ -36,6 +36,22 @@ struct GodexEZ2Encoder {
         Data([0x1B, 0x46, 0x30, 0x1B, 0x71, 0x30, 0x34, 0x30, 0x1B, 0x4D, 0x30, 0x31])
     }
 
+    /// Physically tested on the EZ-2 as a standalone job: a buffered
+    /// label with a single ASCII space advances the stock to the next label.
+    /// Must be sent on a separate serial connection, outside Line Mode.
+    func blankSeparatorCommands() -> Data {
+        Data([
+            0x1B, 0x46, 0x30,              // ESC F0
+            0x1B, 0x71, 0x30, 0x34, 0x30,  // ESC q040
+            0x1B, 0x4D, 0x30, 0x31,        // ESC M01
+            0x1B, 0x42,                    // ESC B
+            0x1B, 0x41, 0x31, 0x31,        // ESC A11
+            0x20, 0x0D,                    // space + CR
+            0x1B, 0x45,                    // ESC E
+            0x1B, 0x50, 0x30, 0x31         // ESC P01
+        ])
+    }
+
     /// Each line has the SAME ESC Gnn width. Choose the smallest width containing
     /// all non-white pixels. Send only down to the last ink row, rounded up to
     /// whole millimeters, with a minimum of 32 rows (the tested short-label case).

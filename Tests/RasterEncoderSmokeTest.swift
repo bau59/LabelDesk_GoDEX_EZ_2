@@ -24,6 +24,21 @@ struct RasterEncoderSmokeTest {
             0x1B, 0x4D, 0x30, 0x31
         ], "Line Mode header must match the successful Python batch")
 
+        // Verified physically as a standalone blank label in buffered mode.
+        // The separator must be identical to the successful Python packet,
+        // not a fixed-distance motor feed.
+        assert(Array(encoder.blankSeparatorCommands()) == [
+            0x1B, 0x46, 0x30,              // ESC F0
+            0x1B, 0x71, 0x30, 0x34, 0x30,  // ESC q040
+            0x1B, 0x4D, 0x30, 0x31,        // ESC M01
+            0x1B, 0x42,                    // ESC B
+            0x1B, 0x41, 0x31, 0x31,        // ESC A11
+            0x20, 0x0D,                    // ASCII space + CR
+            0x1B, 0x45,                    // ESC E
+            0x1B, 0x50, 0x30, 0x31         // ESC P01
+        ], "Blank separator must exactly match physical test")
+
+
         func checkPacket(_ data: Data, rows expectedRows: Int,
                          width expectedWidth: Int, raster: LabelRaster) {
             let bytes = [UInt8](data)
@@ -109,6 +124,6 @@ struct RasterEncoderSmokeTest {
                                                 from: JSONEncoder().encode(tuned))
         assert(decoded.labelIntervalSeconds == 0.8)
 
-        print("EZ-2 T3 startup, repeated F0/q040/M01, adaptive Gnn and FF passed.")
+        print("EZ-2 startup, Gnn/FF and buffered blank P01 separator passed.")
     }
 }
