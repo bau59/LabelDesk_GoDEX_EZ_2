@@ -29,6 +29,33 @@ concurrency:
   cancel-in-progress: true
 
 jobs:
+  web-smoke:
+    name: Validate WebKit UI and printer packets (Node)
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: "22"
+      - name: Verify JavaScript and interfaces without macOS hardware
+        shell: bash
+        run: |
+          set -euo pipefail
+          node --check LabelDesk/Resources/app.js
+          node --check LabelDesk/Resources/dish-controller.js
+          node --check LabelDesk/Resources/dish-engine.js
+          node --check LabelDesk/Resources/text-engine.js
+          node --check LabelDesk/Resources/raster.js
+          python3 -c "import pathlib,re; s=pathlib.Path('LabelDesk/Resources/editor.html').read_text(); m=re.search(r'<script>(.*?)</script>',s,re.S); assert m; pathlib.Path('/tmp/label-editor.js').write_text(m.group(1))"
+          node --check /tmp/label-editor.js
+          node Tests/WebRasterSmoke.js
+          node Tests/MediaCompatibilitySmoke.js
+          node Tests/SidebarWorkflowSmoke.js
+          node Tests/DishCatalogSmoke.js
+          node Tests/BarcodesNativeSmoke.js
+          node Tests/CP866FoodSmoke.js
+          node Tests/EditorGeometrySmoke.js
+
   build-intel:
     name: Build x86_64 .app and .dmg
     runs-on: macos-15-intel
@@ -192,7 +219,7 @@ jobs:
 
   publish-release:
     name: Publish versioned GitHub Release
-    needs: build-intel
+    needs: [build-intel, web-smoke]
     if: github.event_name == 'push' && github.ref == 'refs/heads/main'
     runs-on: ubuntu-latest
     permissions:
