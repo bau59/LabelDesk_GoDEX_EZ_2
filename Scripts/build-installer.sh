@@ -64,7 +64,7 @@ done
 iconutil -c icns "$ICONSET" -o "$APP/Contents/Resources/LabelDesk.icns"
 rm -rf "$ICONSET"
 cp "$ROOT/Scripts/install-update.sh" "$APP/Contents/Resources/install-update.sh"
-for file in app.html app.js editor.html barcodes.js native.js text-engine.js food-presets.js dish-engine.js dish-controller.js raster.js; do
+for file in app.html app.js editor.html barcodes.js native.js text-engine.js food-presets.js dish-engine.js dish-controller.js raster.js diagnostics.js; do
 
   cp "$ROOT/LabelDesk/Resources/$file" "$APP/Contents/Resources/$file"
 done
