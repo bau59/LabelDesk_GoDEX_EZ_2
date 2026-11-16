@@ -1,6 +1,6 @@
 # LabelDesk — original GoDEX EZ-2 on macOS (WebKit + zsh)
 
-**1.0.8 WebKit/zsh release (simplified template folders, copy steppers, text margins).** No Node.js, Python, pip, npm, HTTP server or external dependencies are needed on the user's Mac. The system frameworks AppKit/WebKit and system commands `/bin/zsh`, `/bin/stty`, `/bin/cat` and `printf` handle the application and RS-232.
+**1.0.9 WebKit/zsh release (dedicated printing, catalog folders, native app icon).** No Node.js, Python, pip, npm, HTTP server or external dependencies are needed on the user's Mac. The system frameworks AppKit/WebKit and system commands `/bin/zsh`, `/bin/stty`, `/bin/cat` and `printf` handle the application and RS-232.
 
 ## Runtime layout
 
@@ -25,6 +25,7 @@ After the initial macOS installation, the following files are copied into the us
 ├── templates/          # existing UUID JSON templates, untouched
 ├── folders.json        # existing logical folders, untouched
 ├── items.json          # universal catalog (new writes in 1.0.7)
+├── itemFolders.json     # catalog folders (new in 1.0.9)
 ├── dishes.json         # legacy catalog kept for safe fallback (1.0.6)
 ├── queue.json          # existing queue and job history, untouched
 ├── settings.json       # existing port and printer options, untouched
@@ -45,6 +46,14 @@ On installation/update, bundled runtime files overwrite the local version **only
 - **Storage:** new writes go to \`items.json\`. If it is absent, the app loads old \`dishes.json\` records as food-type positions. Only after the first save is \`items.json\` created; \`dishes.json\` is **not deleted or modified**. Existing UUID templates, folders, settings, and print queue files remain untouched.
 - **Navigation:** the left vertical sidebar contains Catalog, Label Editor, Print Queue and Settings. The Catalog sidebar lists positions; the Editor sidebar lists saved template folders and layouts. Folder/template management actions are collapsed unless opened. The old one-off Quick Fill tab is no longer exposed; its internal compatibility code remains to avoid breaking previous data. Sidebar and layer-panel widths can still be adjusted independently.
 - **Runtime constraints:** no app-time Node/Python/npm, no network storage, and no changes to the tested GoDEX EZ-2 text/CP866 or raster/serial transport. Verify first labels physically on the installed roll before production printing.
+
+## Print batches, catalog folders, application icon (1.0.9)
+
+The **Каталог** page is for maintaining saved items. Saved positions can be assigned to catalog folders with the **Папки каталога → ＋** control or the folder chips in the item card. Folders are stored separately in `itemFolders.json` and do not interfere with the label template folders in `folders.json`. Renaming does not change item IDs. Deleting a folder moves its items to **Без папки**, never deleting the positions; the application attempts a rollback if the category-file write fails.
+
+**Печать позиций** is now a separate top-level page. Its search and folder filters are independent of catalog browsing. Select multiple items (including across folders), configure production date, expiration override, batch code, quantities, and per-item templates. **Дополнить** expands an individual row so that any standard field can be temporarily changed or missing custom fields can be added. The queued document uses a snapshot of these temporary edits; the original item and template files remain unchanged. **Подготовить печать →** validates and persists the batch atomically, then opens the existing **Очередь** page where the user explicitly starts the physical print. This avoids accidentally printing old pending jobs.
+
+The Intel Mac installer now includes `LabelDesk.icns`, generated at build time from `Scripts/make-icon.swift` with all expected 16–1024 px iconset representations. `CFBundleIconFile` points to that icon for Finder/Dock. Printer command transport and print dimensions are unchanged.
 
 ## Simple template library (1.0.8)
 
