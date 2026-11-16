@@ -198,6 +198,11 @@ body[data-editor-mode="text"] #label{border-color:#c0c8d2}
  padding:10px;margin:12px 0}
 .frame-help{background:#f6f8fa;padding:12px;border-radius:9px;color:#546174;font-size:11px}
 
+
+.zoom-controls{display:flex;gap:4px;align-items:center;white-space:nowrap}
+.zoom-controls button{font-size:11px;padding:6px 9px}
+.zoom-controls span{min-width:38px;text-align:center;font-size:11px;color:#677589}
+.layer-picker,.layer-width-control{display:none!important}
 </style>
 </head>
 <body>
@@ -236,7 +241,7 @@ body[data-editor-mode="text"] #label{border-color:#c0c8d2}
       <div class="divider"></div>
      <button id="undo" title="Отменить · ⌘Z">↶</button>
      <button id="redo" title="Повторить · ⌘⇧Z">↷</button>
-     <label>Масштаб <select id="zoom"><option value="fit" selected>Вписать</option><option value="6">6×</option><option value="8">8×</option><option value="10">10×</option><option value="12">12×</option><option value="16">16×</option></select></label>
+     <div class="zoom-controls"><button id="zoomFit" type="button" title="Вписать всю этикетку">Вписать</button><button id="zoomMinus" type="button" title="Уменьшить">−</button><span id="zoomIndicator" aria-live="polite">Авто</span><button id="zoomPlus" type="button" title="Увеличить">+</button></div>
    </div>
    <div id="desk"><div id="label" aria-label="Макет этикетки"><div id="grid"></div></div></div>
    <div id="foot">Щёлкните по объекту или слою для выбора · перетащите для перемещения · тяните за угол для размера · двойной щелчок — текст · стрелки — точное движение</div>
@@ -484,6 +489,7 @@ function renderCanvas(){
  el.style.width=(width*zoom)+"px";el.style.height=(height*zoom)+"px";
  $("grid").style.backgroundImage="linear-gradient(to right,#0000000d 1px,transparent 1px),linear-gradient(to bottom,#0000000d 1px,transparent 1px)";
  $("grid").style.backgroundSize=zoom+"px "+zoom+"px";
+ $("zoomIndicator").textContent=zoomMode==="fit"?"Авто":zoom.toFixed(1)+"×";
  if(doc.printMode==="text"&&window.EZ2Text){
    renderTextFlow(el,zoom,width);
    return;
@@ -1025,7 +1031,9 @@ $("docname").addEventListener("focus",()=>{if(doc)checkpoint();});
 $("docname").addEventListener("input",function(){if(!doc)return;doc.name=this.value;commit();});
 $("label").addEventListener("click",ev=>{ev.stopPropagation();setSelected(null);});
 $("docSettings").addEventListener("click",()=>setSelected(null));
-$("zoom").addEventListener("change",function(){zoomMode=this.value;if(zoomMode!=="fit")zoom=Number(this.value);renderCanvas();});
+$("zoomFit").addEventListener("click",()=>{zoomMode="fit";renderCanvas();});
+$("zoomMinus").addEventListener("click",()=>{zoomMode="manual";zoom=Math.max(3,zoom-1.5);renderCanvas();});
+$("zoomPlus").addEventListener("click",()=>{zoomMode="manual";zoom=Math.min(24,zoom+1.5);renderCanvas();});
 
 window.addEventListener("resize",()=>{if(zoomMode==="fit")renderCanvas();});
 $("up").onclick=()=>moveLayer(1);$("down").onclick=()=>moveLayer(-1);
