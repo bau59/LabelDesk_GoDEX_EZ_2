@@ -157,6 +157,13 @@ body[data-editor-mode="raster"] .mode-toolset[data-mode-tools="raster"]{display:
 .editor-mode-indicator{white-space:nowrap;border:1px solid #dae2eb;background:#f5f7fa;
  border-radius:7px;padding:8px 10px;color:#4d5e72;font-size:11px;font-weight:650}
 body[data-editor-mode="text"] #desk{background:#edf0f4}
+body[data-editor-mode="text"] #layerPicker,
+body[data-editor-mode="text"] #layersWidth{display:none}
+.layout{grid-template-columns:var(--layer-width,225px) minmax(265px,1fr) minmax(285px,320px)}
+.layout.layers-hidden{grid-template-columns:0 minmax(265px,1fr) minmax(285px,320px)}
+.font-cards+details{margin-top:12px}
+#props details summary{font-size:12px;color:#596b80;font-weight:650;cursor:pointer;margin:11px 0}
+
 body[data-editor-mode="text"] #grid{opacity:.2}
 body[data-editor-mode="text"] #label{border-color:#c0c8d2}
 .text-preview-row{position:absolute;z-index:2;overflow:visible;cursor:pointer}
@@ -288,7 +295,8 @@ function newElem(kind){
  checkpoint();doc.elements.push(e);selected=e.id;draw();commit();
 }
 function moveLayer(delta){
- if(!doc)return;let index=doc.elements.findIndex(e=>e.id===selected);let dest=index+delta;
+ if(!doc)return;let index=doc.elements.findIndex(e=>e.id===selected);
+ let dest=index+(doc.printMode==="text"?-delta:delta);
  if(index<0||dest<0||dest>=doc.elements.length)return;
  checkpoint();let item=doc.elements.splice(index,1)[0];doc.elements.splice(dest,0,item);draw();commit();
 }
@@ -305,7 +313,7 @@ function labelFor(e){
 function renderLayers(){
  const root=$("layers");root.replaceChildren();
  if(!doc||!doc.elements.length){let p=document.createElement("p");p.className="empty";p.textContent="Пока нет объектов. Добавьте текст или штрихкод.";root.appendChild(p);}
- else doc.elements.slice().reverse().forEach(function(e){
+ else (doc.printMode==="text"?doc.elements:doc.elements.slice().reverse()).forEach(function(e){
    const b=document.createElement("button");b.type="button";b.className="layer"+(selected===e.id?" selected":"");b.title="Выделить объект";
    const glyph=document.createElement("span");glyph.className="glyph";glyph.textContent={text:"T",barcode:"▥",line:"━",rectangle:"▢",textFrame:"▣"}[e.kind];
    const name=document.createElement("span");name.className="label";name.textContent=labelFor(e);
@@ -315,7 +323,7 @@ function renderLayers(){
  $("leftPanelTitle").textContent=doc?.printMode==="text"?"Строки":"Слои";
   const picker=$("layerPicker");picker.replaceChildren();
   if(doc){
-   doc.elements.slice().reverse().forEach(e=>{
+   (doc.printMode==="text"?doc.elements:doc.elements.slice().reverse()).forEach(e=>{
     const option=document.createElement("option");
     option.value=e.id;option.textContent=labelFor(e);
     picker.appendChild(option);
@@ -323,8 +331,9 @@ function renderLayers(){
   }
   picker.value=selected||"";picker.disabled=!doc?.elements.length;
  const pos=doc?doc.elements.findIndex(e=>e.id===selected):-1;
- $("up").disabled=pos<0||pos===doc.elements.length-1;
- $("down").disabled=pos<=0;
+  const ordered=doc?.printMode==="text";
+ $("up").disabled=pos<0||(ordered?pos===0:pos===doc.elements.length-1);
+ $("down").disabled=pos<0||(ordered?pos===doc.elements.length-1:pos===0);
  $("clone").disabled=pos<0;$("remove").disabled=pos<0;
 }
 function barcodeSVG(item,width,height){
@@ -879,7 +888,7 @@ function draw(){
  $("editorModeIndicator").textContent=doc.printMode==="text"?"Текст CP866":"Растр XY";
  $("propsTitle").textContent=selectedObj()?(doc.printMode==="text"?"Настройки строки":"Свойства объекта"):"Настройки макета";
  $("foot").textContent=doc.printMode==="text"?
-   "Текст CP866: порядок слоёв определяет порядок строк. Стрелки меняют порядок; Y автоматически задаётся принтером. Эскиз приблизительный.":
+   "Текст CP866: строки отображаются и печатаются сверху вниз. Стрелки меняют их порядок; X/Y свободно не задаются. Форма букв приблизительная.":
    "Растр: перемещайте и масштабируйте объекты, точные координаты X/Y будут сохранены.";
  renderLayers();renderCanvas();renderProps();
  $("undo").disabled=!history.length;$("redo").disabled=!future.length;
@@ -897,7 +906,7 @@ window.labelDeskLoad=function(next){
  if(!next||!Array.isArray(next.elements))return;
  const previousSelected=selected?.toLowerCase();
  doc=clone(next);const same=doc.elements.find(e=>e.id.toLowerCase()===previousSelected);
- selected=same?same.id:(doc.elements.length?doc.elements[doc.elements.length-1].id:null);history=[];future=[];draw();
+ selected=same?same.id:null;history=[];future=[];draw();
 };
 document.querySelectorAll("[data-add]").forEach(b=>b.addEventListener("click",()=>newElem(b.dataset.add)));
 $("docname").addEventListener("focus",()=>{if(doc)checkpoint();});
