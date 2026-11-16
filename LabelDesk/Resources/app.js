@@ -741,7 +741,7 @@
       });
       state.profile={...defaultProfile(),...(info.settings?.profile||{})};
       state.settingsSnapshot=info.settings||{schemaVersion:1,snapToGrid:true};
-       dishesController?.bootstrap(info.items??info.dishes,info.itemFolders);
+       dishesController?.bootstrap(info.items??info.dishes,info.itemFolders,info.printPresets);
       state.runtimePath=info.runtimePath||"";
       const hadUserTemplates=state.templates.length>0;
       const originalFirst=state.templates.slice().sort((a,b)=>
