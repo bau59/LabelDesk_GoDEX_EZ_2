@@ -410,6 +410,25 @@
     // Named buttons and delegated table events are independent from the legacy template UI.
     for(const id of ["newDish","newDishMain"])$(id).addEventListener("click",newDish);
     $("saveDish").addEventListener("click",saveDish);
+    $("addItemFolder").addEventListener("click",createFolder);
+    $("printSearch").addEventListener("input",e=>{
+      printSearch=String(e.target.value||"").trim();
+      renderBatch();
+    });
+    $("itemFolderPicker").addEventListener("click",e=>{
+      const button=e.target.closest("[data-assign-item-folder]");
+      if(!button)return;
+      const id=button.dataset.assignItemFolder;
+      draft.folderID=id==="unfiled"?null:validFolder(id);
+      dirty=true;renderFolderPicker();
+      $("dishFormHint").textContent="Есть несохранённые изменения";
+    });
+    $("printFolderFilters").addEventListener("click",e=>{
+      const button=e.target.closest("[data-print-folder]");
+      if(!button)return;
+      printFolderID=button.dataset.printFolder;
+      renderBatch();
+    });
     $("addCustomField").addEventListener("click",()=>{
       if(!draft)draft=fresh();
       if(!Array.isArray(draft.customFields))draft.customFields=[];
@@ -457,6 +476,22 @@
       pickerFor=null;renderBatch();
       if(previewID)previewDish(previewID);
     });
+    $("dishBatchRows").addEventListener("input",e=>{
+      const el=e.target,id=el.dataset.dishId;
+      if(!id)return;
+      const dish=findDish(id);
+      if(!dish)return;
+      const edit=rowEdit(dish);
+      if(el.dataset.rowValue!==undefined){
+        edit.values[el.dataset.rowValue]=el.value;
+      }else if(el.dataset.rowExtraName!==undefined){
+        const f=edit.extras[Number(el.dataset.rowExtraName)];
+        if(f)f.name=el.value;
+      }else if(el.dataset.rowExtraValue!==undefined){
+        const f=edit.extras[Number(el.dataset.rowExtraValue)];
+        if(f)f.value=el.value;
+      }
+    });
     $("dishBatchRows").addEventListener("change",e=>{
       const target=e.target,id=target.dataset.dishSelect;
       if(id){if(target.checked)selected.add(id);else selected.delete(id);}
@@ -471,6 +506,32 @@
     });
     $("dishBatchRows").addEventListener("click",e=>{
       const target=e.target;
+      const openDetail=target.closest("[data-open-detail]");
+      if(openDetail){detailFor=detailFor===openDetail.dataset.openDetail?null:openDetail.dataset.openDetail;
+        pickerFor=null;renderBatch();return;}
+      const closeDetail=target.closest("[data-close-detail]");
+      if(closeDetail){detailFor=null;renderBatch();return;}
+      const addExtra=target.closest("[data-row-extra-add]");
+      if(addExtra){
+        const d=findDish(addExtra.dataset.rowExtraAdd);
+        if(!d)return;
+        const edit=rowEdit(d);
+        if(edit.extras.length>=40){note("Максимум 40 дополнительных полей",true);return;}
+        edit.extras.push({id:uuid(),name:"",value:""});
+        renderBatch();return;
+      }
+      const removeExtra=target.closest("[data-row-extra-remove]");
+      if(removeExtra){
+        const id=removeExtra.dataset.dishId,d=findDish(id);
+        if(!d)return;
+        const edit=rowEdit(d),index=Number(removeExtra.dataset.rowExtraRemove);
+        if(Number.isInteger(index)&&index>=0&&index<edit.extras.length){
+          edit.extras.splice(index,1);renderBatch();
+        }
+        return;
+      }
+      const reset=target.closest("[data-reset-overrides]");
+      if(reset){delete rowEdits[reset.dataset.resetOverrides];renderBatch();return;}
       const step=target.closest("[data-copy-step]");
       if(step){
         const id=step.dataset.dishId,delta=Number(step.dataset.copyStep);
@@ -498,12 +559,29 @@
     for(const id of ["batchProducedAt","batchExpiresAt","batchCode"])
       $(id).addEventListener("change",()=>{if(previewID)previewDish(previewID);});
     document.body.addEventListener("click",e=>{
+      const catalogFolder=e.target.closest("[data-catalog-folder]");
+      if(catalogFolder){
+        catalogFolderID=catalogFolder.dataset.catalogFolder;
+        renderSidebar();return;
+      }
+      const rename=e.target.closest("[data-item-folder-rename]");
+      if(rename){renameFolder(rename.dataset.itemFolderRename);return;}
+      const remove=e.target.closest("[data-item-folder-delete]");
+      if(remove){deleteFolder(remove.dataset.itemFolderDelete);return;}
       const open=e.target.closest("[data-dish-open]");
       if(open){openDish(open.dataset.dishOpen);return;}
       const preview=e.target.closest("[data-dish-preview]");
       if(preview){previewDish(preview.dataset.dishPreview);}
     });
-    return {bootstrap,render,renderPrint};
+    function selectCurrentForPrint(){
+      const item=findDish(chosenID);
+      if(!item){note("Сначала сохраните позицию",true);return false;}
+      if(dirty){note("Сначала сохраните изменения карточки",true);return false;}
+      selected.add(item.id);
+      renderBatch();
+      return true;
+    }
+    return {bootstrap,render,renderPrint,selectCurrentForPrint};
   }
   root.EZ2DishController={create};
 })(typeof window!=="undefined"?window:globalThis);
