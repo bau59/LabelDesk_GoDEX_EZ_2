@@ -19,6 +19,7 @@ on:
       - feat/dual-editor-font-preview-110
       - feat/clear-catalog-print-library-111
       - feat/compact-print-presets-framed-text-112
+      - feat/print-calibration-backup-ui-113
   workflow_dispatch:
 
 permissions:
@@ -56,6 +57,7 @@ jobs:
           node Tests/BarcodesNativeSmoke.js
           node Tests/CP866FoodSmoke.js
           node Tests/EditorGeometrySmoke.js
+          node Tests/PrinterDiagnosticsSmoke.js
 
   build-intel:
     name: Build x86_64 .app and .dmg
