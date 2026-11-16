@@ -69,7 +69,7 @@
     const doc=JSON.parse(JSON.stringify(template));
     const elements=[];
     for(const element of doc.elements){
-      if(!["text","barcode"].includes(element.kind)||element.isVariable===false){
+      if(!["text","barcode","textFrame","framedText"].includes(element.kind)||element.isVariable===false){
         elements.push(element);continue;
       }
       // An unnamed literal variable stays as authored for backward compatibility.
