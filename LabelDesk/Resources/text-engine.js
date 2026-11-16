@@ -193,7 +193,7 @@
           throw Error("Позиция Mnn за областью печати");
         if((position-1)*8+Array.from(line).length*f.widthDots>PRINTABLE_DOTS-margins.right*8)
           throw Error("Строка выходит за 55 мм печати: "+line);
-        rows.push({kind:"text",text:line,font:f,margin:position,element:el});
+        rows.push({kind:"text",text:line,font:f,margin:position,element:el,reverse:el.reversePrint===true});
         usedDots+=f.heightDots;
       }
     }
