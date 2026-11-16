@@ -118,7 +118,7 @@ async function save(name){
  $("customFields").fire("input",{dataset:{customName:"0"},value:"Артикул"});
  $("customFields").fire("input",{dataset:{customValue:"0"},value:"SKU-17"});
  await $("saveDish").fire("click");
- assert.equal(persisted.items[0].customFields[0].name,"Артикул");
- assert.equal(persisted.items[0].customFields[0].value,"SKU-17");
+ assert.equal(persisted.items.find(d=>d.id===id).customFields[0].name,"Артикул");
+ assert.equal(persisted.items.find(d=>d.id===id).customFields[0].value,"SKU-17");
  console.log("Item catalog smoke passed: migration-safe saves, custom fields, omitted blanks, mixed templates and atomic queue.");
 })().catch(e=>{console.error(e);process.exitCode=1;});
