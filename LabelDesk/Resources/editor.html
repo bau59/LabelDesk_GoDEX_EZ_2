@@ -105,6 +105,46 @@ strong{font-size:14px;display:block;margin-bottom:14px}
 .checkbox{display:flex;align-items:center;gap:8px;cursor:pointer;color:var(--fg)}
 .checkbox input{width:auto;accent-color:var(--accent)}
 
+
+/* Editorial editor panels aligned with the catalog. Does not alter geometry. */
+:root{--bg:#f8f9fb;--panel:#fff;--surface:#f5f6f8;--line:#e3e7ee;
+  --fg:#19212b;--muted:#7c8795;--accent:#111827;--accent-soft:#f0f2f6;
+  font:13px -apple-system,BlinkMacSystemFont,"Helvetica Neue",sans-serif}
+button{border-color:#dce2ea;color:#263240;border-radius:8px;font-weight:560}
+button:hover{background:#f5f7f9;border-color:#cbd4df}
+input,textarea,select{border-color:#d8dfe8;border-radius:8px;padding:10px}
+input:focus,textarea:focus,select:focus{outline-color:#8793a6;border-color:#111827}
+.panelhead{font-size:13px;font-weight:720;height:54px;padding:18px;
+  letter-spacing:-.2px;color:#172231}
+.layer{font-size:12px;border-radius:8px;padding:11px 10px;margin:2px 0}
+.layer .label{font-weight:540;color:#667386}
+.layer.selected{border-color:#dce1e8;background:#f0f2f6}
+.layer.selected .label{color:#121a26}
+.layer .glyph{color:#344254;background:#f0f2f6;border-radius:7px}
+.layerbottom{padding:12px;border-color:#e9edf2}
+.tools{padding:12px 15px;border-color:#e7ebef;background:#fff;gap:8px}
+.tools button[data-add]{border-color:#dce3eb;background:#fff;font-size:12px}
+.tools label{font-size:11px;color:#718092}
+.tools select{font-size:11px}
+#desk{background:radial-gradient(circle at 50% 35%,#ffffff,#f1f3f6 75%)}
+#label{border:1px solid #b4bfcd;box-shadow:0 16px 34px #11182716}
+.obj.sel{outline-color:#111827}
+.obj.sel:hover{outline-color:#111827}
+.obj:not(.sel):hover{outline-color:#64748b}
+.resize-handle{background:#111827;box-shadow:0 0 0 1px #111827}
+#props{padding:20px 18px}
+#props>strong{font-size:15px;color:#1c2530}
+.prop{gap:7px;margin-bottom:15px}
+.prop>label{color:#687587;font-size:11px}
+.dochead{padding:19px 17px}
+.dochead label{font-size:11px}
+.dochead input{font-weight:620}
+.hint{font-size:11px;color:#8190a0}
+.warn{font-size:11px}
+.text-align-controls button.current{color:#111827;border-color:#bfc7d2;background:#eceff4}
+#foot{font-size:11px;color:#808c9b}
+#toggleLayers.active{background:#edf0f4;color:#111827;border-color:#cbd4df}
+
 </style>
 </head>
 <body>
@@ -537,7 +577,7 @@ function renderProps(){
    root.appendChild(prop("Выравнивание текста",alignControls));
    root.appendChild(checkbox("Менять при печати",e.isVariable!==false,n=>{e.isVariable=n;renderLayers();}));
    if(e.isVariable!==false){
-     root.appendChild(prop("Название поля в режиме заполнения",
+     root.appendChild(prop("Имя поля в карточке каталога",
        textInput(e.fieldName||"",v=>{e.fieldName=v;},false,"field-name")));
    }
    let rotation=document.createElement("select");
@@ -556,7 +596,7 @@ function renderProps(){
    root.appendChild(checkbox("Печатать цифры под штрихкодом",e.showsHumanReadable,n=>{e.showsHumanReadable=n;}));
    root.appendChild(checkbox("Менять данные при заполнении",e.isVariable!==false,n=>{e.isVariable=n;renderLayers();}));
    if(e.isVariable!==false){
-     root.appendChild(prop("Название поля в режиме заполнения",
+     root.appendChild(prop("Имя поля в карточке каталога",
        textInput(e.fieldName||"",v=>{e.fieldName=v;},false,"field-name")));
    }
    const status=document.createElement("p");status.className="hint";
