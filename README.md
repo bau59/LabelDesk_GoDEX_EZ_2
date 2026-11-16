@@ -1,6 +1,6 @@
 # LabelDesk — original GoDEX EZ-2 on macOS (WebKit + zsh)
 
-**1.0.10 WebKit/zsh release (separate text and raster editors, native font previews and CP866 frames).** No Node.js, Python, pip, npm, HTTP server or external dependencies are needed on the user's Mac. The system frameworks AppKit/WebKit and system commands `/bin/zsh`, `/bin/stty`, `/bin/cat` and `printf` handle the application and RS-232.
+**1.0.11 WebKit/zsh release (main-area lists, explicit print selection, persistent text margins).** No Node.js, Python, pip, npm, HTTP server or external dependencies are needed on the user's Mac. The system frameworks AppKit/WebKit and system commands `/bin/zsh`, `/bin/stty`, `/bin/cat` and `printf` handle the application and RS-232.
 
 ## Runtime layout
 
@@ -54,6 +54,14 @@ The **Каталог** page is for maintaining saved items. Saved positions can 
 **Печать позиций** is now a separate top-level page. Its search and folder filters are independent of catalog browsing. Select multiple items (including across folders), configure production date, expiration override, batch code, quantities, and per-item templates. **Дополнить** expands an individual row so that any standard field can be temporarily changed or missing custom fields can be added. The queued document uses a snapshot of these temporary edits; the original item and template files remain unchanged. **Подготовить печать →** validates and persists the batch atomically, then opens the existing **Очередь** page where the user explicitly starts the physical print. This avoids accidentally printing old pending jobs.
 
 The Intel Mac installer now includes `LabelDesk.icns`, generated at build time from `Scripts/make-icon.swift` with all expected 16–1024 px iconset representations. `CFBundleIconFile` points to that icon for Finder/Dock. Printer command transport and print dimensions are unchanged.
+
+## List and print workflow cleanup (1.0.11)
+
+- **Каталог:** navigation sidebar lists **only catalog folders**. The main screen lists saved positions with **Редактировать / ＋ В печать / Удалить**, and the full position form opens on demand. Saving a position no longer silently includes it in the next print batch.
+- **Этикетки:** navigation sidebar lists **only template folders**. Saved labels appear in the main screen with direct **Редактировать / Копировать / Переместить / Удалить** controls. The editor canvas opens on explicit Edit or New, and **← Все этикетки** returns to the list. Folder filters stay independent from catalog folders. Existing label IDs, JSON structure and printer mode are unchanged.
+- **Печать позиций:** starts with an empty selected list. The top picker uses search and folder filters with explicit **＋ Добавить** (or **Добавить найденные**); the lower batch table displays **only added positions**, and **Убрать** removes an item from the batch without deleting the saved catalog record. Search/filter changes never silently change batch contents. The per-item template, copy count and transient data override UI are preserved.
+- **Margin persistence bug fixed:** formerly the `saveSettings` function referenced undefined `left`/`right`; validation had accidentally been inserted into an obsolete native test. The save operation now validates 0–15 whole millimeters, stores both values under `settings.profile.marginLeftMM` and `marginRightMM`, and restores them when Settings is displayed or the app is relaunched. Tests verify the save and refresh round-trip. No physical printer calibration commands were changed.
+- **Text canvas 3-mm stripe:** the striped region at the right of a 58-mm label showed the distinct 55-mm ESC G raster limit, **not** a margin chosen in Settings. To avoid confusion it is no longer drawn over the text-mode canvas. The raster restriction and text planner bounds remain unchanged; the inspector explains the distinction. Blank new text templates now show a neutral create-a-line hint rather than a print-validation error.
 
 ## Label editor redesign (1.0.10)
 
