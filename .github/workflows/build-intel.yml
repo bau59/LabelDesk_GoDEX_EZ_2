@@ -67,6 +67,8 @@ jobs:
           test -f build/LabelDesk.app/Contents/Resources/native.js
           test -f build/LabelDesk.app/Contents/Resources/text-engine.js
           test -f build/LabelDesk.app/Contents/Resources/food-presets.js
+          test -f build/LabelDesk.app/Contents/Resources/dish-engine.js
+          test -f build/LabelDesk.app/Contents/Resources/dish-controller.js
           test -f build/LabelDesk.app/Contents/Resources/printer-text.sh
           test -f build/LabelDesk.app/Contents/Resources/printer-native.sh
           test -f build/LabelDesk.app/Contents/Resources/printer.sh
