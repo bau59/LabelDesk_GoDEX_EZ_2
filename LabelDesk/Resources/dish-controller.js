@@ -168,10 +168,68 @@
           ' мм'+(ok?'':' · рулон не подходит')+'</small></button>';
       }).join("");
     }
+    const supplementalFields=[
+      ["name","Название"],["weightG","Вес, г"],["ingredients","Состав"],
+      ["allergens","Аллергены"],["kcal","Ккал / 100 г"],
+      ["protein","Белки"],["fat","Жиры"],["carbs","Углеводы"],
+      ["manufacturer","Производитель"],["address","Адрес"],
+      ["storage","Условия хранения"],["shelfLifeHours","Срок годности, часы"],
+      ["barcode","Штрихкод"]
+    ];
+    function rowEdit(d){
+      if(!rowEdits[d.id])rowEdits[d.id]={values:{},extras:clone(d.customFields||[])};
+      return rowEdits[d.id];
+    }
+    function editableRow(d){
+      const edit=rowEdit(d);
+      const fields=supplementalFields.map(([key,title])=>{
+        const value=Object.hasOwn(edit.values,key)?edit.values[key]:String(d[key]??"");
+        const control=["ingredients","allergens","address","storage"].includes(key)?
+          '<textarea rows="2" data-row-value="'+esc(key)+'" data-dish-id="'+esc(d.id)+'">'+esc(value)+'</textarea>':
+          '<input type="text" value="'+esc(value)+'" data-row-value="'+esc(key)+
+          '" data-dish-id="'+esc(d.id)+'">';
+        return '<label>'+esc(title)+control+'</label>';
+      }).join("");
+      const extras=edit.extras.map((f,index)=>
+        '<div class="custom-row"><input value="'+esc(f.name||"")+
+        '" data-row-extra-name="'+index+'" data-dish-id="'+esc(d.id)+
+        '" placeholder="Название поля"><input value="'+esc(f.value||"")+
+        '" data-row-extra-value="'+index+'" data-dish-id="'+esc(d.id)+
+        '" placeholder="Значение"><button data-row-extra-remove="'+index+
+        '" data-dish-id="'+esc(d.id)+'" type="button" title="Убрать поле">×</button></div>').join("");
+      return '<tr class="batch-edit-row"><td colspan="5"><div class="batch-edit-title">'+
+        '<strong>Дополнить для печати: '+esc(d.name)+'</strong>'+
+        '<button type="button" data-close-detail="'+esc(d.id)+'">Закрыть ×</button></div>'+
+        '<p class="batch-edit-help">Изменения только для этой партии. Сохранённая позиция не изменяется.</p>'+
+        '<div class="batch-override-grid">'+fields+'</div>'+
+        '<p class="batch-edit-help">Дополнительные поля</p>'+
+        '<div class="batch-custom-overrides">'+extras+'</div>'+
+        '<div class="batch-edit-tools"><button type="button" data-row-extra-add="'+esc(d.id)+
+        '">＋ Добавить поле</button><button type="button" data-reset-overrides="'+esc(d.id)+
+        '">Сбросить дополнения</button></div></td></tr>';
+    }
+    function printableItem(d){
+      const item=clone(d),edit=rowEdits[d.id];
+      if(!edit)return item;
+      Object.assign(item,edit.values);
+      const normalized=new Set();
+      const extras=[];
+      for(const f of edit.extras){
+        const name=String(f.name||"").trim(),value=String(f.value||"");
+        if(!name){if(value.trim())throw Error("Позиция «"+d.name+"»: укажите имя дополнительного поля");continue;}
+        const n=root.EZ2Dishes.normalize(name);
+        if(normalized.has(n))throw Error("Позиция «"+d.name+"»: повторяется поле «"+name+"»");
+        normalized.add(n);
+        extras.push({id:f.id||uuid(),name,value});
+      }
+      item.customFields=extras;
+      return item;
+    }
     function renderBatch(){
-      const visible=list();
+      const visible=printList();
       if(!findTemplate(defaultTemplateID))defaultTemplateID=defaultTemplate()?.id||null;
       const defaultID=defaultTemplateID;
+      renderPrintFilters();
       $("dishBatchTemplate").innerHTML=templateCards(defaultID,null)||
         '<p class="muted">Создайте шаблон в редакторе</p>';
       $("dishBatchRows").innerHTML=visible.length?visible.map(d=>{
@@ -182,7 +240,7 @@
           (marked?' checked':'')+' aria-label="Выбрать '+esc(d.name)+'"></td>'+
           '<td><strong style="font-size:12px;margin:0">'+esc(d.name)+'</strong>'+
           '<small style="display:block;color:#7b899e">'+esc(kindLabel(d.kind||"food")+
-            (d.weightG?" · "+d.weightG+" г":""))+'</small></td>'+
+            (d.weightG?" · "+d.weightG+" г":""))+' · '+esc(folderName(d.folderID))+'</small></td>'+
           '<td><div class="copies-stepper">'+
           '<button type="button" data-copy-step="-1" data-dish-id="'+esc(d.id)+
           '" aria-label="Минус одна копия">−</button>'+
@@ -192,19 +250,25 @@
           '" aria-label="Плюс одна копия">+</button></div></td>'+
           '<td><button type="button" class="selected-template" data-open-template="'+esc(d.id)+
           '"><span>'+esc(label?.name||"Выбрать шаблон")+'</span><b>Изменить</b></button></td>'+
-          '<td><button data-dish-preview="'+esc(d.id)+'">Просмотр</button></td></tr>';
-        if(pickerFor!==d.id)return row;
-        return row+'<tr class="template-pick-row"><td colspan="5"><div class="template-pick-header">'+
-          '<strong>Шаблон для «'+esc(d.name)+'»</strong>'+
-          '<button type="button" data-close-picker="'+esc(d.id)+'">Закрыть ×</button></div>'+
-          '<div class="template-chip-list">'+templateCards(id,d.id)+'</div></td></tr>';
+          '<td><div class="flex"><button type="button" data-open-detail="'+esc(d.id)+
+          '">Дополнить</button><button data-dish-preview="'+esc(d.id)+'">Просмотр</button></div></td></tr>';
+        let extra='';
+        if(pickerFor===d.id){
+          extra+='<tr class="template-pick-row"><td colspan="5"><div class="template-pick-header">'+
+            '<strong>Шаблон для «'+esc(d.name)+'»</strong>'+
+            '<button type="button" data-close-picker="'+esc(d.id)+'">Закрыть ×</button></div>'+
+            '<div class="template-chip-list">'+templateCards(id,d.id)+'</div></td></tr>';
+        }
+        if(detailFor===d.id)extra+=editableRow(d);
+        return row+extra;
       }).join(""):'<tr><td colspan="5" class="empty">'+
-        (dishes.length?"Ничего не найдено":"Сначала сохраните позицию")+'</td></tr>';
+        (dishes.length?"В этой папке ничего не найдено":"Сначала сохраните позицию")+'</td></tr>';
       const count=selected.size,total=Array.from(selected).reduce((n,id)=>n+(copies[id]||1),0);
       $("selectedDishCount").textContent=count+" позиций · "+total+" этикеток";
+      $("printSelectedCount").textContent=count?String(count):"";
       $("dishBatchStatus").textContent=count?
-        "В очередь попадут отдельные снимки этикеток. Данные и шаблоны не изменяются.":
-        "Отметьте позиции в таблице. Выбор сохраняется при поиске.";
+        "Выбранные позиции остаются отмеченными при поиске и смене папки.":
+        "Отметьте нужные позиции. Изменения в «Дополнить» не сохраняются в каталог.";
       $("queueDishes").disabled=!count||!state.templates.length||state.running;
       $("selectAllDishes").checked=visible.length>0&&visible.every(d=>selected.has(d.id));
     }
@@ -213,6 +277,7 @@
       renderSidebar();
       renderBatch();
     }
+    function renderPrint(){renderBatch();}
     function newDish(){
       if(dirty&&!window.confirm("Карточка не сохранена. Отменить изменения?"))return;
       chosenID=null;draft=fresh();dirty=false;editForm();renderSidebar();
@@ -270,7 +335,7 @@
       if(!window.confirm("Удалить позицию «"+dish.name+"»? Задания в очереди останутся."))return;
       try{
         await persistDishes(dishes.filter(d=>!same(d.id,dish.id)));
-        selected.delete(dish.id);delete copies[dish.id];delete templateOverrides[dish.id];
+        selected.delete(dish.id);delete copies[dish.id];delete templateOverrides[dish.id];delete rowEdits[dish.id];
         chosenID=null;draft=fresh();dirty=false;editForm();render();
         note("Позиция удалена");
       }catch(e){note("Не удалось удалить блюдо: "+e.message,true);}
@@ -282,7 +347,7 @@
     function documentFor(dish,templateID){
       const template=findTemplate(templateID);
       if(!template)throw Error("Позиция «"+dish.name+"»: шаблон не найден");
-      const doc=root.EZ2Dishes.fill(template,dish,batchData());
+      const doc=root.EZ2Dishes.fill(template,printableItem(dish),batchData());
       const check=compatibility(doc);
       if(!check.ok)throw Error("Позиция «"+dish.name+"»: "+check.reason);
       if(!root.EZ2Raster.transportReady(media()))
@@ -332,7 +397,8 @@
       return date.getFullYear()+"-"+pad(date.getMonth()+1)+"-"+pad(date.getDate())+
         "T"+pad(date.getHours())+":"+pad(date.getMinutes());
     }
-    function bootstrap(raw){
+    function bootstrap(raw,savedFolders){
+      folders=Array.isArray(savedFolders)?savedFolders.filter(f=>f&&f.id&&f.name):[];
       dishes=Array.isArray(raw)?raw.filter(d=>d&&d.id&&d.name)
         .map(d=>({...d,kind:d.kind||"food",
           customFields:Array.isArray(d.customFields)?d.customFields:[]})):[];
@@ -424,7 +490,7 @@
       }
     });
     $("selectAllDishes").addEventListener("change",e=>{
-      list().forEach(d=>{if(e.target.checked)selected.add(d.id);else selected.delete(d.id);});
+      printList().forEach(d=>{if(e.target.checked)selected.add(d.id);else selected.delete(d.id);});
       renderBatch();
     });
     $("clearDishSelection").addEventListener("click",()=>{selected.clear();renderBatch();});
@@ -437,7 +503,7 @@
       const preview=e.target.closest("[data-dish-preview]");
       if(preview){previewDish(preview.dataset.dishPreview);}
     });
-    return {bootstrap,render};
+    return {bootstrap,render,renderPrint};
   }
   root.EZ2DishController={create};
 })(typeof window!=="undefined"?window:globalThis);
