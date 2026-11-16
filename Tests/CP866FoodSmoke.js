@@ -55,7 +55,7 @@ assert.equal(doubleFrame.rows[0].text,"╔══════════╗");
 assert.equal(doubleFrame.rows[2].text,"╚══════════╝");
 assert.throws(()=>printer.plan(make([{...oneFrame,frameChars:56}])),/Ширина рамки/);
 assert.throws(()=>printer.plan(make([{...oneFrame,value:"Длинный заголовок в рамке"}])),
-  /Текст рамки длиннее/);
+  /Текст не помещается/);
 // Previously limited to five lines; modern editor allows a taller framed
 // block while the total 38-mm physical height safety limit still applies.
 const seven=printer.plan(make([{...oneFrame,frameRows:7}]));
