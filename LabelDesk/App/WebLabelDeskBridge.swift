@@ -21,7 +21,7 @@ final class WebLabelDeskBridge: NSObject, WKScriptMessageHandler, WKNavigationDe
         super.init()
     }
 
-    /// Copies only the 5 editable runtime files, never touching templates,
+    /// Copies bundled runtime assets without overwriting user-modified files.
     /// queue or settings. On upgrades unchanged stock files can be refreshed;
     /// files modified by the user remain untouched.
     func prepareRuntime() throws -> URL {
@@ -32,7 +32,7 @@ final class WebLabelDeskBridge: NSObject, WKScriptMessageHandler, WKNavigationDe
         let old = (readJSON(manifestURL) as? [String: String]) ?? [:]
         var newHashes: [String: String] = [:]
 
-        for file in ["app.html", "app.js", "editor.html", "barcodes.js", "native.js", "text-engine.js", "food-presets.js", "dish-engine.js", "dish-controller.js", "raster.js", "printer.sh", "printer-native.sh", "printer-text.sh"] {
+        for file in bundledRuntimeNames() {
             let ext = (file as NSString).pathExtension
             let basename = (file as NSString).deletingPathExtension
             guard let bundled = Bundle.main.url(forResource: basename, withExtension: ext) else {
@@ -68,13 +68,129 @@ final class WebLabelDeskBridge: NSObject, WKScriptMessageHandler, WKNavigationDe
         return try? JSONSerialization.jsonObject(with: data, options: [.fragmentsAllowed])
     }
 
+    private func dataError(_ detail: String) -> NSError {
+        NSError(domain: "LabelDesk", code: 30,
+                userInfo: [NSLocalizedDescriptionKey: detail])
+    }
+
+    /// Missing is normal; malformed existing data must never silently become [].
+    private func checkedJSON(_ url: URL, dictionary: Bool = false) throws -> Any? {
+        guard fm.fileExists(atPath: url.path) else { return nil }
+        let data = try Data(contentsOf: url)
+        let value: Any
+        do {
+            value = try JSONSerialization.jsonObject(with: data)
+        } catch {
+            throw dataError("Повреждён файл \\(url.lastPathComponent). Данные не перезаписаны. Восстановите копию из Backups.")
+        }
+        if dictionary ? !(value is [String: Any]) : !(value is [Any]) {
+            throw dataError("Неверный формат \\(url.lastPathComponent). Данные не перезаписаны.")
+        }
+        return value
+    }
+
+    private func backupFile(_ url: URL) throws {
+        guard fm.fileExists(atPath: url.path) else { return }
+        let parent = root.appendingPathComponent("Backups/History", isDirectory: true)
+            .appendingPathComponent(url.lastPathComponent, isDirectory: true)
+        try fm.createDirectory(at: parent, withIntermediateDirectories: true)
+        let label = ISO8601DateFormatter().string(from: Date())
+            .replacingOccurrences(of: ":", with: "-")
+        let target = parent.appendingPathComponent(label + "-" +
+            UUID().uuidString.prefix(8) + ".bak")
+        try fm.copyItem(at: url, to: target)
+        let versions = try fm.contentsOfDirectory(at: parent,
+            includingPropertiesForKeys: [.creationDateKey])
+            .sorted { $0.lastPathComponent < $1.lastPathComponent }
+        if versions.count > 12 {
+            for old in versions.prefix(versions.count - 12) { try fm.removeItem(at: old) }
+        }
+    }
+
+    private func createSnapshot() throws -> URL {
+        let dir = root.appendingPathComponent("Backups", isDirectory: true)
+        try fm.createDirectory(at: dir, withIntermediateDirectories: true)
+        let name = "LabelDesk-" + ISO8601DateFormatter().string(from: Date())
+            .replacingOccurrences(of: ":", with: "-") + "-" + UUID().uuidString.prefix(8)
+        let dest = dir.appendingPathComponent(name, isDirectory: true)
+        try fm.createDirectory(at: dest, withIntermediateDirectories: true)
+        for key in ["settings", "folders", "items", "dishes", "itemFolders",
+                    "printPresets", "queue"] {
+            let source = root.appendingPathComponent(key + ".json")
+            if fm.fileExists(atPath: source.path) {
+                _ = try checkedJSON(source, dictionary: key == "settings")
+                try fm.copyItem(at: source, to: dest.appendingPathComponent(key + ".json"))
+            }
+        }
+        let tdir = root.appendingPathComponent("templates", isDirectory: true)
+        if fm.fileExists(atPath: tdir.path) {
+            _ = try templates()
+            try fm.copyItem(at: tdir, to: dest.appendingPathComponent("templates"))
+        }
+        return dest
+    }
+
+    private func bundledRuntimeNames() -> [String] {
+        ["app.html", "app.js", "editor.html", "barcodes.js", "native.js",
+         "text-engine.js", "food-presets.js", "dish-engine.js",
+         "dish-controller.js", "raster.js", "diagnostics.js",
+         "printer.sh", "printer-native.sh", "printer-text.sh"]
+    }
+
+    private func runtimeWarnings() -> [String] {
+        bundledRuntimeNames().filter { file in
+            let ext = (file as NSString).pathExtension
+            let name = (file as NSString).deletingPathExtension
+            guard let packaged = Bundle.main.url(forResource: name, withExtension: ext),
+                  let bundled = try? Data(contentsOf: packaged),
+                  let current = try? Data(contentsOf: runtime.appendingPathComponent(file)) else {
+                return true
+            }
+            return sha256(bundled) != sha256(current)
+        }
+    }
+
+    private func restoreBundledRuntime() throws {
+        guard activeProcess == nil else {
+            throw dataError("Нельзя обновлять файлы интерфейса во время передачи в принтер.")
+        }
+        for file in bundledRuntimeNames() {
+            let ext = (file as NSString).pathExtension
+            let name = (file as NSString).deletingPathExtension
+            guard let bundled = Bundle.main.url(forResource: name, withExtension: ext) else {
+                throw dataError("В приложении отсутствует ресурс: " + file)
+            }
+            let local = runtime.appendingPathComponent(file)
+            try backupFile(local)
+            try Data(contentsOf: bundled).write(to: local, options: .atomic)
+        }
+        let hashes = Dictionary(uniqueKeysWithValues: try bundledRuntimeNames().map { file in
+            let ext = (file as NSString).pathExtension
+            let name = (file as NSString).deletingPathExtension
+            guard let bundled = Bundle.main.url(forResource: name, withExtension: ext) else {
+                throw dataError("Нет ресурса: " + file)
+            }
+            return (file, sha256(try Data(contentsOf: bundled)))
+        })
+        let data = try JSONSerialization.data(withJSONObject: hashes, options: [.sortedKeys])
+        try data.write(to: runtime.appendingPathComponent(".bundled-hashes.json"), options: .atomic)
+    }
+
     private func writeJSON(_ text: String, to url: URL) throws {
         let data = Data(text.utf8)
         guard data.count <= 20_000_000 else {
             throw NSError(domain: "LabelDesk", code: 2,
                           userInfo: [NSLocalizedDescriptionKey: "JSON file is too large"])
         }
-        _ = try JSONSerialization.jsonObject(with: data, options: [.fragmentsAllowed])
+        let parsed = try JSONSerialization.jsonObject(with: data)
+        let dictionary = url.lastPathComponent == "settings.json" ||
+            url.deletingLastPathComponent().lastPathComponent == "templates"
+        if dictionary ? !(parsed is [String: Any]) : !(parsed is [Any]) {
+            throw dataError("Ожидался " + (dictionary ? "объект" : "массив") +
+                " JSON: " + url.lastPathComponent)
+        }
+        _ = try checkedJSON(url, dictionary: dictionary)
+        try backupFile(url)
         try data.write(to: url, options: .atomic)
     }
 
@@ -100,35 +216,43 @@ final class WebLabelDeskBridge: NSObject, WKScriptMessageHandler, WKNavigationDe
             .appendingPathComponent(uuid.uuidString + ".json")
     }
 
-    private func templates() -> [[String: Any]] {
+    private func templates() throws -> [[String: Any]] {
         let dir = root.appendingPathComponent("templates", isDirectory: true)
-        let paths = (try? fm.contentsOfDirectory(at: dir,
-                      includingPropertiesForKeys: [.contentModificationDateKey])) ?? []
-        return paths.filter { $0.pathExtension == "json" }
-            .sorted { ($0.lastPathComponent) < ($1.lastPathComponent) }
-            .compactMap { readJSON($0) as? [String: Any] }
+        let paths = try fm.contentsOfDirectory(at: dir, includingPropertiesForKeys: [])
+        return try paths.filter { $0.pathExtension == "json" }
+            .sorted { $0.lastPathComponent < $1.lastPathComponent }
+            .map { url in
+                guard let result = try checkedJSON(url, dictionary: true)
+                    as? [String: Any],
+                      let id = result["id"] as? String,
+                      UUID(uuidString: id) != nil,
+                      result["elements"] is [Any] else {
+                    throw dataError("Неверная структура шаблона: " + url.lastPathComponent)
+                }
+                return result
+            }
     }
 
-    private func loadAll() -> [String: Any] {
-        var settings = (readJSON(root.appendingPathComponent("settings.json"))
-                        as? [String: Any]) ?? [:]
+    private func loadAll() throws -> [String: Any] {
+        var settings = (try checkedJSON(root.appendingPathComponent("settings.json"),
+                         dictionary: true) as? [String: Any]) ?? [:]
         if settings["profile"] == nil {
             settings["profile"] = ["portPath":
                 UserDefaults.standard.string(forKey: "serialPort") ?? ""]
         }
+        let existingItems = try checkedJSON(root.appendingPathComponent("items.json"))
+        let olderDishes = try checkedJSON(root.appendingPathComponent("dishes.json"))
         return [
-            "templates": templates(),
+            "templates": try templates(),
             "settings": settings,
-            "folders": readJSON(root.appendingPathComponent("folders.json")) ?? [],
-            "dishes": readJSON(root.appendingPathComponent("dishes.json")) ?? [],
-            // One-way, non-destructive compatibility: existing dishes are loaded
-            // until the first item save creates items.json. [] is authoritative.
-            "itemFolders": readJSON(root.appendingPathComponent("itemFolders.json")) ?? [],
-            "printPresets": readJSON(root.appendingPathComponent("printPresets.json")) ?? [],
-            "items": readJSON(root.appendingPathComponent("items.json"))
-                ?? readJSON(root.appendingPathComponent("dishes.json")) ?? [],
-            "queue": readJSON(root.appendingPathComponent("queue.json")) ?? [],
-            "runtimePath": runtime.path
+            "folders": try checkedJSON(root.appendingPathComponent("folders.json")) ?? [],
+            "dishes": olderDishes ?? [],
+            "itemFolders": try checkedJSON(root.appendingPathComponent("itemFolders.json")) ?? [],
+            "printPresets": try checkedJSON(root.appendingPathComponent("printPresets.json")) ?? [],
+            "items": existingItems ?? olderDishes ?? [],
+            "queue": try checkedJSON(root.appendingPathComponent("queue.json")) ?? [],
+            "runtimePath": runtime.path,
+            "runtimeWarnings": runtimeWarnings()
         ]
     }
 
@@ -273,11 +397,21 @@ final class WebLabelDeskBridge: NSObject, WKScriptMessageHandler, WKNavigationDe
         do {
             switch action {
             case "loadAll":
-                respond(id, result: loadAll())
+                respond(id, result: try loadAll())
             case "ports":
                 respond(id, result: ports())
             case "openRuntime":
                 NSWorkspace.shared.open(runtime)
+                respond(id, result: true)
+            case "createBackup":
+                respond(id, result: try createSnapshot().path)
+            case "openBackups":
+                let dest = root.appendingPathComponent("Backups", isDirectory: true)
+                try fm.createDirectory(at: dest, withIntermediateDirectories: true)
+                NSWorkspace.shared.open(dest)
+                respond(id, result: dest.path)
+            case "restoreRuntime":
+                try restoreBundledRuntime()
                 respond(id, result: true)
             case "saveData":
                 guard let key = body["key"] as? String,
@@ -307,7 +441,7 @@ final class WebLabelDeskBridge: NSObject, WKScriptMessageHandler, WKNavigationDe
                                   userInfo: [NSLocalizedDescriptionKey: "Missing UUID"])
                 }
                 let path = try templateFile(identifier)
-                if fm.fileExists(atPath: path.path) { try fm.removeItem(at: path) }
+                if fm.fileExists(atPath: path.path) { try backupFile(path); try fm.removeItem(at: path) }
                 respond(id, result: true)
             case "printJob":
                 try startPrint(id: id, body: body)
