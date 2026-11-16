@@ -1,4 +1,4 @@
-// Node-only smoke for the saved dish workflow; no printer hardware is contacted.
+// Node-only smoke for the universal item workflow; no printer hardware is contacted.
 "use strict";
 const assert=require("node:assert/strict");
 const fs=require("node:fs");
@@ -49,10 +49,22 @@ const filled=engine.fill(templates[0],product,batch);
 assert.equal(filled.elements[1].value,"250 г");
 assert.equal(filled.elements[3].value,"18.11.2026 10:00");
 assert.equal(templates[0].elements[1].value,"[МАССА]","Source template mutated");
-assert.throws(()=>engine.fill(templates[0],{...product,manufacturer:""},batch),/Производитель/);
-assert.throws(()=>engine.fill(templates[0],product,{producedAt:""}),/Изготовлено/);
+const omitted=engine.fill(templates[0],{...product,manufacturer:""},batch);
+assert.equal(omitted.elements.some(x=>x.fieldName==="Производитель"),false);
+assert.equal(omitted.elements.length,4);
+const noDates=engine.fill(templates[0],product,{producedAt:""});
+assert.equal(noDates.elements.length,3,"Unfilled dates must not be printed");
+const customTemplate={...templates[1],elements:[row(31,"Название","[НАЗВАНИЕ]"),
+  row(32,"Артикул","[АРТИКУЛ]"),row(33,"Несуществующее","[НЕТ]")]};
+const custom=engine.fill(customTemplate,{name:"Товар",customFields:[
+  {id:uuid(300),name:"артикул",value:"SKU-42"}]},{});
+assert.equal(custom.elements.length,2);
+assert.equal(custom.elements[1].value,"SKU-42");
+assert.equal(templates[1].elements[0].value,"[НАЗВАНИЕ]");
+assert.throws(()=>engine.fill({elements:[row(90,"Не существует","[НЕТ]")]},
+  {name:"Пустой"},{}),/нет заполненных полей/);
 const state={templates:copy(templates),jobs:[],running:false};
-const persisted={dishes:[],queue:[]},logs=[];
+const persisted={items:[],queue:[]},logs=[];
 const native=async(action,args)=>{
  assert.equal(action,"saveData");
  persisted[args.key]=JSON.parse(args.json);
@@ -76,8 +88,8 @@ async function save(name){
 (async()=>{
  await save("Суп");
  await save("Каша");
- assert.equal(persisted.dishes.length,2);
- const first=persisted.dishes[0];
+ assert.equal(persisted.items.length,2);
+ const first=persisted.items[0];
  $("dishBatchRows").fire("change",{dataset:{dishTemplate:first.id},value:templates[1].id});
  await $("queueDishes").fire("click");
  assert.equal(state.jobs.length,2);
@@ -86,10 +98,27 @@ async function save(name){
  assert.equal(state.jobs[1].document.name,"Каша · Состав");
  assert.equal(state.jobs[1].document.elements[3].value,"18.11.2026 10:00");
  assert.equal(state.templates[0].elements[0].value,"[НАЗВАНИЕ]");
- // Failed validation is atomic: neither item is added.
+ // Missing optional dates are omitted, not treated as fatal.
  $("batchProducedAt").value="";
  await $("queueDishes").fire("click");
- assert.equal(state.jobs.length,2);
- assert.match($("dishBatchStatus").textContent,/Изготовлено/);
- console.log("Dish catalog smoke passed: save, auto-select, mixed templates, expiry, atomic queue, immutability.");
+ assert.equal(state.jobs.length,4);
+ assert.equal(state.jobs[3].document.elements.some(e=>e.fieldName==="Годен до"),false);
+ // A broken template still rejects the WHOLE selected batch, with no queue mutation.
+ $("dishBatchRows").fire("change",{dataset:{dishTemplate:first.id},value:"missing-template"});
+ await $("queueDishes").fire("click");
+ assert.equal(state.jobs.length,4);
+ assert.match($("dishBatchStatus").textContent,/шаблон не найден/);
+ // New custom field added through the catalog form is saved and reopened.
+ const id=persisted.items[0].id;
+ controller.render();
+ const handlers=bodyHandlers.filter(h=>h.type==="click");
+ const open={closest:selector=>selector==="[data-dish-open]"?{dataset:{dishOpen:id}}:null};
+ handlers.forEach(h=>h.fn({target:open}));
+ $("addCustomField").fire("click");
+ $("customFields").fire("input",{dataset:{customName:"0"},value:"Артикул"});
+ $("customFields").fire("input",{dataset:{customValue:"0"},value:"SKU-17"});
+ await $("saveDish").fire("click");
+ assert.equal(persisted.items[0].customFields[0].name,"Артикул");
+ assert.equal(persisted.items[0].customFields[0].value,"SKU-17");
+ console.log("Item catalog smoke passed: migration-safe saves, custom fields, omitted blanks, mixed templates and atomic queue.");
 })().catch(e=>{console.error(e);process.exitCode=1;});
