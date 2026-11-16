@@ -430,7 +430,13 @@ footer{color:#8993a1}
         <div class="flex"><button id="catalogGoPrint" type="button">Перейти к печати</button>
           <button id="newDishMain" class="primary">＋ Новая позиция</button></div>
       </div>
-      <div class="card">
+      <div id="catalogRecords" class="card">
+        <div class="section-head"><div><h3>Позиции каталога <small id="dishSummary"></small></h3>
+          <p class="muted">Изменяйте карточки и добавляйте позиции в печать.</p></div></div>
+        <div class="library-search"><input id="dishSearch" type="search" placeholder="Поиск по названию..." aria-label="Поиск позиций"></div>
+        <div id="dishList" class="catalog-record-list"></div>
+      </div>
+      <div id="catalogEditor" class="card" hidden>
         <div class="section-head"><div><h3 id="dishFormTitle">Новая позиция</h3><p class="muted">Заполните только нужные поля. Остальные не попадут на этикетку.</p></div><span class="muted" id="dishFormHint">Поля независимы от шаблонов</span></div>
         <div id="dishFields" class="fields">
           <div class="field item-folder-field"><label>Папка каталога</label>
@@ -460,6 +466,7 @@ footer{color:#8993a1}
           <div id="customFields"></div>
         </div>
         <div class="form-actions">
+          <button id="closeDishEditor" type="button">← К списку</button>
           <button id="saveDish" class="primary">Сохранить позицию</button>
           <button id="sendDishToPrint" type="button">В печать</button>
           <button id="deleteDish" class="danger">Удалить</button>
