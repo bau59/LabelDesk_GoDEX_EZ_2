@@ -2,7 +2,7 @@
 (function(root){
   "use strict";
   function create(api){
-    const {state,native,uuid,clone,note,compatibility,media,encodeJob,renderQueue}=api;
+    const {state,native,uuid,clone,note,compatibility,media,encodeJob,renderQueue,openQueue}=api;
     const $=id=>document.getElementById(id);
     const esc=value=>String(value??"").replace(/[&<>"']/g,c=>
       ({"&":"&amp;","<":"&lt;",">":"&gt;",'"':"&quot;","'":"&#39;"}[c]));
@@ -390,6 +390,7 @@
         state.jobs=jobs;renderQueue();renderBatch();
         note("В очередь добавлено "+items.length+" позиций, этикеток: "+
           items.reduce((sum,j)=>sum+j.copies,0));
+        openQueue?.();
       }catch(e){$("dishBatchStatus").textContent=e.message;note(e.message,true);}
     }
     function localDateTime(date=new Date()){
