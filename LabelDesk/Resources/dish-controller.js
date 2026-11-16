@@ -2,7 +2,7 @@
 (function(root){
   "use strict";
   function create(api){
-    const {state,native,uuid,clone,note,compatibility,media,encodeJob,renderQueue,openQueue,openPrint}=api;
+    const {state,native,uuid,clone,note,compatibility,media,encodeJob,renderQueue,openQueue,openPrint,printQueuedIDs}=api;
     const $=id=>document.getElementById(id);
     const esc=value=>String(value??"").replace(/[&<>"']/g,c=>
       ({"&":"&amp;","<":"&lt;",">":"&gt;",'"':"&quot;","'":"&#39;"}[c]));
@@ -17,7 +17,7 @@
     let printPresets=[];
     const rowEdits={}; let detailFor=null;
     let selected=new Set(),copies={},templateOverrides={},previewID=null,formInitialized=false;
-    let defaultTemplateID=null,pickerFor=null;
+    let defaultTemplateID=null,pickerFor=null,templateQuery="",templateLimit=6,validationErrors={};
     const findDish=id=>dishes.find(d=>same(d.id,id));
     const findTemplate=id=>state.templates.find(t=>same(t.id,id));
     const validFolder=id=>folders.some(f=>same(f.id,id))?id:null;
@@ -45,7 +45,11 @@
     function editForm(){
       draft=draft||fresh();
       for(const [key,id] of Object.entries(fieldIDs))
-        $(id).value=key==="kind"?(draft.kind||"food"):String(draft[key]??"");
+        $(id).value=key==="kind"?(draft.kind||"food"):
+          ($(id).type==="number"?String(draft[key]??"").replace(",","."):String(draft[key]??""));
+      $("itemKindButtons").innerHTML=[["product","Товар"],["food","Блюдо"],["other","Данные"]]
+        .map(([value,label])=>'<button type="button" data-kind-choice="'+value+'" class="'+
+          ((draft.kind||"food")===value?'current':'')+'">'+label+'</button>').join("");
       renderCustomFields();
       renderFolderPicker();
       $("dishFormTitle").textContent=chosenID?"Карточка: "+(draft.name||"без названия"):"Новая позиция";
@@ -164,10 +168,17 @@
       return state.templates.slice().sort((a,b)=>
         a.name.localeCompare(b.name,"ru"));
     }
+    function matchingTemplates(){
+      return templateList().filter(t=>String(t.name||"").toLocaleLowerCase("ru")
+        .includes(templateQuery.toLocaleLowerCase("ru")));
+    }
     function templateCards(selectedID,dishID){
-      return templateList().map(t=>{
-        const ok=compatibility(t).ok;
-        const chosen=same(selectedID,t.id);
+      const pinned=findTemplate(selectedID);
+      const found=matchingTemplates();
+      const visible=[...(pinned?[pinned]:[]),
+        ...found.filter(t=>!same(t.id,selectedID)).slice(0,templateLimit)];
+      return visible.map(t=>{
+        const ok=compatibility(t).ok,chosen=same(selectedID,t.id);
         const action=dishID?' data-pick-template="'+esc(t.id)+'" data-dish-id="'+esc(dishID)+'"':
           ' data-pick-default="'+esc(t.id)+'"';
         return '<button type="button" class="template-chip'+(chosen?' selected':'')+
@@ -194,7 +205,9 @@
         const value=Object.hasOwn(edit.values,key)?edit.values[key]:String(d[key]??"");
         const control=["ingredients","allergens","address","storage"].includes(key)?
           '<textarea rows="2" data-row-value="'+esc(key)+'" data-dish-id="'+esc(d.id)+'">'+esc(value)+'</textarea>':
-          '<input type="text" value="'+esc(value)+'" data-row-value="'+esc(key)+
+          '<input '+(["weightG","kcal","protein","fat","carbs","shelfLifeHours"].includes(key)?
+             'type="number" min="0" step="0.1"':'type="text"')+
+          ' value="'+esc(String(value).replace(",", "."))+'" data-row-value="'+esc(key)+
           '" data-dish-id="'+esc(d.id)+'">';
         return '<label>'+esc(title)+control+'</label>';
       }).join("");
@@ -340,7 +353,9 @@
           '" class="danger">Убрать</button></td>'+
           '<td><strong style="font-size:12px;margin:0">'+esc(d.name)+'</strong>'+
           '<small style="display:block;color:#7b899e">'+esc(kindLabel(d.kind||"food")+
-            (d.weightG?" · "+d.weightG+" г":""))+' · '+esc(folderName(d.folderID))+'</small></td>'+
+            (d.weightG?" · "+d.weightG+" г":""))+' · '+esc(folderName(d.folderID))+'</small>'+
+        (validationErrors[d.id]?'<small class="batch-validation-error">'+
+          esc(validationErrors[d.id])+'</small>':'')+'</td>'+
           '<td><div class="copies-stepper">'+
           '<button type="button" data-copy-step="-1" data-dish-id="'+esc(d.id)+
           '" aria-label="Минус одна копия">−</button>'+
@@ -362,7 +377,8 @@
         if(detailFor===d.id)extra+=editableRow(d);
         return row+extra;
       }).join(""):'<tr><td colspan="5"><div class="print-empty">Партия пока пуста. Добавьте позиции из каталога выше.</div></td></tr>';
-      const count=selected.size,total=visible.reduce((n,d)=>n+(copies[d.id]||1),0);
+      $("batchTemplateMore").hidden=matchingTemplates().length<=templateLimit+1;
+            const count=selected.size,total=visible.reduce((n,d)=>n+(copies[d.id]||1),0);
       $("selectedDishCount").textContent=count+" позиций · "+total+" этикеток";
       $("printRowCount").textContent="("+count+")";
       $("printSelectedCount").textContent=count?String(count):"";
@@ -481,7 +497,25 @@
         $("dishPreviewCaption").textContent="Не готово к печати";
       }
     }
-    async function queueSelected(){
+    function validateSelected(){
+      const issues={};let checked=0;
+      for(const dish of dishes.filter(d=>selected.has(d.id))){
+        try{
+          const count=Number(copies[dish.id]||1);
+          if(!Number.isInteger(count)||count<1||count>200)
+            throw Error("Копий: от 1 до 200");
+          const doc=documentFor(dish,templateOverrides[dish.id]||defaultTemplateID);
+          encodeJob(doc,count);checked++;
+        }catch(e){issues[dish.id]=e.message;}
+      }
+      validationErrors=issues;
+      renderBatch();
+      const total=Object.keys(issues).length;
+      note(total?"Найдены ошибки: "+total+". Исправьте выделенные позиции.":
+        "Проверено позиций: "+checked+". Партия готова.",total>0);
+      return !total;
+    }
+        async function queueSelected(){
       const active=dishes.filter(d=>selected.has(d.id));
       if(!active.length){note("Отметьте позиции",true);return;}
       const items=[];
@@ -503,7 +537,8 @@
         note("В очередь добавлено "+items.length+" позиций, этикеток: "+
           items.reduce((sum,j)=>sum+j.copies,0));
         openQueue?.();
-      }catch(e){$("dishBatchStatus").textContent=e.message;note(e.message,true);}
+        return items.map(item=>item.id);
+      }catch(e){$("dishBatchStatus").textContent=e.message;note(e.message,true);return null;}
     }
     function localDateTime(date=new Date()){
       const pad=n=>String(n).padStart(2,"0");
@@ -517,7 +552,7 @@
         .map(d=>({...d,kind:d.kind||"food",
           customFields:Array.isArray(d.customFields)?d.customFields:[]})):[];
       chosenID=null;draft=fresh();formOpen=false;selected.clear();printLimit=6;
-      dirty=false;formInitialized=false;
+      dirty=false;formInitialized=false;validationErrors={};
       $("batchProducedAt").value=localDateTime();
       render();
     }
@@ -587,7 +622,19 @@
         $("dishFormHint").textContent="Есть несохранённые изменения";
       }
     });
-    $("dishBatchTemplate").addEventListener("click",e=>{
+    $("batchTemplateSearch").addEventListener("input",e=>{
+      templateQuery=String(e.target.value||"").trim();templateLimit=6;renderBatch();
+    });
+    $("batchTemplateMore").addEventListener("click",()=>{templateLimit+=6;renderBatch();});
+    $("validateBatch").addEventListener("click",validateSelected);
+    $("itemKindButtons").addEventListener("click",e=>{
+      const button=e.target.closest("[data-kind-choice]");
+      if(!button)return;
+      const select=$("itemKind");select.value=button.dataset.kindChoice;
+      select.dispatchEvent(new Event("input",{bubbles:true}));
+      editForm();
+    });
+        $("dishBatchTemplate").addEventListener("click",e=>{
       const button=e.target.closest("[data-pick-default]");
       if(!button)return;
       defaultTemplateID=button.dataset.pickDefault;
