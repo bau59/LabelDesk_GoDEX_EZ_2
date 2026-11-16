@@ -504,6 +504,14 @@ input[type="number"]::-webkit-inner-spin-button,input[type="number"]::-webkit-ou
 #diagMore[hidden]{display:none!important}
 @media(max-width:750px){.diag-preview-wrap{grid-template-columns:1fr}}
 
+
+.inline-choices{display:flex;flex-wrap:wrap;gap:6px}
+.inline-choices button{padding:8px 13px;font-size:12px}
+.inline-choices button.current{background:#1d2b42;border-color:#1d2b42;color:#fff}
+#batchTemplateSearch{max-width:440px;margin:5px 0 10px}
+#batchTemplateMore{margin-top:8px;font-size:11px;padding:7px 11px}
+.batch-validation-error{display:block;color:#af3344;font-size:11px;margin-top:6px}
+
 </style>
 </head>
 <body>
@@ -556,14 +564,14 @@ input[type="number"]::-webkit-inner-spin-button,input[type="number"]::-webkit-ou
           <div class="field item-folder-field"><label>Папка каталога</label>
             <div id="itemFolderPicker" class="item-folder-picker"></div></div>
           <div class="field"><label for="dishName">Название *</label><input id="dishName" data-dish="name" autocomplete="off" placeholder="Например, Суп дня или Товар № 12"></div>
-          <div class="field"><label for="itemKind">Тип записи</label><select id="itemKind" data-dish="kind"><option value="product">Товар</option><option value="food">Блюдо</option><option value="other">Данные</option></select></div>
-          <div class="field"><label for="dishWeight">Вес / масса, г</label><input id="dishWeight" data-dish="weightG" inputmode="decimal"></div>
-          <div class="field"><label for="dishShelfLife">Срок хранения, часов</label><input id="dishShelfLife" data-dish="shelfLifeHours" inputmode="decimal" placeholder="Например, 48"></div>
+          <div class="field"><label for="itemKind">Тип записи</label><select hidden id="itemKind" data-dish="kind"><option value="product">Товар</option><option value="food">Блюдо</option><option value="other">Данные</option></select><div id="itemKindButtons" class="inline-choices"></div></div>
+          <div class="field"><label for="dishWeight">Вес / масса, г</label><input id="dishWeight" type="number" min="0" step="0.5" data-dish="weightG" inputmode="decimal"></div>
+          <div class="field"><label for="dishShelfLife">Срок хранения, часов</label><input id="dishShelfLife" type="number" min="0" step="1" data-dish="shelfLifeHours" inputmode="decimal" placeholder="Например, 48"></div>
           <details class="field-group"><summary>Состав и КБЖУ <span>необязательно</span></summary><div class="fields">
-          <div class="field"><label for="dishKcal">Ккал на 100 г</label><input id="dishKcal" data-dish="kcal" inputmode="decimal"></div>
-          <div class="field"><label for="dishProtein">Белки на 100 г</label><input id="dishProtein" data-dish="protein" inputmode="decimal"></div>
-          <div class="field"><label for="dishFat">Жиры на 100 г</label><input id="dishFat" data-dish="fat" inputmode="decimal"></div>
-          <div class="field"><label for="dishCarbs">Углеводы на 100 г</label><input id="dishCarbs" data-dish="carbs" inputmode="decimal"></div>
+          <div class="field"><label for="dishKcal">Ккал на 100 г</label><input id="dishKcal" type="number" min="0" step="1" data-dish="kcal" inputmode="decimal"></div>
+          <div class="field"><label for="dishProtein">Белки на 100 г</label><input id="dishProtein" type="number" min="0" step="0.1" data-dish="protein" inputmode="decimal"></div>
+          <div class="field"><label for="dishFat">Жиры на 100 г</label><input id="dishFat" type="number" min="0" step="0.1" data-dish="fat" inputmode="decimal"></div>
+          <div class="field"><label for="dishCarbs">Углеводы на 100 г</label><input id="dishCarbs" type="number" min="0" step="0.1" data-dish="carbs" inputmode="decimal"></div>
           <div class="field"><label for="dishIngredients">Состав</label><textarea id="dishIngredients" data-dish="ingredients" rows="2"></textarea></div>
           <div class="field"><label for="dishAllergens">Аллергены</label><textarea id="dishAllergens" data-dish="allergens" rows="2"></textarea></div>
           </div></details>
@@ -624,7 +632,9 @@ input[type="number"]::-webkit-inner-spin-button,input[type="number"]::-webkit-ou
           <div class="field"><label for="batchExpiresAt">Годен до (если нужно)</label><input id="batchExpiresAt" type="datetime-local"></div>
           <div class="field"><label for="batchCode">Код партии / ШК</label><input id="batchCode" placeholder="Например, A-125"></div>
           <div class="field batch-template-group"><label>Общий шаблон для партии</label>
-            <div id="dishBatchTemplate" class="template-chip-list" aria-label="Общий шаблон"></div></div>
+            <input id="batchTemplateSearch" type="search" placeholder="Найти макет…" aria-label="Поиск макетов для партии">
+            <div id="dishBatchTemplate" class="template-chip-list" aria-label="Общий шаблон"></div>
+            <button id="batchTemplateMore" type="button">Показать ещё макеты</button></div>
         </div>
         <h4 class="batch-section-title">3. Позиции в партии <span id="printRowCount"></span></h4>
         <div class="table-description">Только добавленные позиции. Кнопка «Убрать» исключает запись из партии, но не удаляет её из каталога.</div>
@@ -634,7 +644,10 @@ input[type="number"]::-webkit-inner-spin-button,input[type="number"]::-webkit-ou
         </table></div>
         <div id="dishBatchStatus" class="muted" role="status"></div>
         <p class="muted">Дополнения действуют только при печати и не меняют сохранённую карточку.</p>
-        <div class="flex"><button id="queueDishes" class="primary">Подготовить печать →</button><button id="clearDishSelection">Очистить выбор</button></div>
+        <div class="flex">
+          <button id="validateBatch" type="button">Проверить всю партию</button>
+          <button id="queueDishes" class="primary">Подготовить печать →</button>
+          <button id="clearDishSelection">Очистить выбор</button></div>
         <div class="grid2" style="margin-top:17px">
           <div><h4>Предпросмотр</h4><p id="dishPreviewError" class="warning"></p><p class="muted" id="dishPreviewCaption"></p></div>
           <div><img id="dishPreview" alt="Предпросмотр выбранной позиции"></div>
