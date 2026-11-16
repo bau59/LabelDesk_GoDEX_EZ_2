@@ -14,6 +14,7 @@
       manufacturer:"dishManufacturer",address:"dishAddress",barcode:"dishBarcode"};
     let dishes=[],chosenID=null,draft=null,dirty=false,search="";
     let selected=new Set(),copies={},templateOverrides={},previewID=null,formInitialized=false;
+    let defaultTemplateID=null,pickerFor=null;
     const findDish=id=>dishes.find(d=>same(d.id,id));
     const findTemplate=id=>state.templates.find(t=>same(t.id,id));
     const list=()=>dishes.filter(d=>!search||
@@ -50,45 +51,69 @@
         (d.shelfLifeHours?" · "+esc(d.shelfLifeHours)+" ч":"")+'</small></button>').join(""):
         '<p class="empty">'+(dishes.length?"Ничего не найдено":"Добавьте первую позицию")+'</p>';
     }
-    function templateOptions(selectedID){
-      return state.templates.slice().sort((a,b)=>a.name.localeCompare(b.name,"ru")).map(t=>
-        '<option value="'+esc(t.id)+'"'+(same(selectedID,t.id)?' selected':'')+'>'+
-        esc(t.name)+" · "+esc(t.widthMM)+"×"+esc(t.heightMM)+
-        (compatibility(t).ok?"":" ⚠ рулон")+'</option>').join("");
-    }
     function defaultTemplate(){
       return state.templates.find(t=>t.starterPack==="food-v1"&&compatibility(t).ok)||
         state.templates.find(t=>compatibility(t).ok)||state.templates[0];
     }
+    function templateList(){
+      return state.templates.slice().sort((a,b)=>
+        a.name.localeCompare(b.name,"ru"));
+    }
+    function templateCards(selectedID,dishID){
+      return templateList().map(t=>{
+        const ok=compatibility(t).ok;
+        const chosen=same(selectedID,t.id);
+        const action=dishID?' data-pick-template="'+esc(t.id)+'" data-dish-id="'+esc(dishID)+'"':
+          ' data-pick-default="'+esc(t.id)+'"';
+        return '<button type="button" class="template-chip'+(chosen?' selected':'')+
+          (ok?'':' incompatible')+'"'+action+' title="'+esc(t.name)+'">'+
+          '<span>'+esc(t.name)+'</span><small>'+esc(t.widthMM)+' × '+esc(t.heightMM)+
+          ' мм'+(ok?'':' · рулон не подходит')+'</small></button>';
+      }).join("");
+    }
     function renderBatch(){
-      const visible=list(),defaultID=$("dishBatchTemplate").value;
+      const visible=list();
+      if(!findTemplate(defaultTemplateID))defaultTemplateID=defaultTemplate()?.id||null;
+      const defaultID=defaultTemplateID;
+      $("dishBatchTemplate").innerHTML=templateCards(defaultID,null)||
+        '<p class="muted">Создайте шаблон в редакторе</p>';
       $("dishBatchRows").innerHTML=visible.length?visible.map(d=>{
         const marked=selected.has(d.id),count=copies[d.id]||1;
-        return '<tr><td><input type="checkbox" data-dish-select="'+esc(d.id)+'"'+
+        const id=templateOverrides[d.id]||defaultID;
+        const label=findTemplate(id);
+        const row='<tr><td><input type="checkbox" data-dish-select="'+esc(d.id)+'"'+
           (marked?' checked':'')+' aria-label="Выбрать '+esc(d.name)+'"></td>'+
           '<td><strong style="font-size:12px;margin:0">'+esc(d.name)+'</strong>'+
-          '<small style="display:block;color:#7b899e">'+esc(kindLabel(d.kind||"food")+(d.weightG?" · "+d.weightG+" г":""))+'</small></td>'+
-          '<td><input type="number" min="1" max="200" value="'+esc(count)+
-          '" data-dish-copies="'+esc(d.id)+'"></td>'+
-          '<td><select data-dish-template="'+esc(d.id)+'">'+
-          templateOptions(templateOverrides[d.id]||defaultID)+'</select></td>'+
+          '<small style="display:block;color:#7b899e">'+esc(kindLabel(d.kind||"food")+
+            (d.weightG?" · "+d.weightG+" г":""))+'</small></td>'+
+          '<td><div class="copies-stepper">'+
+          '<button type="button" data-copy-step="-1" data-dish-id="'+esc(d.id)+
+          '" aria-label="Минус одна копия">−</button>'+
+          '<input type="text" inputmode="numeric" autocomplete="off" pattern="[0-9]*"'+
+          ' value="'+esc(count)+'" data-dish-copies="'+esc(d.id)+'" aria-label="Копий">'+
+          '<button type="button" data-copy-step="1" data-dish-id="'+esc(d.id)+
+          '" aria-label="Плюс одна копия">+</button></div></td>'+
+          '<td><button type="button" class="selected-template" data-open-template="'+esc(d.id)+
+          '"><span>'+esc(label?.name||"Выбрать шаблон")+'</span><b>Изменить</b></button></td>'+
           '<td><button data-dish-preview="'+esc(d.id)+'">Просмотр</button></td></tr>';
+        if(pickerFor!==d.id)return row;
+        return row+'<tr class="template-pick-row"><td colspan="5"><div class="template-pick-header">'+
+          '<strong>Шаблон для «'+esc(d.name)+'»</strong>'+
+          '<button type="button" data-close-picker="'+esc(d.id)+'">Закрыть ×</button></div>'+
+          '<div class="template-chip-list">'+templateCards(id,d.id)+'</div></td></tr>';
       }).join(""):'<tr><td colspan="5" class="empty">'+
         (dishes.length?"Ничего не найдено":"Сначала сохраните позицию")+'</td></tr>';
-      const number=selected.size,total=Array.from(selected).reduce((n,id)=>n+(copies[id]||1),0);
-      $("selectedDishCount").textContent=number+" позиций · "+total+" этикеток";
-      $("dishBatchStatus").textContent=number?
-        "В очередь попадут отдельные снимки макетов. Карточки и шаблоны не изменяются.":
+      const count=selected.size,total=Array.from(selected).reduce((n,id)=>n+(copies[id]||1),0);
+      $("selectedDishCount").textContent=count+" позиций · "+total+" этикеток";
+      $("dishBatchStatus").textContent=count?
+        "В очередь попадут отдельные снимки этикеток. Данные и шаблоны не изменяются.":
         "Отметьте позиции в таблице. Выбор сохраняется при поиске.";
-      $("queueDishes").disabled=!number||!state.templates.length||state.running;
+      $("queueDishes").disabled=!count||!state.templates.length||state.running;
       $("selectAllDishes").checked=visible.length>0&&visible.every(d=>selected.has(d.id));
     }
     function render(){
       if(!formInitialized)editForm();
       renderSidebar();
-      const ddl=$("dishBatchTemplate"),chosen=ddl.value||defaultTemplate()?.id||"";
-      ddl.innerHTML='<option value="">Выберите шаблон</option>'+templateOptions(chosen);
-      ddl.value=findTemplate(chosen)?chosen:(defaultTemplate()?.id||"");
       renderBatch();
     }
     function newDish(){
@@ -170,7 +195,7 @@
     function previewDish(id){
       const dish=findDish(id);if(!dish)return;previewID=id;
       try{
-        const doc=documentFor(dish,templateOverrides[id]||$("dishBatchTemplate").value);
+        const doc=documentFor(dish,templateOverrides[id]||defaultTemplateID);
         encodeJob(doc,1);
         $("dishPreview").src=root.EZ2Raster.draw(doc).toDataURL("image/png");
         $("dishPreviewError").textContent="";
@@ -191,7 +216,7 @@
           const count=Number(copies[dish.id]||1);
           if(!Number.isInteger(count)||count<1||count>200)
             throw Error("Позиция «"+dish.name+"»: копий от 1 до 200");
-          const doc=documentFor(dish,templateOverrides[dish.id]||$("dishBatchTemplate").value);
+          const doc=documentFor(dish,templateOverrides[dish.id]||defaultTemplateID);
           encodeJob(doc,count); // validate before any queue writes
           const prefix=$("batchName").value.trim();
           if(prefix)doc.name=prefix+" · "+doc.name;
@@ -262,17 +287,44 @@
         $("dishFormHint").textContent="Есть несохранённые изменения";
       }
     });
-    $("dishBatchTemplate").addEventListener("change",()=>{renderBatch();if(previewID)previewDish(previewID);});
+    $("dishBatchTemplate").addEventListener("click",e=>{
+      const button=e.target.closest("[data-pick-default]");
+      if(!button)return;
+      defaultTemplateID=button.dataset.pickDefault;
+      pickerFor=null;renderBatch();
+      if(previewID)previewDish(previewID);
+    });
     $("dishBatchRows").addEventListener("change",e=>{
       const target=e.target,id=target.dataset.dishSelect;
       if(id){if(target.checked)selected.add(id);else selected.delete(id);}
       if(target.dataset.dishCopies){
-        const n=Number(target.value);
-        if(Number.isInteger(n)&&n>=1&&n<=200)copies[target.dataset.dishCopies]=n;
-        else note("Копий от 1 до 200",true);
+        const raw=String(target.value||"").trim();
+        const n=Number(raw);
+        if(/^\d+$/.test(raw)&&Number.isInteger(n)&&n>=1&&n<=200)
+          copies[target.dataset.dishCopies]=n;
+        else note("Копий должно быть от 1 до 200",true);
       }
-      if(target.dataset.dishTemplate)templateOverrides[target.dataset.dishTemplate]=target.value;
-      renderBatch();if(previewID)previewDish(previewID);
+      renderBatch();
+    });
+    $("dishBatchRows").addEventListener("click",e=>{
+      const target=e.target;
+      const step=target.closest("[data-copy-step]");
+      if(step){
+        const id=step.dataset.dishId,delta=Number(step.dataset.copyStep);
+        copies[id]=Math.max(1,Math.min(200,(copies[id]||1)+delta));
+        renderBatch();return;
+      }
+      const open=target.closest("[data-open-template]");
+      if(open){pickerFor=pickerFor===open.dataset.openTemplate?null:open.dataset.openTemplate;
+        renderBatch();return;}
+      const close=target.closest("[data-close-picker]");
+      if(close){pickerFor=null;renderBatch();return;}
+      const pick=target.closest("[data-pick-template]");
+      if(pick){
+        templateOverrides[pick.dataset.dishId]=pick.dataset.pickTemplate;
+        pickerFor=null;renderBatch();
+        if(previewID===pick.dataset.dishId)previewDish(previewID);
+      }
     });
     $("selectAllDishes").addEventListener("change",e=>{
       list().forEach(d=>{if(e.target.checked)selected.add(d.id);else selected.delete(d.id);});
