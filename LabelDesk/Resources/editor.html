@@ -207,6 +207,27 @@ body[data-editor-mode="text"] #label{border-color:#c0c8d2}
 .choice-buttons{display:flex;flex-wrap:wrap;gap:6px}
 .choice-buttons button{font-size:11px;padding:7px 11px}
 .choice-buttons button.current{background:#e9edf2;border-color:#9eaaba;font-weight:700;color:#172132}
+
+/* Same input density and +/- controls as the outer application. */
+#props input:not([type="checkbox"]),#props textarea,.dochead input{
+ min-height:38px;border:1px solid #d3dce8;border-radius:9px;background:#fff;padding:8px 11px;
+ font:inherit;color:#172132;max-width:100%;min-width:0
+}
+.editor-stepper{display:flex;align-items:stretch;min-width:0;max-width:260px;
+ border:1px solid #d3dce8;border-radius:9px;background:#fff;overflow:hidden}
+.editor-stepper input{min-width:30px;width:60px;max-width:100%;flex:1;text-align:center;
+ border:0!important;border-radius:0!important;padding:5px!important;outline:0!important}
+.editor-stepper input::-webkit-inner-spin-button,.editor-stepper input::-webkit-outer-spin-button{
+ -webkit-appearance:none;margin:0
+}
+.editor-stepper button{width:34px;min-width:34px;padding:0;background:#f1f4f8;
+ border:0;border-radius:0;font-size:17px;color:#253448}
+.editor-stepper button:first-child{border-right:1px solid #d3dce8}
+.editor-stepper button:last-child{border-left:1px solid #d3dce8}
+.editor-stepper:focus-within{outline:2px solid #91a5c4}
+#editorValidation{font-size:11px;color:#718093;margin-left:10px;max-width:38ch}
+#editorValidation.error{color:#ac3848;font-weight:650}
+
 </style>
 </head>
 <body>
@@ -249,6 +270,7 @@ body[data-editor-mode="text"] #label{border-color:#c0c8d2}
    </div>
    <div id="desk"><div id="label" aria-label="Макет этикетки"><div id="grid"></div></div></div>
    <div id="foot">Щёлкните по объекту или слою для выбора · перетащите для перемещения · тяните за угол для размера · двойной щелчок — текст · стрелки — точное движение</div>
+   <div id="editorValidation" role="status"></div>
  </main>
  <aside class="panel right">
    <div class="panelhead" id="propsTitle">Свойства</div>
@@ -258,6 +280,7 @@ body[data-editor-mode="text"] #label{border-color:#c0c8d2}
 </div>
 <script src="barcodes.js"></script>
 <script src="text-engine.js"></script>
+<script src="raster.js"></script>
 <script>
 (function(){
 "use strict";
@@ -686,9 +709,29 @@ function textInput(value,onChange,multiline,id){
  return el;
 }
 function numInput(value,onChange,min,max,step){
- let el=document.createElement("input");el.type="number";el.step=String(step??0.1);if(min!==undefined)el.min=String(min);if(max!==undefined)el.max=String(max);
- el.value=String(value);el.addEventListener("change",()=>{const n=Number(el.value);if(!Number.isFinite(n))return;checkpoint();onChange(Math.max(min??-1e6,Math.min(max??1e6,n)));renderCanvas();renderLayers();commit();});
- return el;
+ const input=document.createElement("input");input.type="number";
+ input.step=String(step??0.1);if(min!==undefined)input.min=String(min);
+ if(max!==undefined)input.max=String(max);input.value=String(value);
+ const wrapper=document.createElement("div");wrapper.className="editor-stepper";
+ const minus=document.createElement("button"),plus=document.createElement("button");
+ for(const [b,label] of [[minus,"−"],[plus,"＋"]]){b.type="button";b.textContent=label;}
+ function apply(){
+   const n=Number(input.value);if(!Number.isFinite(n))return;
+   const clamped=Math.max(min??-1e6,Math.min(max??1e6,n));
+   input.value=String(clamped);checkpoint();onChange(clamped);
+   renderCanvas();renderLayers();commit();
+ }
+ input.addEventListener("change",apply);
+ function adjust(dir){
+   const unit=Number(step)||1,places=String(unit).split(".")[1]?.length||0;
+   const current=Number(input.value)||0;
+   input.value=String(Math.max(min??-1e6,Math.min(max??1e6,
+     Number((current+dir*unit).toFixed(Math.min(6,places))))));
+   apply();
+ }
+ minus.onclick=()=>adjust(-1);plus.onclick=()=>adjust(1);
+ wrapper.append(minus,input,plus);
+ return wrapper;
 }
 function checkbox(label,value,onChange){
  let row=document.createElement("label");row.className="checkbox";
@@ -970,6 +1013,25 @@ function renderProps(){
  let d=document.createElement("button");d.textContent="Удалить";d.onclick=remove;
  actions.append(c,d);root.appendChild(actions);
 }
+function renderValidation(){
+ const el=$("editorValidation");if(!doc)return;
+ try{
+   if(doc.printMode==="text"){
+     if(!doc.elements.length){el.textContent="Добавьте первую строку.";return;}
+     const p=window.EZ2Text.plan({...doc,
+       marginLeftMM:printerMedia.marginLeftMM,marginRightMM:printerMedia.marginRightMM},
+       {allowPlaceholders:true});
+     el.textContent="CP866: "+p.usedDots+" / 256 точек по высоте · "+
+       p.rows.length+" строк";el.classList.remove("error");
+   }else{
+     window.EZ2Raster.draw(doc); // Uses the same text-overflow checks as printing.
+     const beyond=doc.elements.find(e=>e.xMM+e.widthMM>55||
+       e.yMM+e.heightMM>35);
+     if(beyond)throw Error("Объект за пределами 55×35 мм печати.");
+     el.textContent="Растр: объекты внутри 55×35 мм";el.classList.remove("error");
+   }
+ }catch(e){el.textContent=e.message;el.classList.add("error");}
+}
 function draw(){
  if(!doc)return;
  $("docname").value=doc.name;
@@ -979,7 +1041,7 @@ function draw(){
  $("foot").textContent=doc.printMode==="text"?
    "Текст CP866: строки отображаются и печатаются сверху вниз. Стрелки меняют их порядок; X/Y свободно не задаются. Форма букв приблизительная.":
    "Растр: перемещайте и масштабируйте объекты, точные координаты X/Y будут сохранены.";
- renderLayers();renderCanvas();renderProps();
+ renderLayers();renderCanvas();renderProps();renderValidation();
  $("undo").disabled=!history.length;$("redo").disabled=!future.length;
 }
 window.labelDeskSetMedia=function(media){
