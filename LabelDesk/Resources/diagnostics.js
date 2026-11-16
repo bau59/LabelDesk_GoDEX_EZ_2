@@ -59,7 +59,7 @@
       page++;
       const id="F"+String(page).padStart(2,"0");
       append(id,"Встроенные шрифты · "+page,"text",
-        [text(id+" ШРИФТЫ · ДОТ/СИМВОЛ"),...elements],
+        [text(id+" ШРИФТЫ - DOT/CODE"),...elements],
         "Шрифты","Перед каждой строкой указан код и размер знака в точках.");
       elements=[];total=10;
     };
