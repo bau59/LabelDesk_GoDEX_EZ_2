@@ -122,140 +122,89 @@ function trigger(id,type="click",event){return element(id).fire(type,event);}
 function assertExistsName(name){assert.ok(store.templates.some(t=>t.name===name),"Missing template "+name);}
 (async()=>{
   await settle();
-  assert.ok(html.includes('id="folderDetail"') && html.includes('id="templateDetail"'));
+  assert.ok(html.includes('id="folderDetail"')&&html.includes('id="templateDetail"'));
+  assert.ok(!html.includes('data-view="quick"'),"Quick Fill must not be a navigation section");
   assert.match(element("folders").innerHTML,/Все шаблоны/);
-  assert.match(element("folders").innerHTML,/Без папки/);
   assert.equal(store.folders.length,1);
   assert.equal(store.templates.length,2);
 
-  // 1: Navigate folder, base is selected and quick fill displays its text.
+  // Opening a folder selects its layout directly in the editor, never Quick Fill.
   await click("folder",firstFolder.id);
-  assert.match(element("quickTemplateName").textContent,/Базовый товар/);
-  assert.match(element("folderDetail").innerHTML,/Назначить базовый шаблон/);
-  assert.match(element("quickFields").innerHTML,/Название/);
+  assert.match(element("topTitle").textContent,/Редактор этикеток/);
+  assert.match(element("templates").innerHTML,/Базовый товар/);
+  assert.match(element("templates").innerHTML,/Вариант/);
+  assert.doesNotMatch(element("folderDetail").innerHTML,/Назначить базовый/);
 
-  // 2: Create folder: independent copy, existing base must not move.
-  prompts.push("Новый раздел");
+  // A new folder is PURE STORAGE: it must NOT clone or save a hidden base.
+  const before=store.templates.length;
+  prompts.push("Холодильник");
   await trigger("addFolder");
   assert.equal(store.folders.length,2);
-  const folder=store.folders.find(f=>f.name==="Новый раздел");
-  assert.ok(folder);
-  const createdBase=store.templates.find(t=>t.id===folder.baseTemplateID);
-  assert.ok(createdBase);
-  assert.notEqual(createdBase.id,base.id);
-  assert.equal(store.templates.find(t=>t.id===base.id).folderID,firstFolder.id);
-  assert.equal(createdBase.folderID,folder.id);
-  assert.match(element("folderDetail").innerHTML,/Новый раздел/);
+  assert.equal(store.templates.length,before);
+  const created=store.folders.find(f=>f.name==="Холодильник");
+  assert.ok(created);
+  assert.equal(created.baseTemplateID,undefined,"New folders have no mandatory base");
+  assert.match(element("templates").innerHTML,/нет этикеток/);
 
-  // 3: New template in current folder, save to file.
+  // Save a new label in this folder; it is editable, movable and deletable.
   await trigger("newTemplate");
-  assert.match(element("editorContext").textContent,/Не сохранён/);
   await trigger("saveTemplate");
-  const newVariant=store.templates.find(t=>t.folderID===folder.id&&t.id!==createdBase.id);
-  assert.ok(newVariant);
-  assert.equal(newVariant.widthMM,58);
-  assert.match(element("templates").innerHTML,/Новая этикетка/);
+  const label=store.templates.find(t=>t.folderID===created.id);
+  assert.ok(label);
+  assert.equal(label.name,"Новая этикетка");
 
-  // 4: Assign variant as folder base, then quick fill must switch to it.
-  element("baseChoice").value=newVariant.id;
-  await click("library-action","set-base");
-  assert.equal(store.folders.find(f=>f.id===folder.id).baseTemplateID,newVariant.id);
-  assert.match(element("quickTemplateName").textContent,/Новая этикетка/);
-  assert.ok(store.templates.some(t=>t.id===createdBase.id),"Old base must remain saved");
-
-  // A second, direct one-click star in the list can also change the base.
-  await click("library-action","set-base-row",{templateId:createdBase.id});
-  assert.equal(store.folders.find(f=>f.id===folder.id).baseTemplateID,createdBase.id);
-  element("baseChoice").value=newVariant.id;
-  await click("library-action","set-base");
-  assert.equal(store.folders.find(f=>f.id===folder.id).baseTemplateID,newVariant.id);
-
-  // 5: Move old base to unfiled; current base cannot move.
-  await click("template",createdBase.id);
-  element("moveTarget").value="unfiled";
-  await click("library-action","move-selected");
-  assert.equal(store.templates.find(t=>t.id===createdBase.id).folderID,null);
-  assert.equal(store.folders.find(f=>f.id===folder.id).baseTemplateID,newVariant.id);
-  assert.match(element("folders").innerHTML,/Без папки/);
-
-  // 6: Rename folder and persist to folders.json.
-  await click("folder",folder.id);
-  prompts.push("Новое имя");
-  await click("library-action","rename-folder");
-  assert.equal(store.folders.find(f=>f.id===folder.id).name,"Новое имя");
-  assert.match(element("folders").innerHTML,/Новое имя/);
-
-  // 7: Delete folder moves ALL remaining members to unfiled; files remain.
-  const templateCount=store.templates.length;
-  await click("library-action","delete-folder");
-  assert.equal(store.folders.some(f=>f.id===folder.id),false);
-  assert.equal(store.templates.length,templateCount);
-  assert.equal(store.templates.find(t=>t.id===newVariant.id).folderID,null);
-  assertExistsName("Базовый товар");
-  assertExistsName("Новая этикетка");
-
-  // 8: Search filters the list, not stored templates.
-  element("templateSearch").value="Вариант";
-  await trigger("templateSearch","input");
-  assert.match(element("templates").innerHTML,/Вариант/);
-  assert.doesNotMatch(element("templates").innerHTML,/Базовый товар/);
-  element("templateSearch").value="";
-  await trigger("templateSearch","input");
-  assert.doesNotMatch(element("templates").innerHTML,/Базовый товар/,
-    "No query means respect current unfiled folder filter");
-  await click("folder","all");
-  assert.match(element("templates").innerHTML,/Базовый товар/,
-    "All templates shows items from all folders");
-
-  // 9: Editing + dirty confirmation must prevent discarding a draft.
-  await click("template",base.id);
-  const unsaved=copy(store.templates.find(t=>t.id===base.id));
-  unsaved.name="Неподтвержденный черновик";
+  // Draft guard still works for real edits.
+  const edited=copy(label);edited.name="Несохранённый заголовок";
   window.listeners.get("message")({source:frame,
-    data:{source:"labeldesk-editor",type:"document",json:JSON.stringify(unsaved)}});
+    data:{source:"labeldesk-editor",type:"document",json:JSON.stringify(edited)}});
   assert.match(element("editorContext").textContent,/Не сохранён/);
   window.confirm=()=>false;
   await click("folder",firstFolder.id);
-  assert.match(element("editorContext").textContent,/Неподтвержденный черновик/);
-  assert.equal(store.templates.find(t=>t.id===base.id).name,"Базовый товар");
+  assert.match(element("editorContext").textContent,/Несохранённый заголовок/);
   window.confirm=()=>true;
-
-  // 10: Quick fill is detached from saved base and produces a persisted job.
   await click("folder",firstFolder.id);
-  element("quickCopies").value="2";
-  const field=unsaved.elements[0].id;
-  element("quickFields").fire("input",{target:{dataset:{field},value:"Новый текст"}});
-  const barcodeID=unsaved.elements[1].id;
-  element("quickFields").fire("input",{target:{dataset:{field:barcodeID},value:"654321"}});
-  await trigger("queueQuick");
-  assert.equal(store.queue.length,1);
-  assert.equal(store.queue[0].copies,2);
-  assert.equal(store.queue[0].document.elements[0].value,"Новый текст");
-  assert.equal(store.queue[0].document.elements[1].value,"654321");
-  assert.equal(store.templates.find(t=>t.id===base.id).elements[0].value,"Старое");
-  assert.equal(store.templates.find(t=>t.id===base.id).elements[1].value,"123456",
-    "Variable barcode quick fill must not change base template");
 
-  // 11: Reopen job and verify native serial receives packet without modifying protocol.
-  await trigger("printOne");
-  assert.equal(store.printJobs.length,1);
-  assert.equal(store.printJobs[0].copies,2);
-  assert.equal(store.printJobs[0].port,"/dev/cu.usbserial-1430");
+  // Direct folder-row actions, no nested "base" selector or hidden menu.
+  prompts.push("Новая полка");
+  await click("folder-action","rename",{folderId:created.id});
+  assert.ok(store.folders.some(f=>f.name==="Новая полка"));
+  await click("folder",created.id);
+  await click("template",label.id);
+  await click("move-to","unfiled");
+  assert.equal(store.templates.find(t=>t.id===label.id).folderID,null);
+  assert.match(element("notify").textContent,/перемещён|перемещена/i);
 
-  // 12: Failed folder write rolls back the cloned base; library unchanged.
-  const before=store.templates.length;
+  // Delete the old folder directly; its templates are preserved as unfiled.
+  const countBefore=store.templates.length;
+  await click("folder-action","delete",{folderId:firstFolder.id});
+  assert.equal(store.folders.some(f=>f.id===firstFolder.id),false);
+  assert.equal(store.templates.length,countBefore);
+  assert.equal(store.templates.find(t=>t.id===base.id).folderID,null);
+  assert.equal(store.templates.find(t=>t.id===secondary.id).folderID,null);
+
+  // Even a formerly starred "base template" can be edited/deleted.
+  await click("folder","all");
+  await click("template",base.id);
+  await click("library-action","delete-selected");
+  assert.equal(store.templates.some(t=>t.id===base.id),false);
+  assert.ok(store.templates.some(t=>t.id===secondary.id));
+
+  // Search remains global and folder selection is only a filter.
+  element("templateSearch").value="Вариант";
+  await trigger("templateSearch","input");
+  assert.match(element("templates").innerHTML,/Вариант/);
+  element("templateSearch").value="";
+  await trigger("templateSearch","input");
+
+  // File-write error must never create an orphaned folder or copied label.
+  const beforeFolder=store.folders.length,beforeTemplates=store.templates.length;
   prompts.push("Сбойная папка");
   failNextFolderSave=true;
   await trigger("addFolder");
-  assert.equal(store.templates.length,before);
-  assert.equal(store.folders.some(f=>f.name==="Сбойная папка"),false);
+  assert.equal(store.folders.length,beforeFolder);
+  assert.equal(store.templates.length,beforeTemplates);
   assert.match(element("notify").textContent,/Не удалось создать папку/);
-
-  // 13: All saved data survives the fake app reload; new UI does not reset JSON.
-  const snapshots=copy({templates:store.templates,folders:store.folders,queue:store.queue});
-  assert.equal(copy(store.templates).length,snapshots.templates.length);
-  assert.equal(copy(store.folders).length,snapshots.folders.length);
-  assert.equal(copy(store.queue).length,snapshots.queue.length);
   assert.ok(log.includes("saveTemplate")&&log.includes("saveData"));
-  console.log("Sidebar integration passed: folder create/base/rename/delete, template move/search, dirty guard, quick fill, queue, rollback.");
+
+  console.log("Sidebar workflow passed: pure folders, direct rename/delete, template edit/move/delete, draft guard, rollback.");
 })().catch(err=>{console.error(err);process.exitCode=1;});
