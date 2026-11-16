@@ -56,6 +56,7 @@ final class WebLabelDeskBridge: NSObject, WKScriptMessageHandler, WKNavigationDe
         let manifest = try JSONSerialization.data(withJSONObject: newHashes,
                                                   options: [.sortedKeys])
         try manifest.write(to: manifestURL, options: .atomic)
+        try warnAboutModifiedRuntime()
         return runtime
     }
 
@@ -146,6 +147,32 @@ final class WebLabelDeskBridge: NSObject, WKScriptMessageHandler, WKNavigationDe
                 return true
             }
             return sha256(bundled) != sha256(current)
+        }
+    }
+
+    /// Native prompt also works when an outdated custom app.js cannot show its
+    /// own Settings warning. Never overwrite custom runtime files silently.
+    private func warnAboutModifiedRuntime() throws {
+        let changed = runtimeWarnings()
+        if changed.isEmpty { return }
+        let version = Bundle.main.infoDictionary?["CFBundleShortVersionString"] as? String ?? ""
+        let signature = sha256(Data((version + "|" + changed.joined(separator: "|")).utf8))
+        let preference = "LabelDesk.runtimeWarning"
+        if UserDefaults.standard.string(forKey: preference) == signature { return }
+        let alert = NSAlert()
+        alert.messageText = "Рабочие файлы отличаются от LabelDesk " + version
+        alert.informativeText = "Обнаружены изменения: " +
+            changed.prefix(5).joined(separator: ", ") +
+            (changed.count > 5 ? " и другие." : ".") +
+            "\\nШтатные ресурсы можно восстановить без удаления каталога и шаблонов. " +
+            "Перед заменой файлы сохраняются в Backups."
+        alert.addButton(withTitle: "Восстановить штатные")
+        alert.addButton(withTitle: "Оставить мои изменения")
+        if alert.runModal() == .alertFirstButtonReturn {
+            try restoreBundledRuntime()
+            UserDefaults.standard.removeObject(forKey: preference)
+        } else {
+            UserDefaults.standard.set(signature, forKey: preference)
         }
     }
 
