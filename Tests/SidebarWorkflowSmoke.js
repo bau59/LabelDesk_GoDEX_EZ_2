@@ -128,12 +128,15 @@ function assertExistsName(name){assert.ok(store.templates.some(t=>t.name===name)
   assert.equal(store.folders.length,1);
   assert.equal(store.templates.length,2);
 
-  // Opening a folder selects its layout directly in the editor, never Quick Fill.
+  // Folder selection shows the main label list, not an arbitrary first editor.
   await click("folder",firstFolder.id);
   assert.match(element("topTitle").textContent,/Редактор этикеток/);
   assert.match(element("templates").innerHTML,/Базовый товар/);
   assert.match(element("templates").innerHTML,/Вариант/);
-  assert.doesNotMatch(element("folderDetail").innerHTML,/Назначить базовый/);
+  assert.equal(element("editorWorkspace").hidden,true);
+  assert.equal(element("editorLibrary").hidden,false);
+  assert.match(html,/id="templates" class="template-main-list"/);
+  assert.ok(!html.includes('id="dishList"></div>\n  </div>'),"Record list must not be in sidebar");
 
   // A new folder is PURE STORAGE: it must NOT clone or save a hidden base.
   const before=store.templates.length;
@@ -147,7 +150,8 @@ function assertExistsName(name){assert.ok(store.templates.some(t=>t.name===name)
   assert.match(element("templates").innerHTML,/нет этикеток/);
 
   // Save a new label in this folder; it is editable, movable and deletable.
-  await trigger("newTemplate");
+  await trigger("newTemplateMain");
+  assert.equal(element("editorWorkspace").hidden,false);
   await trigger("saveTemplate");
   const label=store.templates.find(t=>t.folderID===created.id);
   assert.ok(label);
@@ -169,8 +173,9 @@ function assertExistsName(name){assert.ok(store.templates.some(t=>t.name===name)
   await click("folder-action","rename",{folderId:created.id});
   assert.ok(store.folders.some(f=>f.name==="Новая полка"));
   await click("folder",created.id);
-  await click("template",label.id);
-  await click("move-to","unfiled");
+  await click("template-move",label.id);
+  assert.match(element("templates").innerHTML,/data-move-to="unfiled"/);
+  await click("move-to","unfiled",{templateId:label.id});
   assert.equal(store.templates.find(t=>t.id===label.id).folderID,null);
   assert.match(element("notify").textContent,/перемещён|перемещена/i);
 
@@ -184,12 +189,11 @@ function assertExistsName(name){assert.ok(store.templates.some(t=>t.name===name)
 
   // Even a formerly starred "base template" can be edited/deleted.
   await click("folder","all");
-  await click("template",base.id);
-  await click("library-action","delete-selected");
+  await click("template-remove",base.id);
   assert.equal(store.templates.some(t=>t.id===base.id),false);
   assert.ok(store.templates.some(t=>t.id===secondary.id));
 
-  // Search remains global and folder selection is only a filter.
+  // Search stays in the main list; folder selection controls the scope.
   element("templateSearch").value="Вариант";
   await trigger("templateSearch","input");
   assert.match(element("templates").innerHTML,/Вариант/);
@@ -205,6 +209,19 @@ function assertExistsName(name){assert.ok(store.templates.some(t=>t.name===name)
   assert.equal(store.templates.length,beforeTemplates);
   assert.match(element("notify").textContent,/Не удалось создать папку/);
   assert.ok(log.includes("saveTemplate")&&log.includes("saveData"));
+  // Save margins via the actual settings handler and confirm persisted JSON,
+  // input round-trip and compatibility with all other profile fields.
+  element("marginLeft").value="3";element("marginRight").value="4";
+  await trigger("saveMarginSettings");
+  assert.equal(store.settings.profile.marginLeftMM,3);
+  assert.equal(store.settings.profile.marginRightMM,4);
+  assert.equal(store.settings.profile.portPath,"/dev/cu.usbserial-1430");
+  assert.equal(element("marginLeft").value,3);
+  assert.equal(element("marginRight").value,4);
+  element("marginLeft").value="16";
+  await trigger("saveMarginSettings");
+  assert.equal(store.settings.profile.marginLeftMM,3,"Invalid margins must not be saved");
+  assert.match(element("notify").textContent,/Отступы/);
 
   console.log("Sidebar workflow passed: pure folders, direct rename/delete, template edit/move/delete, draft guard, rollback.");
 })().catch(err=>{console.error(err);process.exitCode=1;});
