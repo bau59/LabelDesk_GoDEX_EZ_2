@@ -14,6 +14,7 @@ on:
       - feat/ez2-native-fonts-barcodes-editor
       - feat/native-cp866-food-presets-105
       - feat/universal-items-ui-107
+      - feat/simple-folders-margins-108
   workflow_dispatch:
 
 permissions:
@@ -214,4 +215,4 @@ jobs:
             --repo "$GITHUB_REPOSITORY" \
             --target "$GITHUB_SHA" \
             --title "LabelDesk ${APP_VERSION}" \
-            --notes "LabelDesk 1.0.7 for Intel macOS 15+. Universal item catalog (product, food or generic data) with named custom fields. Template variables match standard or user-defined item fields; missing and empty values omit the label element instead of blocking printing. Default sidebar shows catalog or template folders, not obsolete quick-fill. New clean left navigation, tighter form hierarchy, optional detail sections and adjusted label editor appearance. Old dishes.json is read non-destructively; updated records are stored in items.json. Existing templates, folders, queues, printer protocol and updater are preserved. Native CP866 and raster transport unchanged, physical output still requires user verification. Ad-hoc signed, not notarized."
+            --notes "LabelDesk 1.0.8 for Intel macOS 15+. Folder organization is now simple: a folder is just a grouping for label templates. Create folders without implicit base copies; rename and delete folders directly in the sidebar, moving their labels to Unfiled; any template can be edited, duplicated, moved or deleted, including former base templates. Print batch UI uses large minus/plus copy controls and visible selectable template cards rather than native spinner and template dropdowns. Printer Settings now allow configurable whole-millimeter left/right safe margins (0-15 mm each) for text-mode CP866 labels; margins affect the real Mnn positioning, line wrapping and editor guides. The verified F0/q040/M01 framing and raster transport remain unchanged. Existing folder, template, item and queue JSON files are preserved. Margin behavior has automated tests; check physical output on a single label before batch printing. Ad-hoc signed, not notarized."
