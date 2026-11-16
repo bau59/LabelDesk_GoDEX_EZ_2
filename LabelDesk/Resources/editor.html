@@ -203,6 +203,10 @@ body[data-editor-mode="text"] #label{border-color:#c0c8d2}
 .zoom-controls button{font-size:11px;padding:6px 9px}
 .zoom-controls span{min-width:38px;text-align:center;font-size:11px;color:#677589}
 .layer-picker,.layer-width-control{display:none!important}
+
+.choice-buttons{display:flex;flex-wrap:wrap;gap:6px}
+.choice-buttons button{font-size:11px;padding:7px 11px}
+.choice-buttons button.current{background:#e9edf2;border-color:#9eaaba;font-weight:700;color:#172132}
 </style>
 </head>
 <body>
@@ -730,6 +734,14 @@ function fontGallery(element,codes){
  return box;
 }
 
+function choiceButtons(options,chosen,onChange){
+  const box=document.createElement("div");box.className="choice-buttons";
+  for(const [key,label] of options){
+    const b=document.createElement("button");b.type="button";b.textContent=label;
+    b.className=key===chosen?"current":"";b.onclick=()=>onChange(key);box.appendChild(b);
+  }
+  return box;
+}
 function renderProps(){
  const root=$("props");root.replaceChildren();if(!doc)return;
  const e=selectedObj();
@@ -848,14 +860,9 @@ function renderProps(){
    if(doc.printMode!=="text")
      root.appendChild(prop("Кегль, pt (для растра)",numInput(e.fontSize,n=>{e.fontSize=n;},5,52,1)));
    if(doc.printMode!=="text"){
-     const modes=document.createElement("select");
-     for(const [id,label] of [["auto","Растровый текст"],
-        ["device","Штатный шрифт — диагностический тест"]]){
-       let opt=document.createElement("option");opt.value=id;opt.textContent=label;modes.appendChild(opt);
-     }
-     modes.value=e.renderMode||"auto";
-     modes.addEventListener("change",()=>{checkpoint();e.renderMode=modes.value;renderProps();commit();});
-     root.appendChild(prop("Способ вывода (растр)",modes));
+     root.appendChild(prop("Способ вывода",choiceButtons([
+      ["auto","Растровый текст"],["device","Штатный шрифт (диагностика)"]],
+      e.renderMode||"auto",v=>{checkpoint();e.renderMode=v;renderProps();commit();})));
    }
    if(doc.printMode==="text"||e.renderMode==="device"){
      if(doc.printMode==="text"){
@@ -872,13 +879,8 @@ function renderProps(){
           " точек на символ · 8 точек ≈ 1 мм. Форма букв приблизительная, размеры и перенос — из планировщика печати.";
        root.appendChild(info);
      }else{
-       const fonts=document.createElement("select");
-       for(const code of ["A11","A12","A13","A14","A21","A22","A31","A41","A00","A01","A02","A03","A04"]){
-         const opt=document.createElement("option");opt.value=code;opt.textContent=code;fonts.appendChild(opt);
-       }
-       fonts.value=e.deviceFont||"A11";
-       fonts.addEventListener("change",()=>{checkpoint();e.deviceFont=fonts.value;draw();commit();});
-       root.appendChild(prop("Штатный шрифт для диагностики",fonts));
+       root.appendChild(prop("Размер диагностического шрифта",fontGallery(e,
+     ["A00","A01","A02","A03","A04","A11","A12","A13","A21","A22"])));
      }
      const warn=document.createElement("p");warn.className="warn";
      warn.textContent="GoDEX EZ-2: CP866, включая русские буквы и Ё/ё, подтверждён. Режим печатает последовательными строками; расположение по Y ориентировочное.";
@@ -898,6 +900,7 @@ function renderProps(){
      }else root.appendChild(prop("Символы CP866",symbols));
    if(doc.printMode!=="text")
      root.appendChild(checkbox("Жирный",e.isBold,n=>{e.isBold=n;}));
+   else root.appendChild(checkbox("Инверсия текста (ESC V)",e.reversePrint,n=>{e.reversePrint=n;}));
    const alignControls=document.createElement("div");alignControls.className="text-align-controls";
    for(const [mode,title] of [["left","По левому краю"],["center","По центру"],["right","По правому краю"]]){
      const button=document.createElement("button");button.type="button";
@@ -915,19 +918,14 @@ function renderProps(){
      root.appendChild(prop("Имя поля в карточке каталога",
        textInput(e.fieldName||"",v=>{e.fieldName=v;},false,"field-name")));
    }
-   let rotation=document.createElement("select");
-   for(let angle of [0,90,180,270]){let opt=document.createElement("option");opt.value=angle;opt.textContent=angle+"°";rotation.append(opt);}rotation.value=e.rotation;
-   rotation.addEventListener("change",()=>{checkpoint();e.rotation=Number(rotation.value);renderCanvas();commit();});
-   if(doc.printMode!=="text")root.appendChild(prop("Поворот",rotation));
+   if(doc.printMode!=="text")
+      root.appendChild(prop("Поворот",choiceButtons(
+        [0,90,180,270].map(x=>[String(x),x+"°"]),String(e.rotation||0),
+        v=>{checkpoint();e.rotation=Number(v);renderCanvas();renderProps();commit();})));
  } else if(e.kind==="barcode"){
-   const kind=document.createElement("select");
-   for(const [id,label] of [["CODE128","Code 128 (автоматически B/C)"],["CODE39","Code 39"],
-      ["EAN13","EAN-13 (с контрольной цифрой)"],["EAN8","EAN-8 (с контрольной цифрой)"]]){
-     const opt=document.createElement("option");opt.value=id;opt.textContent=label;kind.appendChild(opt);
-   }
-   kind.value=e.barcodeType||"CODE39";
-   kind.addEventListener("change",()=>{checkpoint();e.barcodeType=kind.value;draw();commit();});
-   root.appendChild(prop("Формат штрихкода",kind));
+   root.appendChild(prop("Тип штрихкода",choiceButtons([
+      ["CODE128","Code 128"],["CODE39","Code 39"],["EAN13","EAN-13"],["EAN8","EAN-8"]],
+      e.barcodeType||"CODE128",v=>{checkpoint();e.barcodeType=v;draw();commit();})));
    root.appendChild(checkbox("Печатать цифры под штрихкодом",e.showsHumanReadable,n=>{e.showsHumanReadable=n;}));
    root.appendChild(checkbox("Менять данные при заполнении",e.isVariable!==false,n=>{e.isVariable=n;renderLayers();}));
    if(e.isVariable!==false){
