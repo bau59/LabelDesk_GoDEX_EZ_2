@@ -14,7 +14,7 @@
     return (h.slice(0,8)+"-"+h.slice(8,12)+"-"+h.slice(12,16)+"-"+h.slice(16,20)+"-"+h.slice(20)).toUpperCase();
   };
   const defaultProfile=()=>({portPath:"",rasterThreshold:128,labelIntervalSeconds:1.5,
-    mediaWidthMM:58,mediaHeightMM:38,mediaGapMM:2});
+    mediaWidthMM:58,mediaHeightMM:38,mediaGapMM:2,marginLeftMM:0,marginRightMM:0});
   const media=()=>EZ2Raster.mediaFromProfile(state.profile);
   const compatibility=doc=>EZ2Raster.compatibility(doc,media());
   const canPrint=doc=>compatibility(doc).ok && EZ2Raster.transportReady(media());
@@ -26,8 +26,12 @@
   // Only explicitly marked line-layout documents use native CP866 commands.
   // Existing documents without printMode retain their proven raster behavior.
   const isTextDoc=doc=>doc?.printMode==="text";
+  function withPrintMargins(doc){
+    return {...doc,marginLeftMM:Number(state.profile.marginLeftMM||0),
+      marginRightMM:Number(state.profile.marginRightMM||0)};
+  }
   const encodeJob=(doc,copies=1)=>isTextDoc(doc)
-    ?EZ2Text.build(doc,copies)
+    ?EZ2Text.build(withPrintMargins(doc),copies)
     :EZ2Raster.encode(doc,state.profile.rasterThreshold);
 
   let nextRequest=1;
@@ -73,11 +77,9 @@
   function findFolder(id){return state.folders.find(f=>keySame(f.id,id));}
   function selectedFolder(){return findFolder(state.selectedFolderID);}
   function baseTemplate(){
-    const folder=selectedFolder();
-    // Missing base must never silently print a different selected template.
-    return folder ? (findTemplate(folder.baseTemplateID)||null) : state.current;
+    return state.current;
   }
-  function isBase(id){return state.folders.some(f=>keySame(f.baseTemplateID,id));}
+  function isBase(_id){return false;} // Legacy folder base metadata is ignored.
   function confirmDiscard(){
     return !state.dirty || window.confirm("Текущий макет не сохранён. Отменить изменения?");
   }
@@ -122,7 +124,9 @@
     if(state.editorReady && state.current){
       $("editorFrame").contentWindow.postMessage({
         source:"labeldesk-app",type:"load",
-        document:clone(state.current),media:media()
+        document:clone(state.current),media:{...media(),
+          marginLeftMM:Number(state.profile.marginLeftMM||0),
+          marginRightMM:Number(state.profile.marginRightMM||0)}
       },"*");
     }
   }
@@ -161,72 +165,48 @@
 
   function renderLibrary(){
     updateCounts();
-    const folderCount=id=>state.templates.filter(t=>keySame(t.folderID,id)).length;
-    const folderRow=(id,title,glyph,count)=>'<button class="item '+
-      (keySame(id,state.folderFilter)?'active':'')+'" data-folder="'+esc(id)+'">'+
-      '<span class="sidebar-row"><span class="glyph">'+glyph+'</span><span class="item-content">'+
-      esc(title)+'</span><span class="count">'+count+'</span></span></button>';
-    $("folders").innerHTML=
-      folderRow("all","Все шаблоны","▦",state.templates.length)+
-      folderRow("unfiled","Без папки","□",folderCount(null))+
-      state.folders.slice().sort((a,b)=>a.name.localeCompare(b.name,"ru")).map(f=>
-        folderRow(f.id,f.name,"▣",folderCount(f.id))).join("");
+    const count=id=>state.templates.filter(t=>keySame(t.folderID,id)).length;
+    const folderRow=(id,name,glyph,n)=>'<div class="folder-entry">'+
+      '<button class="item '+(keySame(id,state.folderFilter)?'active':'')+
+      '" data-folder="'+esc(id)+'"><span class="sidebar-row"><span class="glyph">'+glyph+
+      '</span><span class="item-content">'+esc(name)+'</span><span class="count">'+n+
+      '</span></span></button>'+
+      (id==="all"||id==="unfiled"?'':'<div class="folder-row-actions">'+
+        '<button title="Переименовать папку" data-folder-action="rename" data-folder-id="'+esc(id)+'">✎</button>'+
+        '<button title="Удалить папку (шаблоны сохранятся)" data-folder-action="delete" data-folder-id="'+esc(id)+'">×</button></div>')+
+      '</div>';
+    $("folders").innerHTML=folderRow("all","Все шаблоны","▦",state.templates.length)+
+      folderRow("unfiled","Без папки","□",count(null))+
+      state.folders.slice().sort((a,b)=>a.name.localeCompare(b.name,"ru"))
+        .map(f=>folderRow(f.id,f.name,"▣",count(f.id))).join("");
     const visible=visibleTemplates();
     $("templates").innerHTML=visible.length?visible.map(t=>{
       const check=compatibility(t);
-      const base=isBase(t.id);
-      const inActiveFolder=!!selectedFolder()&&keySame(t.folderID,state.selectedFolderID);
-      const starred=base?'<span class="row-star selected" title="Базовый шаблон">★</span>':
-        inActiveFolder?'<button class="row-star" title="Назначить базовым шаблоном"'+
-          ' data-library-action="set-base-row" data-template-id="'+esc(t.id)+'">☆</button>':'';
       return '<div class="template-entry"><button class="item '+
-        (keySame(t.id,state.selectedID)?'active':'')+
-        '" data-template="'+esc(t.id)+'" title="'+esc(check.ok?"Подходит к установленному рулону":check.reason)+'">'+
-        '<span class="sidebar-row"><span class="glyph">▤</span>'+
-        '<span class="item-content">'+esc(t.name)+
-        '<small>'+esc(t.widthMM)+' × '+esc(t.heightMM)+' мм · зазор '+esc(t.gapMM)+' мм</small>'+
-        (base?'<small>Базовый макет</small>':'')+
-        (check.ok?'':'<small class="media-incompatible">⚠ Несовместим с рулоном</small>')+
-        '</span></span></button>'+starred+'</div>';
-    }).join(""):'<p class="empty">Здесь пока нет шаблонов.</p>';
+        (keySame(t.id,state.selectedID)?'active':'')+'" data-template="'+esc(t.id)+
+        '"><span class="sidebar-row"><span class="glyph">▤</span><span class="item-content">'+
+        esc(t.name)+'<small>'+esc(t.widthMM)+' × '+esc(t.heightMM)+' мм</small>'+
+        (!check.ok?'<small class="media-incompatible">⚠ '+esc(check.reason)+'</small>':'')+
+        '</span></span></button></div>';
+    }).join(""):'<p class="empty">В папке нет этикеток. Нажмите «Новый шаблон».</p>';
     const folder=selectedFolder();
-    if(folder){
-      const choices=state.templates.filter(t=>keySame(t.folderID,folder.id))
-        .sort((a,b)=>a.name.localeCompare(b.name,"ru"));
-      const base=findTemplate(folder.baseTemplateID);
-      $("folderDetail").innerHTML='<details><summary>Управление папкой</summary><div><h3>'+esc(folder.name)+'</h3>'+
-        '<p>Базовый макет: '+(base?esc(base.name):'<span class="media-incompatible">не назначен</span>')+'</p>'+
-        '<label for="baseChoice">Назначить базовый шаблон</label>'+
-        '<select id="baseChoice">'+choices.map(t=>'<option value="'+esc(t.id)+'"'+
-          (keySame(t.id,folder.baseTemplateID)?' selected':'')+'>'+esc(t.name)+'</option>').join("")+'</select>'+
-        '<div class="actions"><button data-library-action="set-base" '+(!choices.length?'disabled':'')+
-        '>Назначить</button><button data-library-action="edit-base" '+(!base?'disabled':'')+
-        '>Изменить макет</button></div><div class="actions">'+
-        '<button data-library-action="rename-folder">Переименовать</button>'+
-        '<button data-library-action="delete-folder" class="danger">Удалить папку</button></div></div></details>';
-    }else{
-      $("folderDetail").innerHTML="";
-    }
+    $("folderDetail").innerHTML=folder?
+      '<p class="library-hint">Папка «'+esc(folder.name)+'» · '+count(folder.id)+
+      ' этикеток. Для новой этикетки нажмите «＋ Новый шаблон» сверху.</p>':"";
     const chosen=findTemplate(state.selectedID);
-    if(chosen && visible.some(t=>keySame(t.id,chosen.id))){
+    if(chosen&&visible.some(t=>keySame(t.id,chosen.id))){
       const targets=[{id:"unfiled",name:"Без папки"},...state.folders];
-      $("templateDetail").innerHTML='<details><summary>Управление шаблоном</summary><div><h3>Действия с шаблоном</h3><p>'+
-        esc(chosen.name)+'</p><div class="actions">'+
-        '<button data-library-action="edit-selected">Редактировать</button>'+
-        '<button data-library-action="duplicate-selected">Создать копию</button></div>'+
-        '<label for="moveTarget">Переместить в папку</label><select id="moveTarget">'+
-        targets.map(f=>'<option value="'+esc(f.id)+'"'+
-          (keySame(chosen.folderID,f.id)||(f.id==="unfiled"&&!chosen.folderID)?' selected':'')+
-          '>'+esc(f.name)+'</option>').join("")+'</select>'+
-        '<div class="actions"><button data-library-action="move-selected" '+
-        (isBase(chosen.id)?'disabled title="Сначала назначьте другой базовый макет"':'')+
-        '>Переместить</button>'+
-        '<button data-library-action="delete-selected" class="danger" '+
-        (isBase(chosen.id)?'disabled title="Сначала назначьте другой базовый макет"':'')+
-        '>Удалить шаблон</button></div></div></details>';
-    }else{
-      $("templateDetail").innerHTML="";
-    }
+      $("templateDetail").innerHTML='<div class="template-actions">'+
+        '<h3>'+esc(chosen.name)+'</h3><div class="actions">'+
+        '<button data-library-action="edit-selected">Открыть</button>'+
+        '<button data-library-action="duplicate-selected">Копия</button>'+
+        '<button data-library-action="delete-selected" class="danger">Удалить</button></div>'+
+        '<p class="library-hint">Переместить в папку:</p>'+
+        '<div class="folder-choices">'+targets.map(f=>
+          '<button data-move-to="'+esc(f.id)+'"'+
+          (keySame(chosen.folderID,f.id)||(f.id==="unfiled"&&!chosen.folderID)?' class="selected" disabled':'')+
+          '>'+esc(f.name)+'</button>').join("")+'</div></div>';
+    }else $("templateDetail").innerHTML="";
   }
   function selectTemplate(id){
     const t=findTemplate(id);
@@ -241,24 +221,18 @@
   function selectFolder(id){
     const filter=id==="all"||id==="unfiled"?id:String(id);
     if(filter===state.folderFilter)return;
-    // Simply filtering the library must not destroy unsaved editor state.
-    if(filter==="all"||filter==="unfiled"){
-      state.folderFilter=filter;state.selectedFolderID=null;
-      renderLibrary();if(state.view==="quick")renderQuick();
-      return;
-    }
+    if(!confirmDiscard())return;
     const folder=findFolder(filter);
-    if(!folder||!confirmDiscard())return;
-    state.folderFilter=folder.id;
-    state.selectedFolderID=folder.id;
-    const base=findTemplate(folder.baseTemplateID);
-    state.current=base?clone(base):null;
-    state.selectedID=base?.id||null;
+    if(filter!=="all"&&filter!=="unfiled"&&!folder)return;
+    state.folderFilter=filter;
+    state.selectedFolderID=folder?.id||null;
+    const first=visibleTemplates()[0];
+    state.current=first?clone(first):newDocument();
+    if(!first&&folder)state.current.folderID=folder.id;
+    state.selectedID=state.current.id;
     state.dirty=false;state.quickValues={};
-    renderLibrary();
-    renderQuick(); // Keep old quick-fill binding for existing local data/tests.
-    selectView("editor");
-    note("Папка шаблонов: "+folder.name+(base?"":" · назначьте основной макет"));
+    renderLibrary();selectView("editor");
+    note(folder?"Папка: "+folder.name:"Список шаблонов");
   }
   async function saveTemplateDocument(doc){
     await native("saveTemplate",{document:JSON.stringify(doc)});
@@ -315,7 +289,6 @@
   async function deleteCurrent(){
     const doc=findTemplate(state.selectedID);
     if(!doc){note("Выберите сохранённый шаблон",true);return;}
-    if(isBase(doc.id)){note("Этот шаблон базовый. Сначала назначьте другой базовый макет папки.",true);return;}
     if(state.dirty&&!confirmDiscard())return;
     if(!window.confirm("Удалить шаблон «"+doc.name+"»? Это действие нельзя отменить."))return;
     try{
@@ -334,36 +307,21 @@
     if(!name)return;
     if(name.length>60){note("Название папки — максимум 60 символов",true);return;}
     if(state.folders.some(f=>keySame(f.name,name))){
-      note("Папка с таким названием уже есть",true);return;
+      note("Папка с таким названием уже существует",true);return;
     }
-    if(state.dirty&&!window.confirm("Несохранённые изменения будут скопированы в базовый макет новой папки. Продолжить?"))return;
-    const source=state.current||newDocument();
-    const folderID=uuid(),base=clone(source);
-    base.id=uuid();base.folderID=folderID;base.name="Базовый макет";
-    base.updatedAt=stamp();
-    const folder={id:folderID,name,baseTemplateID:base.id,createdAt:stamp()};
-    let baseCreated=false;
+    if(!confirmDiscard())return;
+    const folder={id:uuid(),name,createdAt:stamp()};
     try{
-      // Original source remains where it was. The new folder gets its own copy.
-      await native("saveTemplate",{document:JSON.stringify(base)});
-      baseCreated=true;
       await saveFolderList([...state.folders,folder]);
-      state.templates.push(clone(base));
-      state.folderFilter=folderID;state.selectedFolderID=folderID;
-      state.current=clone(base);state.selectedID=base.id;
-      state.dirty=false;state.quickValues={};
-      renderLibrary();renderQuick();selectView("editor");
-      note("Создана папка «"+name+"» с независимым базовым шаблоном");
-    }catch(e){
-      if(baseCreated){
-        try{await native("deleteTemplate",{id:base.id});}
-        catch(rollback){note("Ошибка отката базового макета: "+rollback.message,true);}
-      }
-      note("Не удалось создать папку: "+e.message,true);
-    }
+      state.folderFilter=folder.id;state.selectedFolderID=folder.id;
+      state.current=newDocument();state.current.folderID=folder.id;
+      state.selectedID=state.current.id;state.dirty=false;state.quickValues={};
+      renderLibrary();selectView("editor");
+      note("Папка создана: "+name+". Добавьте в неё этикетку.");
+    }catch(e){note("Не удалось создать папку: "+e.message,true);}
   }
-  async function renameFolder(){
-    const folder=selectedFolder();if(!folder)return;
+  async function renameFolder(folderID){
+    const folder=findFolder(folderID)||selectedFolder();if(!folder)return;
     const name=window.prompt("Новое название папки",folder.name)?.trim();
     if(!name||name===folder.name)return;
     if(name.length>60 || state.folders.some(f=>!keySame(f.id,folder.id)&&keySame(f.name,name))){
@@ -391,10 +349,9 @@
       note("Базовый макет папки «"+folder.name+"»: "+doc.name);
     }catch(e){note("Не удалось назначить базовый макет: "+e.message,true);}
   }
-  async function moveSelected(){
-    const doc=findTemplate(state.selectedID),target=$("moveTarget")?.value;
+  async function moveSelected(destination){
+    const doc=findTemplate(state.selectedID),target=destination||$("moveTarget")?.value;
     if(!doc||!target)return;
-    if(isBase(doc.id)){note("Сначала переназначьте базовый шаблон папки",true);return;}
     const folderID=target==="unfiled"?null:findFolder(target)?.id;
     if(target!=="unfiled"&&!folderID){note("Папка назначения не найдена",true);return;}
     if(keySame(doc.folderID,folderID))return;
@@ -410,8 +367,8 @@
       note("Шаблон перемещён в "+(findFolder(folderID)?.name||"«Без папки»"));
     }catch(e){note("Не удалось переместить шаблон: "+e.message,true);}
   }
-  async function deleteFolder(){
-    const folder=selectedFolder();
+  async function deleteFolder(folderID){
+    const folder=findFolder(folderID)||selectedFolder();
     if(!folder)return;
     if(state.dirty&&!confirmDiscard())return;
     if(!window.confirm("Удалить папку «"+folder.name+"»? Все её шаблоны останутся в разделе «Без папки»."))return;
@@ -496,7 +453,7 @@
       const doc=filledDocument();
       // Compatibility prevents sending to hardware, not viewing/editing an
       // existing template. Keep the preview visible for mismatched stock.
-      const canvas=EZ2Raster.draw(doc);
+      const canvas=EZ2Raster.draw(isTextDoc(doc)?withPrintMargins(doc):doc);
       $("quickPreview").src=canvas.toDataURL("image/png");
       const check=compatibility(doc);
       if(!check.ok || !EZ2Raster.transportReady(media())){
@@ -507,7 +464,7 @@
         return;
       }
       if(isTextDoc(doc)){
-        const plan=EZ2Text.plan(doc,{allowPlaceholders:true});
+        const plan=EZ2Text.plan(withPrintMargins(doc),{allowPlaceholders:true});
         $("quickSize").textContent="Текст CP866 · "+plan.rows.length+
           " печатных строк · порядок сверху вниз. Изображение — приблизительный эскиз.";
         try{
@@ -661,6 +618,12 @@
     await persistQueue();renderQueue();
   }
   async function testNativeOnce(){
+    const left=Number($("marginLeft").value),right=Number($("marginRight").value);
+    if(!Number.isFinite(left)||!Number.isFinite(right)||left<0||right<0||
+       left>15||right>15||left+right>=50||
+       !Number.isInteger(left)||!Number.isInteger(right)){
+      note("Отступы: целые 0–15 мм, вместе менее 50 мм",true);return;
+    }
     if(state.running){note("Сначала завершите текущую передачу",true);return;}
     if(!state.profile.portPath){note("Выберите последовательный порт в настройках",true);return;}
     let test;
@@ -706,6 +669,8 @@
     $("mediaWidth").value=media().widthMM;
     $("mediaHeight").value=media().heightMM;
     $("mediaGap").value=media().gapMM;
+    $("marginLeft").value=Number(state.profile.marginLeftMM||0);
+    $("marginRight").value=Number(state.profile.marginRightMM||0);
     $("mediaSupport").textContent=EZ2Raster.transportReady(media())?
       "Транспорт для высоты 38 мм и зазора 2 мм уже проверен. Печать до 55 мм по ширине.":
       "Внимание: транспорт печати пока подтверждён только для высоты 38 мм и зазора 2 мм. Другие рулоны можно указать и подготовить шаблоны, но печать будет заблокирована.";
@@ -737,7 +702,8 @@
     catch(e){note(e.message,true);return;}
     if(state.running){note("Сначала завершите текущую передачу",true);return;}
     const profile={...state.profile,portPath:port,rasterThreshold:threshold,labelIntervalSeconds:delay,
-      mediaWidthMM:checked.widthMM,mediaHeightMM:checked.heightMM,mediaGapMM:checked.gapMM};
+      mediaWidthMM:checked.widthMM,mediaHeightMM:checked.heightMM,mediaGapMM:checked.gapMM,
+      marginLeftMM:left,marginRightMM:right};
     try{
       const settings={...state.settingsSnapshot,profile};
       await native("saveData",{key:"settings",json:JSON.stringify(settings)});
@@ -806,6 +772,15 @@
   document.body.addEventListener("click",async ev=>{
     const view=ev.target.closest("[data-view]");
     if(view){selectView(view.dataset.view);return;}
+    const folderAction=ev.target.closest("[data-folder-action]");
+    if(folderAction){
+      const id=folderAction.dataset.folderId;
+      if(folderAction.dataset.folderAction==="rename")await renameFolder(id);
+      else if(folderAction.dataset.folderAction==="delete")await deleteFolder(id);
+      return;
+    }
+    const moveTo=ev.target.closest("[data-move-to]");
+    if(moveTo){await moveSelected(moveTo.dataset.moveTo);return;}
     const action=ev.target.closest("[data-library-action]");
     if(action){
       const command=action.dataset.libraryAction;
