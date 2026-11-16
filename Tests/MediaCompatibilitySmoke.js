@@ -33,8 +33,10 @@ for(const name of ["mediaWidth","mediaHeight","mediaGap","quickCompatibility","e
   assert.ok(html.includes('id="'+name+'"'),"Missing UI "+name);
 assert.ok(app.includes('widthMM:media().widthMM'),"New templates must use media settings");
 assert.ok(app.includes('EZ2Raster.compatibility(doc,media())'),"Compatibility must be centralized");
-assert.ok(app.includes('state.jobs.filter(j=>j.state==="pending" && canPrint(j.document))'),
+assert.match(app,/state\.jobs\.filter\(j=>j\.state==="pending" && canPrint\(j\.document\) &&/,
   "Queue must skip incompatible jobs without changing their state");
+assert.ok(app.includes("(!wanted||wanted.has(j.id))"),
+  "A diagnostic print must not send unrelated queued jobs");
 assert.ok(editor.includes('width>printerMedia.widthMM'),"Red boundary must follow media width");
 assert.ok(editor.includes('height>printerMedia.heightMM'),"Red boundary must follow media height");
 assert.ok(editor.includes('className="printzone"'),"Separate ESC G55 guide remains");
