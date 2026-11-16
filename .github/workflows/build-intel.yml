@@ -18,6 +18,7 @@ on:
       - feat/print-page-catalog-folders-icon-109
       - feat/dual-editor-font-preview-110
       - feat/clear-catalog-print-library-111
+      - feat/compact-print-presets-framed-text-112
   workflow_dispatch:
 
 permissions:
@@ -220,4 +221,4 @@ jobs:
             --repo "$GITHUB_REPOSITORY" \
             --target "$GITHUB_SHA" \
             --title "LabelDesk ${APP_VERSION}" \
-            --notes "LabelDesk 1.0.11 for Intel macOS 15+. Catalog sidebar and editor sidebar now contain folder filters only; saved positions and label templates are shown in readable main-area lists with direct Edit, Delete, Duplicate, Move or Add-to-print actions. The catalog edit form opens only on request. Batch print selection is empty by default, positions must be explicitly added from catalog search/folders, and each selected row has an obvious Remove button; removing does not delete saved catalog data. The print queue still requires explicit physical print confirmation. Fixed printer margin settings being rejected by undefined left/right variables: saveSettings validates and persists both values in settings.json, and restores them on re-opening Settings. The misleading 3-mm striped raster width guide is removed from CP866 text previews; raster ESC G 55-mm limit is explained separately and unchanged. Empty text templates show a non-error prompt. Existing JSON data, print engine, serial transport, templates and queue remain unchanged. All changes are UI/persistence and should be verified on the installed Mac. Ad-hoc signed, not notarized."
+            --notes "LabelDesk 1.0.12 for Intel macOS 15+. Compact print picker shows up to six as-yet-unselected products at a time, line by line, with search, category filters and Show more; selected items stay in a separate table. Print batches can be saved as reusable presets with quantities, templates, custom one-time values and an explicit One click to Queue action; production dates are refreshed on recall, and no physical printing starts without the separate queue confirmation. Rebuilt CP866 text frame as multiline native text object with alignment, font-size selection and automatic height, subject to total physical row-height budget. Added independent raster framed-text object with adjustable box, content, font and padding. CP866 frame glyphs on screen are rendered as geometric lines to avoid broken firmware-glyph substitutions; actual commands remain ESC CP866 text lines. Replaced the editor zoom dropdown with fit and plus/minus controls and removed the duplicate layer select. Existing templates, catalog and serial transport remain intact. Real printer output requires physical verification. Ad-hoc signed, not notarized."
