@@ -229,7 +229,7 @@
   }
   function selectFolder(id){
     const filter=id==="all"||id==="unfiled"?id:String(id);
-    if(filter===state.folderFilter)return;
+    if(filter===state.folderFilter&&!editorEditing)return;
     if(editorEditing&&!confirmDiscard())return;
     const folder=findFolder(filter);
     if(filter!=="all"&&filter!=="unfiled"&&!folder)return;
@@ -834,7 +834,7 @@
   $("newTemplateMain").addEventListener("click",makeCurrent);
   $("backToTemplates").addEventListener("click",()=>{
     if(!confirmDiscard())return;
-    editorEditing=false;moveTemplateID=null;selectView("editor");
+    editorEditing=false;moveTemplateID=null;state.dirty=false;selectView("editor");
   });
   $("addFolder").addEventListener("click",addFolder);
   $("templateSearch").addEventListener("input",ev=>{
