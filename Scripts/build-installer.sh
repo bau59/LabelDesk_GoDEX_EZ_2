@@ -49,6 +49,20 @@ print "[LabelDesk] Compilation completed in $(( SECONDS - START_TIME )) seconds.
 print "[LabelDesk] 4/5 Creating and signing the app bundle…"
 mkdir -p "$APP/Contents/Resources"
 cp "$ROOT/LabelDesk/Resources/Info.plist" "$APP/Contents/Info.plist"
+# Generate the AppKit app icon into a standard multi-resolution .icns bundle.
+ICONSET="$BUILD_DIR/LabelDesk.iconset"
+mkdir -p "$ICONSET"
+swiftc -target x86_64-apple-macosx15.0 -sdk "$SDK_PATH" -framework AppKit \
+  "$ROOT/Scripts/make-icon.swift" -o "$BUILD_DIR/make-icon"
+"$BUILD_DIR/make-icon" "$BUILD_DIR/LabelDesk-icon-1024.png"
+for spec in 16:16 32:16@2x 32:32 64:32@2x 128:128 256:128@2x \
+  256:256 512:256@2x 512:512 1024:512@2x; do
+  target="${spec%%:*}" filename="${spec#*:}"
+  sips -s format png -z "$target" "$target" "$BUILD_DIR/LabelDesk-icon-1024.png" \
+    --out "$ICONSET/icon_${filename}.png" >/dev/null
+done
+iconutil -c icns "$ICONSET" -o "$APP/Contents/Resources/LabelDesk.icns"
+rm -rf "$ICONSET"
 cp "$ROOT/Scripts/install-update.sh" "$APP/Contents/Resources/install-update.sh"
 for file in app.html app.js editor.html barcodes.js native.js text-engine.js food-presets.js dish-engine.js dish-controller.js raster.js; do
 
