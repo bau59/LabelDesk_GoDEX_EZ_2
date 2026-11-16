@@ -1,30 +1,27 @@
-/* Saved dish -> independent printable template snapshot. No printer I/O. */
+/* Universal saved item -> printable template snapshot. Never changes source data. */
 (function(root){
   "use strict";
   const aliases={
-    name:["название","название блюда","наименование","продукт","блюдо","наименование продукта"],
-    weightG:["масса","масса нетто","вес","вес нетто","масса г","вес г"],
-    kcal:["калорийность","ккал","калории","энергетическая ценность"],
-    protein:["белки","белок"],
-    fat:["жиры","жир"],
-    carbs:["углеводы"],
-    ingredients:["состав","ингредиенты"],
-    allergens:["аллергены"],
-    manufacturer:["производитель","изготовитель"],
-    address:["адрес","адрес производителя"],
+    name:["название","название блюда","название товара","наименование","наименование товара","наименование продукта","товар","продукт","блюдо"],
+    weightG:["масса","масса нетто","масса г","вес","вес нетто","вес г"],
+    kcal:["ккал","калории","калорийность","энергетическая ценность"],
+    protein:["белки","белок"],fat:["жиры","жир"],carbs:["углеводы"],
+    ingredients:["состав","ингредиенты"],allergens:["аллергены"],
+    manufacturer:["производитель","изготовитель","организация"],
+    address:["адрес","адрес производителя","адрес изготовителя"],
     storage:["хранение","условия хранения","температура хранения","хранить"],
     producedAt:["изготовлено","дата изготовления","дата производства","упаковано","дата фасовки"],
-    expiresAt:["годен до","срок годности","дата окончания срока годности","дата годности","употребить до"],
+    expiresAt:["годен до","срок годности","дата годности","дата окончания срока годности","употребить до"],
     shelfLifeHours:["срок хранения","срок годности часы","срок годности часов"],
-    batchCode:["партия","номер партии","код партии"],
-    barcode:["штрихкод","штрихкод код партии","код товара"]
+    batchCode:["партия","номер партии","код партии"],barcode:["штрихкод","штрихкод код партии","код товара"]
   };
-  const canonical=new Map();
-  const normalize=s=>String(s||"").toLocaleLowerCase("ru-RU")
+  const normalize=s=>String(s??"").toLocaleLowerCase("ru-RU")
     .replace(/[^\p{L}\p{N}]+/gu," ").trim().replace(/\s+/g," ");
-  Object.entries(aliases).forEach(([key,names])=>names.forEach(name=>canonical.set(normalize(name),key)));
+  const canonical=new Map();
+  for(const [key,names] of Object.entries(aliases))
+    for(const name of names)canonical.set(normalize(name),key);
   function fieldKey(name){return canonical.get(normalize(name))||null;}
-  function formatDate(raw) {
+  function formatDate(raw){
     const value=String(raw||"").trim();
     if(!/^\d{4}-\d\d-\d\dT\d\d:\d\d$/.test(value))return "";
     const dt=new Date(value);
@@ -46,31 +43,51 @@
     return [dt.getFullYear(),pad(dt.getMonth()+1),pad(dt.getDate())].join("-")+"T"+
       pad(dt.getHours())+":"+pad(dt.getMinutes());
   }
-  function fill(template,dish,batch={}){
-    if(!template||!Array.isArray(template.elements)||!dish)throw Error("Нет шаблона или блюда");
+  function valueFor(item,fieldName,batch={}){
+    const match=normalize(fieldName);
+    if(!match)return null;
+    // Explicit custom values take precedence over built-in aliases.
+    const custom=Array.isArray(item.customFields)?item.customFields:[];
+    const entry=custom.find(field=>normalize(field?.name)===match);
+    if(entry)return String(entry.value??"");
+    const key=fieldKey(fieldName);
+    if(!key)return null;
+    const producedAt=formatDate(batch.producedAt||item.producedAt);
+    const expiresAt=formatDate(batch.expiresAt||
+      expiry(batch.producedAt||item.producedAt,item.shelfLifeHours)||item.expiresAt);
+    const values={...item,producedAt,expiresAt,
+      batchCode:String(batch.batchCode||item.batchCode||""),
+      barcode:String(item.barcode||batch.batchCode||"")};
+    let value=String(values[key]??"").trim();
+    if(value&&["weightG","protein","fat","carbs"].includes(key))value+=" г";
+    if(value&&key==="shelfLifeHours")value+=" ч";
+    return value;
+  }
+  function fill(template,item,batch={}){
+    if(!template||!Array.isArray(template.elements)||!item)
+      throw Error("Не найден шаблон или позиция каталога");
     const doc=JSON.parse(JSON.stringify(template));
-    const producedAt=formatDate(batch.producedAt);
-    const expiresAt=formatDate(batch.expiresAt||expiry(batch.producedAt,dish.shelfLifeHours));
-    const values={...dish,producedAt,expiresAt,
-      batchCode:String(batch.batchCode||""),barcode:String(dish.barcode||batch.batchCode||"")};
-    for(const e of doc.elements){
-      if(!["text","barcode"].includes(e.kind)||e.isVariable===false)continue;
-      const key=fieldKey(e.fieldName);
-      if(!key){
-        if(/\[[^\]]+\]/.test(String(e.value||"")))
-          throw Error("В шаблоне «"+template.name+"» неизвестное поле «"+(e.fieldName||"без имени")+"»");
+    const elements=[];
+    for(const element of doc.elements){
+      if(!["text","barcode"].includes(element.kind)||element.isVariable===false){
+        elements.push(element);continue;
+      }
+      // An unnamed literal variable stays as authored for backward compatibility.
+      const fieldName=String(element.fieldName||"").trim();
+      if(!fieldName){
+        if(!/\[[^\]]+\]/.test(String(element.value||"")))elements.push(element);
         continue;
       }
-      let value=String(values[key]??"").trim();
-      if(key==="weightG"||key==="protein"||key==="fat"||key==="carbs"){
-        if(value)value+= " г";
-      }
-      if(key==="shelfLifeHours"&&value)value+=" ч";
-      if(!value)throw Error("Блюдо «"+dish.name+"»: заполните «"+e.fieldName+"»");
-      e.value=value;
+      const value=valueFor(item,fieldName,batch);
+      // Missing, unknown or blank field = omit that entire block, including its prefix.
+      if(value===null||!String(value).trim())continue;
+      element.value=value;
+      elements.push(element);
     }
-    doc.name=dish.name+" · "+template.name;
+    doc.elements=elements;
+    if(!elements.length)throw Error("Для позиции «"+item.name+"» нет заполненных полей в этом шаблоне");
+    doc.name=String(item.name||"Позиция")+" · "+String(template.name||"Шаблон");
     return doc;
   }
-  root.EZ2Dishes={fieldKey,formatDate,expiry,fill};
+  root.EZ2Dishes={fieldKey,normalize,formatDate,expiry,valueFor,fill};
 })(typeof window!=="undefined"?window:globalThis);
