@@ -13,14 +13,22 @@
       shelfLifeHours:"dishShelfLife",storage:"dishStorage",
       manufacturer:"dishManufacturer",address:"dishAddress",barcode:"dishBarcode"};
     let dishes=[],chosenID=null,draft=null,dirty=false,search="";
+    let folders=[],catalogFolderID="all",printFolderID="all",printSearch="";
+    const rowEdits={}; let detailFor=null;
     let selected=new Set(),copies={},templateOverrides={},previewID=null,formInitialized=false;
     let defaultTemplateID=null,pickerFor=null;
     const findDish=id=>dishes.find(d=>same(d.id,id));
     const findTemplate=id=>state.templates.find(t=>same(t.id,id));
-    const list=()=>dishes.filter(d=>!search||
-      String(d.name||"").toLocaleLowerCase("ru").includes(search.toLocaleLowerCase("ru")))
-      .sort((a,b)=>String(a.name).localeCompare(String(b.name),"ru"));
-    const fresh=()=>({id:uuid(),kind:"product",customFields:[],
+    const validFolder=id=>folders.some(f=>same(f.id,id))?id:null;
+    const inFolder=(d,id)=>id==="all"||
+      (id==="unfiled"?!validFolder(d.folderID):same(d.folderID,id));
+    const matches=(d,q)=>String(d.name||"").toLocaleLowerCase("ru").includes(q.toLocaleLowerCase("ru"));
+    const byName=(a,b)=>String(a.name).localeCompare(String(b.name),"ru");
+    const list=()=>dishes.filter(d=>inFolder(d,catalogFolderID)&&matches(d,search)).sort(byName);
+    const printList=()=>dishes.filter(d=>inFolder(d,printFolderID)&&matches(d,printSearch)).sort(byName);
+    const folderName=id=>folders.find(f=>same(f.id,id))?.name||"Без папки";
+    const fresh=()=>({id:uuid(),kind:"product",
+      folderID:validFolder(catalogFolderID),customFields:[],
       ...Object.fromEntries(Object.keys(fieldIDs).filter(k=>k!=="kind").map(k=>[k,""]))});
     const kindLabel=kind=>({food:"Блюдо",product:"Товар",other:"Данные"})[kind]||"Позиция";
     function renderCustomFields(){
@@ -38,18 +46,107 @@
       for(const [key,id] of Object.entries(fieldIDs))
         $(id).value=key==="kind"?(draft.kind||"food"):String(draft[key]??"");
       renderCustomFields();
+      renderFolderPicker();
       $("dishFormTitle").textContent=chosenID?"Карточка: "+(draft.name||"без названия"):"Новая позиция";
       $("dishFormHint").textContent=dirty?"Есть несохранённые изменения":"Поля независимы от шаблонов";
       $("deleteDish").disabled=!chosenID;formInitialized=true;
     }
+    function folderChips(current,action){
+      const options=[{id:"unfiled",name:"Без папки"},...folders.slice().sort(byName)];
+      return options.map(f=>'<button type="button" data-'+action+'="'+esc(f.id)+
+        '" class="'+((current==="unfiled"&&!f.id)||same(current,f.id)?'selected':'')+
+        '">'+esc(f.name)+'</button>').join("");
+    }
+    function renderFolderPicker(){
+      $("itemFolderPicker").innerHTML=folderChips(validFolder(draft?.folderID)||"unfiled","assign-item-folder");
+    }
     function renderSidebar(){
-      $("dishSummary").textContent=dishes.length+" записей";
-      $("dishList").innerHTML=list().length?list().map(d=>
+      const count=id=>dishes.filter(d=>inFolder(d,id)).length;
+      const entry=(id,name,n)=>{
+        const chosen=same(catalogFolderID,id);
+        const removable=id!=="all"&&id!=="unfiled";
+        return '<div class="item-folder-entry'+(chosen?' active':'')+'">'+
+          '<button type="button" data-catalog-folder="'+esc(id)+'"><span>▤ '+esc(name)+
+          '</span><span class="folder-count">'+n+'</span></button>'+
+          (removable?
+            '<button type="button" class="folder-action" data-item-folder-rename="'+esc(id)+
+            '" title="Переименовать папку">✎</button>'+
+            '<button type="button" class="folder-action danger" data-item-folder-delete="'+esc(id)+
+            '" title="Удалить папку, сохранив позиции">×</button>':'')+'</div>';
+      };
+      $("itemFolders").innerHTML=entry("all","Все позиции",dishes.length)+
+        entry("unfiled","Без папки",count("unfiled"))+
+        folders.slice().sort(byName).map(f=>entry(f.id,f.name,count(f.id))).join("");
+      const visible=list();
+      $("dishSummary").textContent=visible.length+" / "+dishes.length;
+      $("dishList").innerHTML=visible.length?visible.map(d=>
         '<button class="dish-side-row'+(same(d.id,chosenID)?' active':'')+
         '" data-dish-open="'+esc(d.id)+'">'+esc(d.name)+
         '<small>'+esc(kindLabel(d.kind||"food")+(d.weightG?" · "+d.weightG+" г":""))+
         (d.shelfLifeHours?" · "+esc(d.shelfLifeHours)+" ч":"")+'</small></button>').join(""):
-        '<p class="empty">'+(dishes.length?"Ничего не найдено":"Добавьте первую позицию")+'</p>';
+        '<p class="empty">'+(dishes.length?"В этой папке ничего нет":"Добавьте первую позицию")+'</p>';
+    }
+    function renderPrintFilters(){
+      const filter=(id,title)=>'<button type="button" data-print-folder="'+esc(id)+
+        '" class="'+(same(printFolderID,id)?'selected':'')+'">'+esc(title)+'</button>';
+      $("printFolderFilters").innerHTML=filter("all","Все · "+dishes.length)+
+        filter("unfiled","Без папки")+
+        folders.slice().sort(byName).map(f=>filter(f.id,f.name)).join("");
+    }
+    async function createFolder(){
+      const name=window.prompt("Название папки каталога","Новая папка")?.trim();
+      if(!name)return;
+      if(name.length>60){note("Название папки: максимум 60 символов",true);return;}
+      if(folders.some(f=>f.name.toLocaleLowerCase("ru")===name.toLocaleLowerCase("ru"))){
+        note("Папка с таким названием уже существует",true);return;
+      }
+      const folder={id:uuid(),name};
+      try{
+        const next=[...folders,folder];
+        await native("saveData",{key:"itemFolders",json:JSON.stringify(next)});
+        folders=next;catalogFolderID=folder.id;
+        if(!chosenID&&draft&&!dirty)draft.folderID=folder.id;
+        renderSidebar();renderFolderPicker();renderPrintFilters();renderBatch();
+        note("Папка создана: "+name);
+      }catch(e){note("Не удалось создать папку: "+e.message,true);}
+    }
+    async function renameFolder(id){
+      const folder=folders.find(f=>same(f.id,id));if(!folder)return;
+      const name=window.prompt("Новое имя папки",folder.name)?.trim();
+      if(!name||name===folder.name)return;
+      if(name.length>60||folders.some(f=>!same(f.id,id)&&
+        f.name.toLocaleLowerCase("ru")===name.toLocaleLowerCase("ru"))){
+        note("Некорректное или повторяющееся имя папки",true);return;
+      }
+      const next=folders.map(f=>same(f.id,id)?{...f,name}:f);
+      try{
+        await native("saveData",{key:"itemFolders",json:JSON.stringify(next)});
+        folders=next;renderSidebar();renderFolderPicker();renderPrintFilters();
+        note("Папка переименована");
+      }catch(e){note("Не удалось переименовать папку: "+e.message,true);}
+    }
+    async function deleteFolder(id){
+      const folder=folders.find(f=>same(f.id,id));if(!folder)return;
+      if(!window.confirm("Удалить папку «"+folder.name+"»? Позиции останутся в «Без папки»."))return;
+      const old=dishes;
+      const moved=dishes.map(d=>same(d.folderID,id)?{...d,folderID:null}:d);
+      const next=folders.filter(f=>!same(f.id,id));
+      try{
+        await native("saveData",{key:"items",json:JSON.stringify(moved)});
+        try{
+          await native("saveData",{key:"itemFolders",json:JSON.stringify(next)});
+        }catch(e){
+          try{await native("saveData",{key:"items",json:JSON.stringify(old)});}
+          catch(rollback){throw Error(e.message+"; не удалось восстановить позиции: "+rollback.message);}
+          throw e;
+        }
+        dishes=moved;folders=next;
+        if(same(catalogFolderID,id))catalogFolderID="unfiled";
+        if(same(printFolderID,id))printFolderID="unfiled";
+        if(draft&&same(draft.folderID,id))draft.folderID=null;
+        renderSidebar();renderFolderPicker();renderPrintFilters();renderBatch();
+        note("Папка удалена. Позиции сохранены без папки.");
+      }catch(e){note("Не удалось удалить папку: "+e.message,true);}
     }
     function defaultTemplate(){
       return state.templates.find(t=>t.starterPack==="food-v1"&&compatibility(t).ok)||
