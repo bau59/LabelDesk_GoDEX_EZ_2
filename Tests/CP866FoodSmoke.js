@@ -25,6 +25,14 @@ assert.equal(printer.font("A04").widthDots,16);
 assert.equal(printer.font("A04").heightDots,20);
 assert.equal(printer.font("A22").widthDots,32);
 assert.equal(printer.font("A22").heightDots,52);
+const inverted=make([row("СТОП",{reversePrint:true})]);
+const invPlan=printer.plan(inverted);
+assert.equal(invPlan.rows[0].reverse,true);
+const invPacket=decode(printer.build(inverted));
+assert.ok(invPacket.includes(Buffer.from([27,86])),"ESC V inverse command expected");
+assert.ok(!decode(printer.build(make([row("СТОП")]))).includes(Buffer.from([27,86])),
+  "Normal text must stay unchanged");
+
 assert.throws(()=>printer.font("A99"),/Неизвестный/);
 const make=(elements,mode="text")=>({
   widthMM:58,heightMM:38,gapMM:2,printMode:mode,elements
