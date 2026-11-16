@@ -3,6 +3,13 @@
 const assert=require("node:assert/strict");
 const fs=require("node:fs");
 const vm=require("node:vm");
+const html=fs.readFileSync("LabelDesk/Resources/app.html","utf8");
+const catalog=html.split('id="dishesView"')[1]?.split('id="printView"')[0]||"";
+const print=html.split('id="printView"')[1]?.split('id="editorView"')[0]||"";
+assert.ok(html.includes('data-view="print"'),"Print must have a navigation route");
+assert.ok(!catalog.includes('id="dishBatchRows"'),"Batch must not be embedded in the catalog form");
+assert.ok(print.includes('id="dishBatchRows"')&&print.includes('id="printSearch"'));
+assert.ok(html.includes('id="addItemFolder"'),"Catalog folder plus control missing");
 const uuid=n=>"00000000-0000-4000-8000-"+String(n).padStart(12,"0");
 let sequence=500;
 const ids=["name","weightG","kcal","protein","fat","carbs","ingredients","allergens",
@@ -31,7 +38,8 @@ class E {
 }
 const $=id=>{if(!elements.has(id))elements.set(id,new E(id));return elements.get(id);};
 const document={getElementById:$,body:{addEventListener:(type,fn)=>bodyHandlers.push({type,fn})}};
-const root={confirm:()=>true,EZ2Raster:{
+const prompts=[];
+const root={confirm:()=>true,prompt:()=>prompts.shift()||null,EZ2Raster:{
   transportReady:()=>true,draw:()=>({toDataURL:()=>"data:image/png;base64,AA=="})
 }};
 const context={window:root,document,Date,Number,String,Array,Object,Map,Set,Math};
@@ -64,7 +72,7 @@ assert.equal(templates[1].elements[0].value,"[НАЗВАНИЕ]");
 assert.throws(()=>engine.fill({elements:[row(90,"Не существует","[НЕТ]")]},
   {name:"Пустой"},{}),/нет заполненных полей/);
 const state={templates:copy(templates),jobs:[],running:false};
-const persisted={items:[],queue:[]},logs=[];
+const persisted={items:[],itemFolders:[],queue:[]},logs=[];
 const native=async(action,args)=>{
  assert.equal(action,"saveData");
  persisted[args.key]=JSON.parse(args.json);
@@ -75,7 +83,7 @@ const api={state,native,uuid:()=>uuid(sequence++),clone:copy,note:x=>logs.push(x
  encodeJob:doc=>{assert.ok(doc.elements.every(x=>!x.value.includes("[")));
    return {base64:"QUJDREVGRw==",size:8};},renderQueue:()=>{}};
 const controller=root.EZ2DishController.create(api);
-controller.bootstrap([]);
+controller.bootstrap([],[]);
 $("batchProducedAt").value="2026-11-16T10:00";
 async function save(name){
  $("newDish").fire("click");
@@ -102,11 +110,20 @@ async function save(name){
  clickTable("[data-open-template]",{openTemplate:first.id});
  assert.match($("dishBatchRows").innerHTML,/template-pick-row/);
  clickTable("[data-pick-template]",{pickTemplate:templates[1].id,dishId:first.id});
+ // Temporary per-row fields appear only in this print batch.
+ clickTable("[data-open-detail]",{openDetail:first.id});
+ assert.match($("dishBatchRows").innerHTML,/batch-edit-row/);
+ $("dishBatchRows").fire("input",{dataset:{dishId:first.id,rowValue:"protein"},value:"13"});
+ $("dishBatchRows").fire("input",{dataset:{dishId:first.id,rowValue:"ingredients"},value:"Гречка"});
  await $("queueDishes").fire("click");
  assert.equal(state.jobs.length,2);
  assert.equal(persisted.queue.length,2);
  assert.equal(state.jobs[0].copies,2);
  assert.equal(state.jobs[0].document.name,"Суп · КБЖУ");
+ assert.equal(state.jobs[0].document.elements[2].value,"13 г");
+ assert.equal(state.jobs[0].document.elements[3].value,"Гречка");
+ assert.equal(persisted.items.find(d=>d.id===first.id).protein,"6",
+   "Temporary print edits must not change saved catalog data");
  assert.equal(state.jobs[1].document.name,"Каша · Состав");
  assert.equal(state.jobs[1].document.elements[3].value,"18.11.2026 10:00");
  assert.equal(state.templates[0].elements[0].value,"[НАЗВАНИЕ]");
@@ -133,5 +150,24 @@ async function save(name){
  await $("saveDish").fire("click");
  assert.equal(persisted.items.find(d=>d.id===id).customFields[0].name,"Артикул");
  assert.equal(persisted.items.find(d=>d.id===id).customFields[0].value,"SKU-17");
+ // Catalog folders are independent of label folders. Deleting a folder orphans,
+ // never deletes, its saved positions.
+ prompts.push("Холодильник");
+ await $("addItemFolder").fire("click");
+ assert.equal(persisted.itemFolders.length,1);
+ const folder=persisted.itemFolders[0];
+ $("itemFolderPicker").fire("click",{closest:q=>
+   q==="[data-assign-item-folder]"?{dataset:{assignItemFolder:folder.id}}:null});
+ await $("saveDish").fire("click");
+ assert.equal(persisted.items.find(d=>d.id===id).folderID,folder.id);
+ assert.match($("itemFolders").innerHTML,/Холодильник/);
+ assert.match($("printFolderFilters").innerHTML,/Холодильник/);
+ // Simulate body event to delete a folder, followed by async local writes.
+ const remove={closest:q=>q==="[data-item-folder-delete]"?
+   {dataset:{itemFolderDelete:folder.id}}:null};
+ handlers.forEach(h=>h.fn({target:remove}));
+ await new Promise(resolve=>setImmediate(resolve));
+ assert.equal(persisted.itemFolders.length,0);
+ assert.equal(persisted.items.find(d=>d.id===id).folderID,null);
  console.log("Item catalog smoke passed: migration-safe saves, custom fields, omitted blanks, mixed templates and atomic queue.");
 })().catch(e=>{console.error(e);process.exitCode=1;});
