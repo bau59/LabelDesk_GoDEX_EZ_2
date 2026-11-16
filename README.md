@@ -1,6 +1,6 @@
 # LabelDesk — original GoDEX EZ-2 on macOS (WebKit + zsh)
 
-**1.0.5 WebKit/zsh release (CP866 resident text printing and food templates).** No Node.js, Python, pip, npm, HTTP server or external dependencies are needed on the user's Mac. The system frameworks AppKit/WebKit and system commands `/bin/zsh`, `/bin/stty`, `/bin/cat` and `printf` handle the application and RS-232.
+**1.0.6 WebKit/zsh release (dish catalog, batch printing, adjustable editor).** No Node.js, Python, pip, npm, HTTP server or external dependencies are needed on the user's Mac. The system frameworks AppKit/WebKit and system commands `/bin/zsh`, `/bin/stty`, `/bin/cat` and `printf` handle the application and RS-232.
 
 ## Runtime layout
 
@@ -17,11 +17,14 @@ After the initial macOS installation, the following files are copied into the us
 │   ├── native.js      # isolated one-label diagnostic
 │   ├── text-engine.js # resident CP866 compiler
 │   ├── food-presets.js# four seeded food-container samples
+│   ├── dish-engine.js # dish-to-template field mapping
+│   ├── dish-controller.js # dish catalog and batch interface
 │   ├── printer-text.sh# buffered text transport
 │   ├── printer-native.sh # native diagnostic transport
 │   └── printer.sh     # original raster driver
 ├── templates/          # existing UUID JSON templates, untouched
 ├── folders.json        # existing logical folders, untouched
+├── dishes.json         # independent, persistent dish catalog (new in 1.0.6)
 ├── queue.json          # existing queue and job history, untouched
 ├── settings.json       # existing port and printer options, untouched
 ├── spool/              # temporary binary files (removed after job)
@@ -32,6 +35,15 @@ After the initial macOS installation, the following files are copied into the us
 The **compiled Swift app provides a WebKit window, a file/Process bridge and the existing signed GitHub updater** for reading/writing these local JSON files and invoking `printer.sh` via `/bin/zsh` with fixed arguments. All EZ-2 commands, bitmap rendering, queue policy and interface are outside Swift. Change a file in `live/`, then restart the application: **no Xcode, CI, DMG or rebuild is needed**.
 
 On installation/update, bundled runtime files overwrite the local version **only when it is still identical to the previously installed unmodified version**. Hand edits in `live/` are intentionally preserved.
+
+## Dish-first workflow (1.0.6)
+
+- **Блюда** is the landing screen. Save each dish once: name, net weight, energy and macronutrients per 100 g, ingredients, allergens, storage conditions, manufacturer/address, and shelf life in hours. These records live in `dishes.json`, **not** inside templates or folders.
+- **Партия / холодильник:** mark several saved dishes, enter production time and optional batch code or explicit use-by time, set copy count and a **different saved template per dish**. A dish's use-by time is calculated from production time + its saved shelf-life hours unless the batch overrides it. Actual dates and values are never fabricated.
+- **Добавить выбранные в очередь** validates every label before writing a single queue update. Saved dishes and source templates remain unchanged. The queue stores the fully resolved label snapshots. A missing required field or unsupported media prevents the whole batch from entering the queue.
+- The legacy **Макеты / Группы макетов / Разовое заполнение** workflow remains available for existing saved labels. Old UUID template files, `folders.json`, settings, and queued jobs are not migrated or deleted.
+- Main library sidebar can be resized by dragging its right edge or collapsed with **☰**. In the editor, **☷ Слои** shows/hides the layer list; the layer dropdown selects any layer directly and the slider adjusts panel width. None of these controls affect physical label dimensions.
+- CP866 text printing still uses verified resident-font commands. Rendering is only an approximate preview and batch printing on the physical GoDEX EZ-2 must be checked on a small sample before production use.
 
 ## Sidebar and template workflow (1.0.3)
 
