@@ -640,6 +640,33 @@ function changeEditorMode(mode){
  }
  checkpoint();doc.printMode=mode;selected=null;draw();commit();
 }
+function fontGallery(element,codes){
+ const box=document.createElement("div");box.className="font-cards";
+ const ns="http://www.w3.org/2000/svg";
+ for(const code of codes){
+  const f=window.EZ2Text.font(code),button=document.createElement("button");
+  button.type="button";
+  button.className="font-card"+((element.deviceFont||"A00")===code?" selected":"");
+  const swatch=document.createElement("span");swatch.className="font-swatch";
+  const svg=document.createElementNS(ns,"svg"),w=f.widthDots*3,h=f.heightDots;
+  svg.setAttribute("viewBox","0 0 "+w+" "+h);svg.setAttribute("preserveAspectRatio","none");
+  svg.style.width=Math.max(12,w*.7)+"px";svg.style.height=Math.max(7,h*.7)+"px";
+  const t=document.createElementNS(ns,"text");
+  t.textContent="АБВ";t.setAttribute("x","0");t.setAttribute("y",String(h*.82));
+  t.setAttribute("font-size",String(h*.86));t.setAttribute("font-family","Menlo,monospace");
+  t.setAttribute("font-weight",f.bold?"800":"500");
+  t.setAttribute("textLength",String(w));t.setAttribute("lengthAdjust","spacingAndGlyphs");
+  svg.appendChild(t);swatch.appendChild(svg);
+  const name=document.createElement("strong");name.textContent=code;
+  const info=document.createElement("small");
+  info.textContent=f.widthDots+"×"+f.heightDots+" точек"+(f.bold?" · жирный":"");
+  button.append(swatch,name,info);
+  button.onclick=()=>{checkpoint();element.deviceFont=code;draw();commit();};
+  box.appendChild(button);
+ }
+ return box;
+}
+
 function renderProps(){
  const root=$("props");root.replaceChildren();if(!doc)return;
  const e=selectedObj();
@@ -731,13 +758,28 @@ function renderProps(){
      root.appendChild(prop("Способ вывода (растр)",modes));
    }
    if(doc.printMode==="text"||e.renderMode==="device"){
-     const fonts=document.createElement("select");
-     for(const preset of ["A11","A12","A13","A14","A21","A22","A31","A41","A00","A01","A02","A03","A04"]){
-       const opt=document.createElement("option");opt.value=preset;opt.textContent=preset;fonts.appendChild(opt);
+     if(doc.printMode==="text"){
+       root.appendChild(prop("Размер штатного шрифта",fontGallery(e,
+         ["A00","A01","A02","A03","A04","A11","A12","A21","A22"])));
+       const details=document.createElement("details");
+       const summary=document.createElement("summary");summary.textContent="Дополнительные размеры";
+       details.appendChild(summary);
+       details.appendChild(fontGallery(e,["A13","A14","A31","A32","A33","A41","A42","A48"]));
+       root.appendChild(details);
+       const f=window.EZ2Text.font(e.deviceFont||"A00");
+       const info=document.createElement("p");info.className="font-summary";
+       info.textContent="ESC "+f.code+" · "+f.widthDots+"×"+f.heightDots+
+          " точек на символ · 8 точек ≈ 1 мм. Форма букв приблизительная, размеры и перенос — из планировщика печати.";
+       root.appendChild(info);
+     }else{
+       const fonts=document.createElement("select");
+       for(const code of ["A11","A12","A13","A14","A21","A22","A31","A41","A00","A01","A02","A03","A04"]){
+         const opt=document.createElement("option");opt.value=code;opt.textContent=code;fonts.appendChild(opt);
+       }
+       fonts.value=e.deviceFont||"A11";
+       fonts.addEventListener("change",()=>{checkpoint();e.deviceFont=fonts.value;draw();commit();});
+       root.appendChild(prop("Штатный шрифт для диагностики",fonts));
      }
-     fonts.value=e.deviceFont||"A11";
-     fonts.addEventListener("change",()=>{checkpoint();e.deviceFont=fonts.value;commit();});
-     root.appendChild(prop("Встроенный размер EZ-2 (ESC)",fonts));
      const warn=document.createElement("p");warn.className="warn";
      warn.textContent="GoDEX EZ-2: CP866, включая русские буквы и Ё/ё, подтверждён. Режим печатает последовательными строками; расположение по Y ориентировочное.";
      root.appendChild(warn);
@@ -749,7 +791,11 @@ function renderProps(){
      button.onclick=()=>{checkpoint();e.value=(e.value||"")+ch;draw();commit();};
      symbols.appendChild(button);
    }
-   root.appendChild(prop("Символы рамок (CP437)",symbols));
+   if(doc.printMode==="text"){
+       const hint=document.createElement("p");hint.className="text-mode-help";
+       hint.textContent="Для полной рамки используйте «▢ Рамка из символов» сверху. Грани создаются автоматически.";
+       root.appendChild(hint);
+     }else root.appendChild(prop("Символы CP866",symbols));
    if(doc.printMode!=="text")
      root.appendChild(checkbox("Жирный",e.isBold,n=>{e.isBold=n;}));
    const alignControls=document.createElement("div");alignControls.className="text-align-controls";
