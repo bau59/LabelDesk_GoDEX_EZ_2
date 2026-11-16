@@ -352,6 +352,44 @@ footer{color:#8993a1}
 .margin-settings input{width:100%}
 #saveMarginSettings{margin-top:16px}
 
+
+.item-folder-list{margin:0 0 16px}
+.item-folder-entry{display:flex;gap:2px;align-items:center;border-radius:8px}
+.item-folder-entry:hover{background:#f7f8fa}
+.item-folder-entry>button:first-child{border:0;background:transparent;flex:1;text-align:left;
+ padding:9px 10px;font-size:12px;color:#536174;display:flex;align-items:center;justify-content:space-between;gap:8px;min-width:0}
+.item-folder-entry.active{background:#edf1f7}
+.item-folder-entry.active>button:first-child{font-weight:700;color:#172132}
+.item-folder-entry .folder-count{font-size:10px;color:#8c9aaa;background:#f2f4f7;padding:2px 8px;border-radius:15px}
+.item-folder-entry .folder-action{border:0;background:transparent;font-size:15px;padding:5px;width:26px;height:30px;color:#95a0af}
+.item-folder-entry .folder-action:hover{background:#e7ebf0;color:#172132}
+.item-folder-entry .folder-action.danger:hover{color:#b02836;background:#fcebed}
+#addItemFolder{border:0;background:transparent;font-size:19px;padding:2px 8px}
+.item-folder-field{grid-column:1/-1}
+.item-folder-picker,.print-folder-filters{display:flex;flex-wrap:wrap;gap:6px}
+.item-folder-picker button,.print-folder-filters button{font-size:11px;padding:7px 11px;background:#fff;border:1px solid #e1e6ed}
+.item-folder-picker button.selected,.print-folder-filters button.selected{color:#111827;background:#eef1f5;border-color:#a7b5c6;font-weight:700}
+.print-page .card{margin-bottom:18px}
+.print-filter-row{display:flex;flex-direction:column;gap:11px;margin-bottom:14px}
+#printSearch{width:min(100%,470px);background:#f9fafb}
+.print-folder-filters{margin:0 0 3px}
+#printView .dish-table{min-width:760px}
+.batch-edit-row td{background:#fafbfd!important;padding:15px!important}
+.batch-edit-title{font-size:12px;font-weight:700;display:flex;justify-content:space-between;gap:10px}
+.batch-edit-title button{font-size:11px;border:0;background:transparent;color:#53657a}
+.batch-override-grid{display:grid;grid-template-columns:repeat(3,minmax(0,1fr));gap:10px 13px;margin-top:12px}
+.batch-override-grid label{display:flex;flex-direction:column;gap:5px;font-size:11px;color:#617083;min-width:0}
+.batch-override-grid input,.batch-override-grid textarea{width:100%;padding:9px;font-size:12px;border:1px solid #dbe2eb;border-radius:8px}
+.batch-override-grid textarea{min-height:55px}
+.batch-edit-tools{display:flex;gap:8px;margin:12px 0 0}
+.batch-edit-tools button{font-size:11px}
+.batch-custom-overrides{display:grid;grid-template-columns:repeat(2,minmax(0,1fr));gap:9px}
+.batch-edit-help{font-size:11px;color:#7a8797;margin-top:11px}
+.nav-count{font-size:10px;padding:1px 6px;border-radius:9px;background:#e6eaf1}
+#dishSidebar .sidebar-title{gap:8px}
+@media(max-width:1100px){.batch-override-grid{grid-template-columns:repeat(2,minmax(0,1fr))}}
+@media(max-width:800px){.batch-override-grid{grid-template-columns:1fr}}
+
 </style>
 </head>
 <body>
@@ -368,12 +406,15 @@ footer{color:#8993a1}
   <div class="sidebar-brand"><span class="mark">▤</span><div><strong>LabelDesk</strong><small>Этикетки · GoDEX EZ-2</small></div></div>
   <nav aria-label="Основные разделы">
     <button data-view="dishes"><span class="nav-symbol">▦</span>Каталог</button>
+    <button data-view="print"><span class="nav-symbol">▣</span>Печать позиций <span id="printSelectedCount" class="nav-count"></span></button>
     <button data-view="editor"><span class="nav-symbol">▤</span>Редактор этикеток</button>
     <button data-view="queue"><span class="nav-symbol">▧</span>Очередь <span id="pendingCount"></span></button>
     <button data-view="settings"><span class="nav-symbol">⚙</span>Настройки</button>
   </nav>
   <div class="sidebar-caption">БИБЛИОТЕКА</div>
   <div class="sidebar-content" id="dishSidebar">
+    <div class="sidebar-title">Папки каталога <button id="addItemFolder" title="Создать папку каталога" aria-label="Создать папку">＋</button></div>
+    <div id="itemFolders" class="item-folder-list"></div>
     <div class="sidebar-title">Позиции <small id="dishSummary"></small></div>
     <input id="dishSearch" type="search" placeholder="Поиск по названию..." aria-label="Поиск позиций">
     <button id="newDish" class="sidebar-add">＋ Новая позиция</button>
@@ -401,11 +442,14 @@ footer{color:#8993a1}
     <div class="page catalog-page" style="max-width:1450px">
       <div class="page-intro"><div><h2>Каталог</h2>
         <p class="intro">Храните товары, блюда или любые данные в одном месте. Выберите шаблон при печати.</p></div>
-        <button id="newDishMain" class="primary">＋ Новая позиция</button>
+        <div class="flex"><button id="catalogGoPrint" type="button">Перейти к печати</button>
+          <button id="newDishMain" class="primary">＋ Новая позиция</button></div>
       </div>
       <div class="card">
         <div class="section-head"><div><h3 id="dishFormTitle">Новая позиция</h3><p class="muted">Заполните только нужные поля. Остальные не попадут на этикетку.</p></div><span class="muted" id="dishFormHint">Поля независимы от шаблонов</span></div>
         <div id="dishFields" class="fields">
+          <div class="field item-folder-field"><label>Папка каталога</label>
+            <div id="itemFolderPicker" class="item-folder-picker"></div></div>
           <div class="field"><label for="dishName">Название *</label><input id="dishName" data-dish="name" autocomplete="off" placeholder="Например, Суп дня или Товар № 12"></div>
           <div class="field"><label for="itemKind">Тип записи</label><select id="itemKind" data-dish="kind"><option value="product">Товар</option><option value="food">Блюдо</option><option value="other">Данные</option></select></div>
           <div class="field"><label for="dishWeight">Вес / масса, г</label><input id="dishWeight" data-dish="weightG" inputmode="decimal"></div>
@@ -435,8 +479,20 @@ footer{color:#8993a1}
           <button id="deleteDish" class="danger">Удалить</button>
         </div>
       </div>
+     </div>
+   </section>
+   <section class="view" id="printView">
+     <div class="page print-page" style="max-width:1450px">
+       <div class="page-intro"><div><h2>Печать позиций</h2>
+         <p class="intro">Выберите позиции из каталога, дополните данные и отправьте этикетки в очередь.</p></div>
+         <button id="printGoCatalog" type="button">＋ Каталог</button>
+       </div>
       <div class="card">
-        <div class="section-head"><div><h3>Печать нескольких позиций</h3><p class="muted">Выберите позиции, количество и шаблон. Можно использовать разные шаблоны.</p></div><span class="muted" id="selectedDishCount">Ничего не выбрано</span></div>
+        <div class="section-head"><div><h3>Партия этикеток</h3><p class="muted">Отметьте позиции, задайте количество, шаблон и недостающие данные для каждой.</p></div><span class="muted" id="selectedDishCount">Ничего не выбрано</span></div>
+        <div class="print-filter-row">
+          <input id="printSearch" type="search" placeholder="Поиск по позициям…" aria-label="Поиск для печати">
+          <div id="printFolderFilters" class="print-folder-filters"></div>
+        </div>
         <div class="dish-toolbar">
           <div class="field"><label for="batchName">Название партии</label><input id="batchName" placeholder="Например, полка № 1"></div>
           <div class="field"><label for="batchProducedAt">Дата и время</label><input id="batchProducedAt" type="datetime-local"></div>
@@ -447,10 +503,11 @@ footer{color:#8993a1}
         </div>
         <div class="table-description">Исходные записи и шаблоны при печати не меняются. Пустые переменные строки пропускаются.</div>
         <div class="dish-table-wrap"><table class="dish-table">
-          <thead><tr><th style="width:35px"><input type="checkbox" id="selectAllDishes" title="Выбрать все видимые блюда"></th><th>Позиция</th><th>Копий</th><th>Шаблон</th><th>Проверка</th></tr></thead>
+          <thead><tr><th style="width:35px"><input type="checkbox" id="selectAllDishes" title="Выбрать все видимые позиции"></th><th>Позиция</th><th>Копий</th><th>Шаблон</th><th>Данные / просмотр</th></tr></thead>
           <tbody id="dishBatchRows"></tbody>
         </table></div>
-        <div id="dishBatchStatus" class="muted"></div>
+        <div id="dishBatchStatus" class="muted" role="status"></div>
+        <p class="muted">Дополнения действуют только при печати и не меняют сохранённую карточку.</p>
         <div class="flex"><button id="queueDishes" class="primary">Добавить в очередь</button><button id="clearDishSelection">Очистить выбор</button></div>
         <div class="grid2" style="margin-top:17px">
           <div><h4>Предпросмотр</h4><p id="dishPreviewError" class="warning"></p><p class="muted" id="dishPreviewCaption"></p></div>
