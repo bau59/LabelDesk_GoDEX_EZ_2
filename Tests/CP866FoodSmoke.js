@@ -56,7 +56,18 @@ assert.equal(doubleFrame.rows[2].text,"╚══════════╝");
 assert.throws(()=>printer.plan(make([{...oneFrame,frameChars:56}])),/Ширина рамки/);
 assert.throws(()=>printer.plan(make([{...oneFrame,value:"Длинный заголовок в рамке"}])),
   /Текст рамки длиннее/);
-assert.throws(()=>printer.plan(make([{...oneFrame,frameRows:7}])),/Высота рамки/);
+// Previously limited to five lines; modern editor allows a taller framed
+// block while the total 38-mm physical height safety limit still applies.
+const seven=printer.plan(make([{...oneFrame,frameRows:7}]));
+assert.equal(seven.rows.length,9);
+const multiFrame=printer.plan(make([{...oneFrame,value:"Молоко\\nПастеризованное",frameRows:0,
+  frameChars:22,textAlignment:"center",deviceFont:"A00"}]));
+assert.equal(multiFrame.rows.length,4);
+assert.match(multiFrame.rows[1].text,/Молоко/);
+assert.match(multiFrame.rows[2].text,/Пастеризованное/);
+assert.throws(()=>printer.plan(make([{...oneFrame,frameRows:24}])),/высоту/);
+assert.throws(()=>printer.frameLines({...oneFrame,frameRows:2,value:"1234567890".repeat(6)},12),
+  /не помещается/);
 const multi=make([
   row("ПРИВЕТ МИР", {id:"a",deviceFont:"A11"}),
   row("Состав: картофель, мясо, соль", {id:"b"}),
