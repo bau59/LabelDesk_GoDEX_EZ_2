@@ -482,10 +482,18 @@ footer{color:#8993a1}
        </div>
       <div class="card">
         <div class="section-head"><div><h3>Партия этикеток</h3><p class="muted">Отметьте позиции, задайте количество, шаблон и недостающие данные для каждой.</p></div><span class="muted" id="selectedDishCount">Ничего не выбрано</span></div>
-        <div class="print-filter-row">
-          <input id="printSearch" type="search" placeholder="Поиск по позициям…" aria-label="Поиск для печати">
-          <div id="printFolderFilters" class="print-folder-filters"></div>
+        <div class="print-picker">
+          <div class="flex space">
+            <div><h4>1. Добавить позиции</h4><p class="muted">Записи появятся в партии только после нажатия «Добавить».</p></div>
+            <button id="addVisibleToPrint" type="button">＋ Добавить найденные</button>
+          </div>
+          <div class="print-filter-row">
+            <input id="printSearch" type="search" placeholder="Поиск по позициям…" aria-label="Поиск для печати">
+            <div id="printFolderFilters" class="print-folder-filters"></div>
+          </div>
+          <div id="printCatalogResults" class="print-catalog-results"></div>
         </div>
+        <h4 class="batch-section-title">2. Общие данные печати</h4>
         <div class="dish-toolbar">
           <div class="field"><label for="batchName">Название партии</label><input id="batchName" placeholder="Например, полка № 1"></div>
           <div class="field"><label for="batchProducedAt">Дата и время</label><input id="batchProducedAt" type="datetime-local"></div>
@@ -494,9 +502,10 @@ footer{color:#8993a1}
           <div class="field batch-template-group"><label>Общий шаблон для партии</label>
             <div id="dishBatchTemplate" class="template-chip-list" aria-label="Общий шаблон"></div></div>
         </div>
-        <div class="table-description">Исходные записи и шаблоны при печати не меняются. Пустые переменные строки пропускаются.</div>
+        <h4 class="batch-section-title">3. Позиции в партии <span id="printRowCount"></span></h4>
+        <div class="table-description">Только добавленные позиции. Кнопка «Убрать» исключает запись из партии, но не удаляет её из каталога.</div>
         <div class="dish-table-wrap"><table class="dish-table">
-          <thead><tr><th style="width:35px"><input type="checkbox" id="selectAllDishes" title="Выбрать все видимые позиции"></th><th>Позиция</th><th>Копий</th><th>Шаблон</th><th>Данные / просмотр</th></tr></thead>
+          <thead><tr><th style="width:110px">Действие</th><th>Позиция</th><th>Копий</th><th>Шаблон</th><th>Данные / просмотр</th></tr></thead>
           <tbody id="dishBatchRows"></tbody>
         </table></div>
         <div id="dishBatchStatus" class="muted" role="status"></div>
