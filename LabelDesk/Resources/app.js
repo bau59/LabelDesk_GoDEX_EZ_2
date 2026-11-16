@@ -778,6 +778,17 @@
     $("port").innerHTML='<option value="">Выберите порт</option>'+
       options.map(p=>'<option value="'+esc(p)+'">'+esc(p)+'</option>').join("");
     $("port").value=port;
+    renderPortChoices();
+  }
+  function renderPortChoices(){
+    const q=String($("portSearch").value||"").toLocaleLowerCase("ru");
+    const current=$("port").value;
+    const ports=Array.from($("port").options).map(o=>o.value).filter(Boolean);
+    const shown=ports.filter(p=>p.toLocaleLowerCase("ru").includes(q)).slice(0,6);
+    $("portChoices").innerHTML=shown.map(p=>
+      '<button type="button" data-port-choice="'+esc(p)+'" class="'+
+      (p===current?'selected':'')+'">'+esc(p)+'</button>').join("")+
+      (!shown.length?'<span class="muted">Порты не найдены. Нажмите «Обновить».</span>':'');
   }
   async function refreshPorts(){
     try{state.ports=(await native("ports"))||[];renderPorts();}
@@ -966,6 +977,12 @@
   });
   $("clearLog").addEventListener("click",()=>{state.log=[];renderQueue();});
   $("refreshPorts").addEventListener("click",refreshPorts);
+  $("portSearch").addEventListener("input",renderPortChoices);
+  $("portChoices").addEventListener("click",e=>{
+    const button=e.target.closest("[data-port-choice]");
+    if(!button)return;
+    $("port").value=button.dataset.portChoice;renderPortChoices();
+  });
   $("saveSettings").addEventListener("click",saveSettings);
   $("saveMarginSettings").addEventListener("click",saveSettings);
   $("openRuntime").addEventListener("click",()=>native("openRuntime").catch(e=>note(e.message,true)));
@@ -1023,5 +1040,9 @@
     window.addEventListener("pointerup",up);
   });
   installNumberSteppers();
+  if(typeof MutationObserver==="function"){
+    const obs=new MutationObserver(()=>installNumberSteppers());
+    obs.observe(document.getElementById("content"),{childList:true,subtree:true});
+  }
   bootstrap();
 })();
