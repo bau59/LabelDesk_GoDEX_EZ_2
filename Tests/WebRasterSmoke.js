@@ -27,7 +27,14 @@ class FakeContext {
       }
     }
   }
-  save(){} restore(){} beginPath(){} rect(){} clip(){} strokeRect(){} fillText(){}
+  save(){} restore(){} beginPath(){} rect(){} clip(){} fillText(){}
+  strokeRect(x,y,w,h){
+    const thickness=Math.max(1,Math.ceil(this.lineWidth||1));
+    const before=this.fillStyle;this.fillStyle="#000";
+    this.fillRect(x,y,w,thickness);this.fillRect(x,y+h-thickness,w,thickness);
+    this.fillRect(x,y,thickness,h);this.fillRect(x+w-thickness,y,thickness,h);
+    this.fillStyle=before;
+  }
 }
 const window = {};
 const context = { window, document: {createElement: type=>{
@@ -91,4 +98,14 @@ eanLabel.elements=[{kind:"barcode",barcodeType:"EAN13",value:"590123412345",
   showsHumanReadable:false,xMM:0,yMM:3,widthMM:55,heightMM:12}];
 assert.doesNotThrow(()=>encode(eanLabel),"EAN13 barcode should render into real raster");
 
+const framed=blank();
+framed.elements=[{id:"frame",kind:"framedText",value:"",fontSize:12,
+  frameBorderMM:0.25,framePaddingMM:1.5,xMM:2,yMM:4,widthMM:36,heightMM:18}];
+const framedPacket=bytes(encode(framed));
+const frameWidth=Number(framedPacket.toString("ascii",2,4));
+const frameStride=4+frameWidth;
+assert.ok(framedPacket.subarray(33*frameStride+4,35*frameStride+4+frameWidth)
+  .some(x=>x!==0),"Box border must be emitted as real ESC G pixels");
+assert.throws(()=>window.EZ2Raster.draw({...framed,
+  elements:[{...framed.elements[0],framePaddingMM:12}]}),/Отступ внутри рамки/);
 console.log("Web raster passed: Gnn+FF, full-height rows, Code128/EAN13 bitmap generation.");
