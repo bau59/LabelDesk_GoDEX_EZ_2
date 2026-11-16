@@ -731,28 +731,60 @@ function renderProps(){
    return;
  }
  let h=document.createElement("strong");h.textContent=typeNames[e.kind];root.appendChild(h);
- if(e.kind==="textFrame"){
-   root.appendChild(prop("Текст внутри рамки",textInput(e.value,v=>{e.value=v;},false,"field-value")));
-   root.appendChild(pair(
-     prop("Ширина, символов",numInput(e.frameChars??34,n=>{e.frameChars=Math.round(n);},4,55,1)),
-     prop("Строк внутри",numInput(e.frameRows??1,n=>{e.frameRows=Math.round(n);},1,5,1))));
-   const styles=document.createElement("div");styles.className="text-align-controls";
-   for(const [key,example] of [["single","┌─┐"],["double","╔═╗"]]){
+ if(e.kind==="textFrame"||e.kind==="framedText"){
+   const raster=e.kind==="framedText";
+   root.appendChild(prop("Текст внутри рамки",textInput(e.value,v=>{e.value=v;},true,"field-value")));
+   if(raster){
+     root.appendChild(pair(
+       prop("Размер текста, pt",numInput(e.fontSize||12,n=>{e.fontSize=n;},5,52,1)),
+       prop("Толщина рамки, мм",numInput(e.frameBorderMM??0.25,n=>{e.frameBorderMM=n;},0.125,2,0.125))));
+     root.appendChild(pair(
+       prop("Внутренний отступ, мм",numInput(e.framePaddingMM??1.5,n=>{e.framePaddingMM=n;},0,6,0.25)),
+       prop("Ширина, мм",numInput(e.widthMM,n=>{e.widthMM=n;},4,60,0.25))));
+     root.appendChild(pair(
+       prop("Высота, мм",numInput(e.heightMM,n=>{e.heightMM=n;},4,100,0.25)),
+       prop("X, мм",numInput(e.xMM,n=>{e.xMM=n;},0,60,0.25))));
+     root.appendChild(prop("Y, мм",numInput(e.yMM,n=>{e.yMM=n;},0,100,0.25)));
+     root.appendChild(checkbox("Жирный текст",e.isBold,n=>{e.isBold=n;}));
+   }else{
+     root.appendChild(pair(
+       prop("Ширина, символов",numInput(e.frameChars??34,n=>{e.frameChars=Math.round(n);},4,55,1)),
+       prop("Строк внутри (0 = авто)",numInput(e.frameRows??0,n=>{e.frameRows=Math.round(n);},0,24,1))));
+     root.appendChild(prop("Размер символов CP866",fontGallery(e,
+       ["A00","A01","A02","A03","A04","A11","A12","A21","A22"])));
+     const styles=document.createElement("div");styles.className="text-align-controls";
+     for(const [key,example] of [["single","┌─┐"],["double","╔═╗"]]){
+       const button=document.createElement("button");button.type="button";
+       button.textContent=example;button.title=key==="single"?"Одинарная":"Двойная";
+       button.className=(e.frameStyle||"single")===key?"current":"";
+       button.onclick=()=>{checkpoint();e.frameStyle=key;draw();commit();};
+       styles.appendChild(button);
+     }
+     root.appendChild(prop("Граница",styles));
+   }
+   const align=document.createElement("div");align.className="text-align-controls";
+   for(const [key,label] of [["left","Слева"],["center","По центру"],["right","Справа"]]){
      const button=document.createElement("button");button.type="button";
-     button.textContent=example;button.title=key==="single"?"Одинарная":"Двойная";
-     button.className=(e.frameStyle||"single")===key?"current":"";
-     button.onclick=()=>{checkpoint();e.frameStyle=key;draw();commit();};
-     styles.appendChild(button);
+     button.textContent={left:"≡ ",center:"≡",right:" ≡"}[key];
+     button.title=label;button.className=(e.textAlignment||"left")===key?"current":"";
+     button.onclick=()=>{checkpoint();e.textAlignment=key;draw();commit();};
+     align.appendChild(button);
    }
-   root.appendChild(prop("Вид рамки",styles));
+   root.appendChild(prop("Выравнивание текста",align));
+   root.appendChild(checkbox("Подставлять значение из каталога",e.isVariable===true,
+     value=>{e.isVariable=value;renderLayers();}));
+   if(e.isVariable===true)
+     root.appendChild(prop("Имя поля",textInput(e.fieldName||"",v=>{e.fieldName=v;},false,"field-name")));
    const help=document.createElement("p");help.className="frame-help";
-   help.textContent="Встроенный шрифт A00, символы CP866. Печатается последовательными строками: верх, боковые стороны и низ.";
+   help.textContent=raster?
+     "Один объект: рамка, внутренний отступ и текст. Перемещается и масштабируется целиком.":
+     "Строки CP866 внутри рамки переносятся автоматически. 0 строк = высота по тексту. Шрифт общий для границы и текста.";
    root.appendChild(help);
-   const buttons=document.createElement("div");buttons.className="actions";
+   const actions=document.createElement("div");actions.className="actions";
    for(const [title,fn] of [["Дублировать",duplicate],["Удалить",remove]]){
-     const b=document.createElement("button");b.type="button";b.textContent=title;b.onclick=fn;buttons.appendChild(b);
+     const button=document.createElement("button");button.type="button";button.textContent=title;button.onclick=fn;actions.appendChild(button);
    }
-   root.appendChild(buttons);return;
+   root.appendChild(actions);return;
  }
  if(e.kind==="text"||e.kind==="barcode")root.appendChild(prop(e.kind==="text"?"Текст":"Данные штрихкода",textInput(e.value,v=>{e.value=v;},e.kind==="text","field-value")));
  if(e.prefix){
