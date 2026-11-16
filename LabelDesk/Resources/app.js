@@ -51,7 +51,7 @@
     else pending.resolve(message.result);
   };
 
-  const state={view:"editor",templates:[],folders:[],jobs:[],profile:defaultProfile(),
+  const state={view:"dishes",templates:[],folders:[],jobs:[],profile:defaultProfile(),
     selectedID:null,selectedFolderID:null,current:null,quickValues:{},editorReady:false,
     dirty:false,running:false,stopRequested:false,ports:[],runtimePath:"",log:[],
     settingsSnapshot:{},folderFilter:"all",librarySearch:""};
@@ -65,6 +65,9 @@
     if(state.log.length>200)state.log.shift();
     $("printLog").textContent=state.log.join("\n");
   };
+  const dishesController=window.EZ2DishController?.create({
+    state,native,uuid,clone,note,compatibility,media,encodeJob,renderQueue
+  })||null;
   function keySame(a,b){return String(a||"").toLowerCase()===String(b||"").toLowerCase();}
   function findTemplate(id){return state.templates.find(t=>keySame(t.id,id));}
   function findFolder(id){return state.folders.find(f=>keySame(f.id,id));}
@@ -100,6 +103,8 @@
     document.querySelectorAll("nav [data-view]").forEach(b=>b.classList.toggle("active",b.dataset.view===view));
     document.querySelectorAll("main .view").forEach(v=>v.classList.toggle("active",v.id===view+"View"));
     $("saveTemplate").disabled=view!=="editor";
+    $("appRoot").classList?.toggle("show-dishes",view==="dishes");
+    if(view==="dishes")dishesController?.render();
     if(view==="editor"){syncEditor();renderEditorCompatibility();}
     if(view==="quick")renderQuick();
     if(view==="queue")renderQueue();
@@ -768,6 +773,7 @@
       });
       state.profile={...defaultProfile(),...(info.settings?.profile||{})};
       state.settingsSnapshot=info.settings||{schemaVersion:1,snapToGrid:true};
+       dishesController?.bootstrap(info.dishes);
       state.runtimePath=info.runtimePath||"";
       const hadUserTemplates=state.templates.length>0;
       const originalFirst=state.templates.slice().sort((a,b)=>
@@ -784,7 +790,8 @@
       state.selectedFolderID=null;
       renderLibrary();renderQueue();renderSettings();syncEditor();
       await refreshPorts();
-      selectView("editor");note("LabelDesk готов. Драйвер редактируется без пересборки.");
+      selectView(dishesController?"dishes":"editor");
+       note("LabelDesk готов. Блюда сохраняются отдельно от макетов.");
     }catch(e){note("Не удалось загрузить данные: "+e.message,true);}
   }
 
@@ -853,5 +860,29 @@
   $("refreshPorts").addEventListener("click",refreshPorts);
   $("saveSettings").addEventListener("click",saveSettings);
   $("openRuntime").addEventListener("click",()=>native("openRuntime").catch(e=>note(e.message,true)));
+  // Resizable and collapsible library. Does not touch printer geometry.
+  let sidebarWidth=278;
+  try{
+    const old=Number(localStorage.getItem("labeldesk-sidebar-width"));
+    if(Number.isFinite(old)&&old>=210&&old<=450)sidebarWidth=old;
+  }catch(_){}
+  function setSidebarWidth(width){
+    sidebarWidth=Math.min(450,Math.max(210,Math.round(width)));
+    $("appRoot").style?.setProperty?.("--sidebar-width",sidebarWidth+"px");
+    try{localStorage.setItem("labeldesk-sidebar-width",String(sidebarWidth));}catch(_){}
+  }
+  setSidebarWidth(sidebarWidth);
+  $("toggleSidebar").addEventListener("click",()=>
+    $("appRoot").classList?.toggle("sidebar-collapsed"));
+  $("sidebarResize").addEventListener("pointerdown",event=>{
+    const x=event.clientX,start=sidebarWidth;
+    const move=e=>setSidebarWidth(start+e.clientX-x);
+    const up=()=>{
+      window.removeEventListener?.("pointermove",move);
+      window.removeEventListener?.("pointerup",up);
+    };
+    window.addEventListener("pointermove",move);
+    window.addEventListener("pointerup",up);
+  });
   bootstrap();
 })();
