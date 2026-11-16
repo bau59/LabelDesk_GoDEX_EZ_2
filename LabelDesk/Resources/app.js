@@ -161,6 +161,7 @@
         }
       }catch(e){note("Ошибка редактора: "+e.message,true);}
     }else if(type==="save"){saveCurrent();}
+    else if(type==="openSettings"){selectView("settings");}
   });
 
   function renderLibrary(){
@@ -331,23 +332,6 @@
       await saveFolderList(state.folders.map(f=>keySame(f.id,folder.id)?{...f,name}:f));
       renderLibrary();note("Папка переименована");
     }catch(e){note("Папка не переименована: "+e.message,true);}
-  }
-  async function assignBase(chosenID){
-    const folder=selectedFolder(),id=chosenID||$("baseChoice")?.value;
-    const doc=findTemplate(id);
-    if(!folder||!doc){note("Выберите шаблон в папке",true);return;}
-    if(!keySame(doc.folderID,folder.id)){
-      note("Базовым можно назначить только шаблон из этой папки",true);return;
-    }
-    if(state.dirty&&!confirmDiscard())return;
-    try{
-      await saveFolderList(state.folders.map(f=>
-        keySame(f.id,folder.id)?{...f,baseTemplateID:doc.id}:f));
-      state.current=clone(doc);
-      state.selectedID=doc.id;state.dirty=false;state.quickValues={};
-      renderLibrary();renderQuick();selectView("editor");
-      note("Базовый макет папки «"+folder.name+"»: "+doc.name);
-    }catch(e){note("Не удалось назначить базовый макет: "+e.message,true);}
   }
   async function moveSelected(destination){
     const doc=findTemplate(state.selectedID),target=destination||$("moveTarget")?.value;
@@ -784,12 +768,10 @@
     const action=ev.target.closest("[data-library-action]");
     if(action){
       const command=action.dataset.libraryAction;
-      if(command==="set-base")await assignBase();
-      else if(command==="set-base-row")await assignBase(action.dataset.templateId);
-      else if(command==="fill-base"){const base=baseTemplate();if(base)selectTemplate(base.id);}
-      else if(command==="edit-base"){
-        const base=selectedFolder()&&findTemplate(selectedFolder().baseTemplateID);
-        if(base)selectTemplate(base.id);
+      if(command==="edit-base"){
+        const folder=selectedFolder();
+        const first=state.templates.find(t=>keySame(t.folderID,folder?.id));
+        if(first)selectTemplate(first.id);
       }
       else if(command==="rename-folder")await renameFolder();
       else if(command==="delete-folder")await deleteFolder();
@@ -842,6 +824,7 @@
   $("clearLog").addEventListener("click",()=>{state.log=[];renderQueue();});
   $("refreshPorts").addEventListener("click",refreshPorts);
   $("saveSettings").addEventListener("click",saveSettings);
+  $("saveMarginSettings").addEventListener("click",saveSettings);
   $("openRuntime").addEventListener("click",()=>native("openRuntime").catch(e=>note(e.message,true)));
   // Resizable and collapsible library. Does not touch printer geometry.
   let sidebarWidth=278;
