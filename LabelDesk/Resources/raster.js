@@ -52,10 +52,17 @@
     const anchor=align==="left"?x:align==="right"?x+w:x+w/2;
     const paint=()=> {
       const lines=wrap(ctx,String(item.prefix||"")+String(item.value||""),w);
-      lines.forEach((line,i)=> {
-        if ((i*lineHeight) >= h) return;
-        ctx.fillText(line,anchor,y+i*lineHeight);
-      });
+      if(lines.length*lineHeight>h+0.5){
+        throw Error("Текст не помещается по высоте: требуется "+
+          (lines.length*lineHeight/DOTS).toFixed(1)+" мм, доступно "+
+          (h/DOTS).toFixed(1)+" мм. Увеличьте блок или уменьшите шрифт.");
+      }
+      for(const line of lines){
+        if(ctx.measureText(line).width>w+0.5){
+          throw Error("Символ шире текстового блока. Увеличьте ширину или уменьшите шрифт.");
+        }
+      }
+      lines.forEach((line,i)=>ctx.fillText(line,anchor,y+i*lineHeight));
     };
     ctx.save();
     ctx.beginPath();ctx.rect(x,y,w,h);ctx.clip();
@@ -72,7 +79,7 @@
   // A real raster object: frame geometry and contained text share one coordinate
   // system and are clipped together. The source document is not modified.
   function framedText(ctx,item,x,y,w,h){
-    const border=Math.max(1,Math.min(24,Math.round(Number(item.frameBorderMM||0.25)*DOTS)));
+    const border=Math.max(1,Math.min(24,Math.round(Number(item.frameBorderMM??0.25)*DOTS)));
     const pad=Math.max(0,Math.min(15,Number(item.framePaddingMM??1.5)))*DOTS;
     const left=x+border/2,right=x+w-border/2,top=y+border/2,bottom=y+h-border/2;
     if(pad*2+border*2>=Math.min(w,h))throw Error("Отступ внутри рамки больше размера объекта");
