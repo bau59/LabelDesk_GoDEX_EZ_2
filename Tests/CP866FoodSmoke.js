@@ -18,6 +18,13 @@ assert.equal(printer.font("A11").heightDots,26);
 assert.equal(printer.font("A12").heightDots,52);
 assert.equal(printer.font("A02").heightDots,20);
 assert.equal(printer.font("A21").widthDots,32);
+assert.deepEqual(toPlain(printer.font("A00")),{code:"A00",widthDots:8,heightDots:10});
+assert.deepEqual(toPlain(printer.font("A01")),{code:"A01",widthDots:8,heightDots:10,bold:true});
+assert.equal(printer.font("A03").heightDots,30);
+assert.equal(printer.font("A04").widthDots,16);
+assert.equal(printer.font("A04").heightDots,20);
+assert.equal(printer.font("A22").widthDots,32);
+assert.equal(printer.font("A22").heightDots,52);
 assert.throws(()=>printer.font("A99"),/Неизвестный/);
 const make=(elements,mode="text")=>({
   widthMM:58,heightMM:38,gapMM:2,printMode:mode,elements
@@ -26,6 +33,30 @@ const row=(value,more={})=>({
   id:"test",kind:"text",value,prefix:"",xMM:0,yMM:0,
   widthMM:55,heightMM:2,deviceFont:"A00",rotation:0,...more
 });
+// A frame is a single editable element expanded to sequential native CP866 rows.
+const oneFrame={id:"frame",kind:"textFrame",value:"Суп",frameChars:12,frameRows:2,
+  frameStyle:"single",xMM:0,widthMM:55,rotation:0};
+const frameDocument=make([oneFrame,row("После рамки",{id:"after"})]);
+const framePlan=printer.plan(frameDocument);
+assert.equal(framePlan.rows.length,5);
+assert.equal(framePlan.rows[0].text,"┌──────────┐");
+assert.equal(framePlan.rows[1].text.length,12);
+assert.match(framePlan.rows[1].text,/^│ Суп/);
+assert.equal(framePlan.rows[2].text,"│          │");
+assert.equal(framePlan.rows[3].text,"└──────────┘");
+assert.equal(framePlan.rows[4].text,"После рамки");
+const framePacket=decode(printer.build(frameDocument));
+assert.ok(framePacket.includes(Buffer.from([218,196,196,196])));
+assert.ok(framePacket.includes(Buffer.from([192,196,196,196])));
+assert.ok(!framePacket.includes(Buffer.from([27,71])),"Frame must not inject raster commands");
+assert.equal(oneFrame.value,"Суп","Frame compilation never edits original template");
+const doubleFrame=printer.plan(make([{...oneFrame,frameStyle:"double",frameRows:1}]));
+assert.equal(doubleFrame.rows[0].text,"╔══════════╗");
+assert.equal(doubleFrame.rows[2].text,"╚══════════╝");
+assert.throws(()=>printer.plan(make([{...oneFrame,frameChars:56}])),/Ширина рамки/);
+assert.throws(()=>printer.plan(make([{...oneFrame,value:"Длинный заголовок в рамке"}])),
+  /Текст рамки длиннее/);
+assert.throws(()=>printer.plan(make([{...oneFrame,frameRows:7}])),/Высота рамки/);
 const multi=make([
   row("ПРИВЕТ МИР", {id:"a",deviceFont:"A11"}),
   row("Состав: картофель, мясо, соль", {id:"b"}),
