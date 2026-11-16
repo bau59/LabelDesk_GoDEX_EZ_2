@@ -13,7 +13,8 @@
       shelfLifeHours:"dishShelfLife",storage:"dishStorage",
       manufacturer:"dishManufacturer",address:"dishAddress",barcode:"dishBarcode"};
     let dishes=[],chosenID=null,draft=null,dirty=false,search="",formOpen=false;
-    let folders=[],catalogFolderID="all",printFolderID="all",printSearch="";
+    let folders=[],catalogFolderID="all",printFolderID="all",printSearch="",printLimit=6;
+    let printPresets=[];
     const rowEdits={}; let detailFor=null;
     let selected=new Set(),copies={},templateOverrides={},previewID=null,formInitialized=false;
     let defaultTemplateID=null,pickerFor=null;
@@ -232,9 +233,93 @@
       item.customFields=extras;
       return item;
     }
+
+    function renderPresets(){
+      $("printPresets").innerHTML=printPresets.length?printPresets.slice().sort((a,b)=>
+        String(a.name).localeCompare(String(b.name),"ru")).map(p=>
+        '<div class="print-preset"><div><strong>'+esc(p.name)+'</strong>'+
+        '<small> · '+p.items.length+' позиций</small></div>'+
+        '<div class="print-preset-actions">'+
+        '<button type="button" data-preset-load="'+esc(p.id)+'">Открыть</button>'+
+        '<button type="button" data-preset-queue="'+esc(p.id)+'" class="primary">В очередь →</button>'+
+        '<button type="button" data-preset-delete="'+esc(p.id)+'" class="danger">Удалить</button></div></div>'
+      ).join(""):'<p class="muted">Нет сохранённых партий. Соберите набор и нажмите «Сохранить».</p>';
+    }
+    async function persistPresets(next){
+      await native("saveData",{key:"printPresets",json:JSON.stringify(next)});
+      printPresets=next;renderPresets();
+    }
+    async function savePreset(){
+      if(!selected.size){note("Сначала добавьте хотя бы одну позицию",true);return;}
+      const suggested=$("batchName").value.trim()||
+        ("Партия "+new Date().toLocaleDateString("ru-RU"));
+      const name=window.prompt("Название пресета печати",suggested)?.trim();
+      if(!name)return;
+      if(name.length>100){note("Название пресета: максимум 100 символов",true);return;}
+      const existing=printPresets.find(p=>p.name.toLocaleLowerCase("ru")===name.toLocaleLowerCase("ru"));
+      if(existing&&!window.confirm("Заменить сохранённую партию «"+name+"»?"))return;
+      const items=dishes.filter(d=>selected.has(d.id)).map(d=>({
+        itemID:d.id,copies:copies[d.id]||1,templateID:templateOverrides[d.id]||defaultTemplateID,
+        overrides:rowEdits[d.id]?clone(rowEdits[d.id]):null
+      }));
+      if(items.some(it=>!findTemplate(it.templateID))){
+        note("Нельзя сохранить партию: один из макетов не найден",true);return;
+      }
+      const now=new Date().toISOString();
+      const preset={id:existing?.id||uuid(),name,items,
+        defaultTemplateID,batchCode:$("batchCode").value.trim(),
+        createdAt:existing?.createdAt||now,updatedAt:now};
+      try{
+        await persistPresets([...printPresets.filter(p=>p.id!==preset.id),preset]);
+        note("Партия сохранена: "+name);
+      }catch(e){note("Не удалось сохранить пресет: "+e.message,true);}
+    }
+    function loadPreset(id){
+      const p=printPresets.find(x=>x.id===id);
+      if(!p)return false;
+      if(!Array.isArray(p.items)||!p.items.length){note("Пресет пуст",true);return false;}
+      const bad=p.items.find(it=>!findDish(it.itemID)||!findTemplate(it.templateID));
+      if(bad){
+        note("Пресет «"+p.name+"» содержит удалённую позицию или шаблон. Исправьте каталог или создайте новый пресет.",true);
+        return false;
+      }
+      const ids=new Set(p.items.map(it=>it.itemID));
+      if(ids.size!==p.items.length){note("В пресете повторяются позиции",true);return false;}
+      selected=ids;copies={};templateOverrides={};
+      for(const key of Object.keys(rowEdits))delete rowEdits[key];
+      for(const it of p.items){
+        copies[it.itemID]=Math.max(1,Math.min(200,Math.round(Number(it.copies)||1)));
+        templateOverrides[it.itemID]=it.templateID;
+        if(it.overrides)rowEdits[it.itemID]=clone(it.overrides);
+      }
+      defaultTemplateID=findTemplate(p.defaultTemplateID)?.id||p.items[0].templateID;
+      $("batchName").value=p.name;
+      $("batchCode").value=p.batchCode||"";
+      // Dates are deliberately fresh on every reuse, not frozen in the preset.
+      $("batchProducedAt").value=localDateTime();
+      $("batchExpiresAt").value="";
+      pickerFor=null;detailFor=null;previewID=null;
+      $("dishPreview").removeAttribute("src");
+      renderBatch();renderSidebar();
+      note("Партия открыта: "+p.name+". Дата обновлена.");
+      return true;
+    }
+    async function deletePreset(id){
+      const p=printPresets.find(x=>x.id===id);if(!p)return;
+      if(!window.confirm("Удалить пресет «"+p.name+"»? Сохранённые позиции останутся."))return;
+      try{
+        await persistPresets(printPresets.filter(x=>x.id!==id));
+        note("Пресет удалён: "+p.name);
+      }catch(e){note("Не удалось удалить пресет: "+e.message,true);}
+    }
+
     function renderBatch(){
-      const candidates=printList();
+      const unselected=printList().filter(d=>!selected.has(d.id));
+      const candidates=unselected.slice(0,printLimit);
       const visible=dishes.filter(d=>selected.has(d.id)).sort(byName);
+      $("printFoundCount").textContent=unselected.length+" доступно";
+      $("printMore").hidden=unselected.length<=printLimit;
+      renderPresets();
       if(!findTemplate(defaultTemplateID))defaultTemplateID=defaultTemplate()?.id||null;
       const defaultID=defaultTemplateID;
       renderPrintFilters();
@@ -242,10 +327,9 @@
         '<div class="print-result"><div><strong>'+esc(d.name)+'</strong><small>'+
         esc(kindLabel(d.kind||"food")+' · '+folderName(d.folderID))+
         '</small></div><button type="button" data-add-print="'+esc(d.id)+'"'+
-        (selected.has(d.id)?' disabled':'')+'>'+
-        (selected.has(d.id)?'В партии ✓':'＋ Добавить')+'</button></div>').join(""):
+        '>＋ Добавить</button></div>').join(""):
         '<div class="print-empty">В этой папке ничего не найдено</div>';
-      $("addVisibleToPrint").disabled=!candidates.some(d=>!selected.has(d.id));
+      $("addVisibleToPrint").disabled=!candidates.length;
       $("dishBatchTemplate").innerHTML=templateCards(defaultID,null)||
         '<p class="muted">Создайте шаблон в редакторе</p>';
       $("dishBatchRows").innerHTML=visible.length?visible.map(d=>{
@@ -426,12 +510,13 @@
       return date.getFullYear()+"-"+pad(date.getMonth()+1)+"-"+pad(date.getDate())+
         "T"+pad(date.getHours())+":"+pad(date.getMinutes());
     }
-    function bootstrap(raw,savedFolders){
+    function bootstrap(raw,savedFolders,savedPresets){
+      printPresets=Array.isArray(savedPresets)?savedPresets.filter(p=>p&&p.id&&p.name&&Array.isArray(p.items)):[];
       folders=Array.isArray(savedFolders)?savedFolders.filter(f=>f&&f.id&&f.name):[];
       dishes=Array.isArray(raw)?raw.filter(d=>d&&d.id&&d.name)
         .map(d=>({...d,kind:d.kind||"food",
           customFields:Array.isArray(d.customFields)?d.customFields:[]})):[];
-      chosenID=null;draft=fresh();formOpen=false;selected.clear();
+      chosenID=null;draft=fresh();formOpen=false;selected.clear();printLimit=6;
       dirty=false;formInitialized=false;
       $("batchProducedAt").value=localDateTime();
       render();
@@ -445,7 +530,7 @@
     $("saveDish").addEventListener("click",saveDish);
     $("addItemFolder").addEventListener("click",createFolder);
     $("printSearch").addEventListener("input",e=>{
-      printSearch=String(e.target.value||"").trim();
+      printSearch=String(e.target.value||"").trim();printLimit=6;
       renderBatch();
     });
     $("itemFolderPicker").addEventListener("click",e=>{
@@ -459,7 +544,7 @@
     $("printFolderFilters").addEventListener("click",e=>{
       const button=e.target.closest("[data-print-folder]");
       if(!button)return;
-      printFolderID=button.dataset.printFolder;
+      printFolderID=button.dataset.printFolder;printLimit=6;
       renderBatch();
     });
     $("addCustomField").addEventListener("click",()=>{
@@ -536,6 +621,16 @@
       }
       renderBatch();
     });
+    $("savePrintPreset").addEventListener("click",savePreset);
+    $("printPresets").addEventListener("click",async e=>{
+      const load=e.target.closest("[data-preset-load]");
+      if(load){loadPreset(load.dataset.presetLoad);return;}
+      const queue=e.target.closest("[data-preset-queue]");
+      if(queue){if(loadPreset(queue.dataset.presetQueue))await queueSelected();return;}
+      const del=e.target.closest("[data-preset-delete]");
+      if(del)await deletePreset(del.dataset.presetDelete);
+    });
+    $("printMore").addEventListener("click",()=>{printLimit+=6;renderBatch();});
     $("printCatalogResults").addEventListener("click",e=>{
       const button=e.target.closest("[data-add-print]");
       if(!button||!findDish(button.dataset.addPrint))return;
@@ -543,7 +638,7 @@
       renderBatch();renderSidebar();
     });
     $("addVisibleToPrint").addEventListener("click",()=>{
-      for(const d of printList())selected.add(d.id);
+      for(const d of printList().filter(d=>!selected.has(d.id)).slice(0,printLimit))selected.add(d.id);
       renderBatch();renderSidebar();
     });
         $("dishBatchRows").addEventListener("click",e=>{
