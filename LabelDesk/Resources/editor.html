@@ -629,6 +629,17 @@ function checkbox(label,value,onChange){
  let txt=document.createElement("span");txt.textContent=label;row.append(input,txt);return row;
 }
 function pair(left,right){let p=document.createElement("div");p.className="prop-row";p.append(left,right);return p;}
+function changeEditorMode(mode){
+ if(!doc||mode===doc.printMode)return;
+ const illegal=doc.elements.filter(e=>
+   mode==="text"?!["text","line","barcode"].includes(e.kind):e.kind==="textFrame");
+ if(illegal.length){
+   window.alert("Несовместимые объекты: "+illegal.length+
+     ". Удалите их перед сменой режима. Автоматическая конвертация может испортить этикетку.");
+   return;
+ }
+ checkpoint();doc.printMode=mode;selected=null;draw();commit();
+}
 function renderProps(){
  const root=$("props");root.replaceChildren();if(!doc)return;
  const e=selectedObj();
@@ -645,15 +656,19 @@ function renderProps(){
                         prop("Высота, мм",numInput(doc.heightMM,n=>{doc.heightMM=Math.round(n);},10,100,1))));
    root.appendChild(prop("Зазор, мм",numInput(doc.gapMM,n=>{doc.gapMM=Math.round(n);},0,10,1)));
    let note=document.createElement("p");note.className="hint";note.textContent=doc.widthMM>55?"Ширина ленты — "+doc.widthMM+" мм. Заштрихованные справа "+(doc.widthMM-55).toFixed(1)+" мм НЕ печатаются ESC G. Печатная графика — 0…55 мм.":"Материал — до 60 мм, графика ESC G — до 55 мм. Выберите слой для редактирования.";;root.appendChild(note);
-   const mode=document.createElement("select");
-   for(const [id,title] of [["text","Штатный текст CP866 (строки)"],["raster","Растр (точные X/Y)"]]){
-     const opt=document.createElement("option");opt.value=id;opt.textContent=title;mode.appendChild(opt);
+   const choice=document.createElement("div");choice.className="mode-choices";
+   for(const [key,title,desc,icon] of [
+     ["text","Текст CP866","Штатные размеры шрифта, строки подряд, рамка из символов.","≡"],
+     ["raster","Растр","Свободные X/Y, графика, размер объектов в миллиметрах.","▦"]
+   ]){
+     const button=document.createElement("button");button.type="button";
+     button.className="mode-choice"+((doc.printMode||"raster")===key?" selected":"");
+     const mark=document.createElement("span");mark.className="mode-mark";mark.textContent=icon;
+     const body=document.createElement("span"),h=document.createElement("strong"),hint=document.createElement("small");
+     h.textContent=title;hint.textContent=desc;body.append(h,hint);button.append(mark,body);
+     button.onclick=()=>changeEditorMode(key);choice.appendChild(button);
    }
-   mode.value=doc.printMode||"raster";
-   mode.addEventListener("change",()=>{
-     checkpoint();doc.printMode=mode.value;draw();commit();
-   });
-   root.appendChild(prop("Способ печати",mode));
+   root.appendChild(prop("Режим этого макета",choice));
    const desc=document.createElement("p");desc.className="hint";
    desc.textContent=doc.printMode==="text"?
      "Печать встроенным шрифтом CP866. Строки идут по порядку слоёв снизу вверх в списке. Точные координаты Y принтер не поддерживает; размеры в эскизе приблизительные.":
@@ -791,7 +806,9 @@ function renderProps(){
 function draw(){
  if(!doc)return;
  $("docname").value=doc.name;
- $("printModeSelect").value=doc.printMode||"raster";
+ document.body.dataset.editorMode=doc.printMode||"raster";
+ $("editorModeIndicator").textContent=doc.printMode==="text"?"Текст CP866":"Растр XY";
+ $("propsTitle").textContent=selectedObj()?(doc.printMode==="text"?"Настройки строки":"Свойства объекта"):"Настройки макета";
  $("foot").textContent=doc.printMode==="text"?
    "Текст CP866: порядок слоёв определяет порядок строк. Стрелки меняют порядок; Y автоматически задаётся принтером. Эскиз приблизительный.":
    "Растр: перемещайте и масштабируйте объекты, точные координаты X/Y будут сохранены.";
@@ -846,10 +863,7 @@ $("docname").addEventListener("input",function(){if(!doc)return;doc.name=this.va
 $("label").addEventListener("click",ev=>{ev.stopPropagation();setSelected(null);});
 $("docSettings").addEventListener("click",()=>setSelected(null));
 $("zoom").addEventListener("change",function(){zoomMode=this.value;if(zoomMode!=="fit")zoom=Number(this.value);renderCanvas();});
-$("printModeSelect").addEventListener("change",function(){
- if(!doc)return;
- checkpoint();doc.printMode=this.value;draw();commit();
-});
+
 window.addEventListener("resize",()=>{if(zoomMode==="fit")renderCanvas();});
 $("up").onclick=()=>moveLayer(1);$("down").onclick=()=>moveLayer(-1);
 $("clone").onclick=duplicate;$("remove").onclick=remove;
