@@ -107,21 +107,30 @@
       {tl:"╔",tr:"╗",bl:"╚",br:"╝",h:"═",v:"║"}:
       {tl:"┌",tr:"┐",bl:"└",br:"┘",h:"─",v:"│"};
     const width=Number(el.frameChars??30);
-    const height=Number(el.frameRows??1);
     if(!Number.isInteger(width)||width<4||width>55||width>capacity)
-      throw Error("Ширина рамки больше печатной области: "+width+" символов");
-    if(!Number.isInteger(height)||height<1||height>5)
-      throw Error("Высота рамки: 1–5 строк внутри");
-    const caption=String(el.value??"").replace(/\r?\n/g," ");
-    if(Array.from(caption).length>width-4)
-      throw Error("Текст рамки длиннее внутреннего поля ("+(width-4)+" символов)");
-    const line=glyphs.v+" "+caption.padEnd(width-4," ")+" "+glyphs.v;
+      throw Error("Ширина рамки больше доступной области: "+width+" символов");
+    const alignment=["left","center","right"].includes(el.textAlignment)?el.textAlignment:"left";
+    const inner=width-4;
+    const lines=wrapText(String(el.value??""),inner);
+    const desired=Number(el.frameRows??0);
+    if(!Number.isInteger(desired)||desired<0||desired>24)
+      throw Error("Строк внутри рамки: от 0 (авто) до 24");
+    const count=desired===0?Math.max(1,lines.length):desired;
+    if(lines.length>count)
+      throw Error("Текст не помещается в рамку: нужно "+lines.length+" строк, доступно "+count);
+    if(count>24)throw Error("Рамка слишком высокая: более 24 строк");
+    const place=line=>{
+      const charCount=Array.from(line).length;
+      const pad=inner-charCount;
+      const before=alignment==="center"?Math.floor(pad/2):alignment==="right"?pad:0;
+      return glyphs.v+" "+" ".repeat(before)+line+
+        " ".repeat(pad-before)+" "+glyphs.v;
+    };
     return [glyphs.tl+glyphs.h.repeat(width-2)+glyphs.tr,
-      ...Array.from({length:height},(_,i)=>i===0?line:
-      glyphs.v+" ".repeat(width-2)+glyphs.v),
+      ...Array.from({length:count},(_,i)=>place(lines[i]||"")),
       glyphs.bl+glyphs.h.repeat(width-2)+glyphs.br];
   }
-    function plan(doc, options={}){
+  function plan(doc, options={}){
     if(!doc || doc.printMode!=="text")throw Error("Этот макет не является строковым");
     if(Math.abs(Number(doc.heightMM)-38)>0.001||Math.abs(Number(doc.gapMM)-2)>0.001)
       throw Error("Штатный драйвер подтверждён для высоты 38 мм, зазора 2 мм");
@@ -136,7 +145,7 @@
     for(const el of doc.elements){
       if(el.rotation && Number(el.rotation)!==0)throw Error("Поворот строки невозможен в EZ-2");
       if(el.kind==="textFrame"){
-        const f=font("A00");
+        const f=font(el.deviceFont||"A00");
         const x=Math.max(0,Number(el.xMM||0));
         if(x>=margins.width)throw Error("Рамка выходит за правую границу");
         const capacity=Math.floor(Math.min(55,Math.max(1,Number(el.widthMM||55)),
