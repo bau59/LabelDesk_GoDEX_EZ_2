@@ -70,7 +70,8 @@
     $("printLog").textContent=state.log.join("\n");
   };
   const dishesController=window.EZ2DishController?.create({
-    state,native,uuid,clone,note,compatibility,media,encodeJob,renderQueue
+    state,native,uuid,clone,note,compatibility,media,encodeJob,renderQueue,
+    openQueue:()=>selectView("queue")
   })||null;
   function keySame(a,b){return String(a||"").toLowerCase()===String(b||"").toLowerCase();}
   function findTemplate(id){return state.templates.find(t=>keySame(t.id,id));}
