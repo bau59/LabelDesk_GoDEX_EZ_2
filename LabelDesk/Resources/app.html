@@ -519,9 +519,26 @@ footer{color:#8993a1}
     </div>
   </section>
   <section class="view" id="editorView">
-    <div id="editorContext" class="editor-context">Выберите шаблон</div>
-    <div id="editorCompatibility" class="media-note"></div>
-    <iframe id="editorFrame" src="editor.html" title="Редактор этикетки"></iframe>
+    <div id="editorLibrary" class="page" style="max-width:1450px">
+      <div class="page-intro"><div><h2>Этикетки <small id="librarySummary"></small></h2>
+        <p class="intro">Папки выбираются слева. Действия находятся у каждой этикетки.</p></div>
+        <button id="newTemplateMain" class="primary">＋ Новая этикетка</button></div>
+      <div class="card">
+        <h3>Шаблоны <span id="templateCount"></span></h3>
+        <p class="muted" id="folderDetail"></p>
+        <div class="library-search"><input id="templateSearch" type="search" placeholder="Поиск по этикеткам..." aria-label="Поиск этикеток"></div>
+        <div id="templates" class="template-main-list"></div>
+        <div id="templateDetail"></div>
+      </div>
+    </div>
+    <div id="editorWorkspace" hidden>
+      <div class="editor-workspace-head">
+        <button id="backToTemplates">← Все этикетки</button>
+        <span id="editorContext" class="editor-context">Выберите шаблон</span>
+        <span id="editorCompatibility" class="media-note"></span>
+      </div>
+      <iframe id="editorFrame" src="editor.html" title="Редактор этикетки"></iframe>
+    </div>
   </section>
   <section class="view" id="quickView" aria-hidden="true">
     <div class="page">
