@@ -71,7 +71,7 @@
   };
   const dishesController=window.EZ2DishController?.create({
     state,native,uuid,clone,note,compatibility,media,encodeJob,renderQueue,
-    openQueue:()=>selectView("queue"),openPrint:()=>selectView("print")
+    openQueue:()=>selectView("queue"),openPrint:()=>selectView("print"),printQueuedIDs:ids=>printQueue(false,ids)
   })||null;
   let editorEditing=false,moveTemplateID=null;
   function keySame(a,b){return String(a||"").toLowerCase()===String(b||"").toLowerCase();}
