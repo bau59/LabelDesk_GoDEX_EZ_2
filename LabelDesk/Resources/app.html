@@ -114,39 +114,39 @@ footer{grid-column:1/3;background:#fff;border-top:1px solid var(--line);font-siz
 <body>
 <div class="app" id="appRoot">
 <header>
-  <button id="toggleSidebar" title="Скрыть или показать боковую панель">☰</button>
-  <div class="brand"><span class="mark">▣</span>LabelDesk<small>Этикетки · GoDEX EZ-2</small></div>
-  <nav>
-    <button data-view="dishes">Блюда</button>
-    <button data-view="quick">Разовое заполнение</button>
-    <button data-view="editor">Макеты</button>
-    <button data-view="queue">Очередь <span id="pendingCount"></span></button>
-    <button data-view="settings">Настройки</button>
-  </nav>
+  <button id="toggleSidebar" title="Скрыть или показать боковую панель" aria-label="Переключить боковую панель">☰</button>
+  <div class="header-context"><span class="header-breadcrumb">LabelDesk / Рабочее пространство</span><strong id="topTitle">Каталог</strong></div>
   <div class="right">
-    <button id="newTemplate">Новая этикетка</button>
+    <button id="newTemplate" class="quiet">＋ Новый шаблон</button>
     <button id="saveTemplate" class="primary">Сохранить макет</button>
   </div>
 </header>
-<aside aria-label="Каталог и макеты">
+<aside aria-label="Навигация и библиотека">
+  <div class="sidebar-brand"><span class="mark">▤</span><div><strong>LabelDesk</strong><small>Этикетки · GoDEX EZ-2</small></div></div>
+  <nav aria-label="Основные разделы">
+    <button data-view="dishes"><span class="nav-symbol">▦</span>Каталог</button>
+    <button data-view="editor"><span class="nav-symbol">▤</span>Редактор этикеток</button>
+    <button data-view="queue"><span class="nav-symbol">▧</span>Очередь <span id="pendingCount"></span></button>
+    <button data-view="settings"><span class="nav-symbol">⚙</span>Настройки</button>
+  </nav>
+  <div class="sidebar-caption">БИБЛИОТЕКА</div>
   <div class="sidebar-content" id="dishSidebar">
-    <div class="sidebar-title">Каталог блюд <small id="dishSummary"></small></div>
-    <input id="dishSearch" type="search" placeholder="Найти блюдо" aria-label="Поиск блюд">
-    <button id="newDish" class="primary">＋ Новое блюдо</button>
+    <div class="sidebar-title">Позиции <small id="dishSummary"></small></div>
+    <input id="dishSearch" type="search" placeholder="Поиск по названию..." aria-label="Поиск позиций">
+    <button id="newDish" class="sidebar-add">＋ Новая позиция</button>
     <div id="dishList"></div>
   </div>
   <div class="sidebar-content" id="templateSidebar">
-  <div class="sidebar-title">Макеты <small id="librarySummary"></small></div>
-  <p class="muted" style="margin:0 7px 14px;font-size:11px">Макеты задают внешний вид. Блюда хранятся отдельно.</p>
-  <div class="search"><input id="templateSearch" type="search" placeholder="Поиск шаблонов" aria-label="Поиск шаблонов"></div>
+  <div class="sidebar-title">Шаблоны <small id="librarySummary"></small></div>
+  <div class="search"><input id="templateSearch" type="search" placeholder="Найти макет..." aria-label="Поиск шаблонов"></div>
   <div class="sidebar-section">
-    <div class="sidebar-head">Группы макетов <button id="addFolder" title="Создать группу с базовым макетом">＋</button></div>
+    <div class="sidebar-head">Папки <button id="addFolder" title="Создать папку">＋</button></div>
     <div id="folders"></div>
     <div id="folderDetail" class="sidebar-panel"></div>
   </div>
   <div class="sidebar-separator"></div>
   <div class="sidebar-section">
-    <div class="sidebar-head">Шаблоны <span id="templateCount"></span></div>
+    <div class="sidebar-head">В папке <span id="templateCount"></span></div>
     <div id="templates"></div>
     <div id="templateDetail" class="sidebar-panel"></div>
   </div>
@@ -155,52 +155,62 @@ footer{grid-column:1/3;background:#fff;border-top:1px solid var(--line);font-siz
 </aside>
 <main id="content">
   <section class="view" id="dishesView">
-    <div class="page" style="max-width:1450px">
-      <div class="flex space"><div><h2>Блюда и печать для холодильника</h2>
-        <p class="intro">Блюдо заполняется один раз. Отметьте нужные позиции, задайте тираж и макет для каждой — затем добавьте всё в очередь.</p></div>
-        <button id="newDishMain">＋ Добавить блюдо</button>
+    <div class="page catalog-page" style="max-width:1450px">
+      <div class="page-intro"><div><h2>Каталог</h2>
+        <p class="intro">Храните товары, блюда или любые данные в одном месте. Выберите шаблон при печати.</p></div>
+        <button id="newDishMain" class="primary">＋ Новая позиция</button>
       </div>
       <div class="card">
-        <div class="flex space"><h3 id="dishFormTitle">Карточка блюда</h3><span class="muted" id="dishFormHint">Данные хранятся отдельно от макетов</span></div>
+        <div class="section-head"><div><h3 id="dishFormTitle">Новая позиция</h3><p class="muted">Заполните только нужные поля. Остальные не попадут на этикетку.</p></div><span class="muted" id="dishFormHint">Поля независимы от шаблонов</span></div>
         <div id="dishFields" class="fields">
-          <div class="field"><label for="dishName">Название блюда *</label><input id="dishName" data-dish="name" autocomplete="off"></div>
-          <div class="field"><label for="dishWeight">Масса нетто, г</label><input id="dishWeight" data-dish="weightG" inputmode="decimal"></div>
+          <div class="field"><label for="dishName">Название *</label><input id="dishName" data-dish="name" autocomplete="off" placeholder="Например, Суп дня или Товар № 12"></div>
+          <div class="field"><label for="itemKind">Тип записи</label><select id="itemKind" data-dish="kind"><option value="product">Товар</option><option value="food">Блюдо</option><option value="other">Данные</option></select></div>
+          <div class="field"><label for="dishWeight">Вес / масса, г</label><input id="dishWeight" data-dish="weightG" inputmode="decimal"></div>
+          <div class="field"><label for="dishShelfLife">Срок хранения, часов</label><input id="dishShelfLife" data-dish="shelfLifeHours" inputmode="decimal" placeholder="Например, 48"></div>
+          <details class="field-group"><summary>Состав и КБЖУ <span>необязательно</span></summary><div class="fields">
           <div class="field"><label for="dishKcal">Ккал на 100 г</label><input id="dishKcal" data-dish="kcal" inputmode="decimal"></div>
           <div class="field"><label for="dishProtein">Белки на 100 г</label><input id="dishProtein" data-dish="protein" inputmode="decimal"></div>
           <div class="field"><label for="dishFat">Жиры на 100 г</label><input id="dishFat" data-dish="fat" inputmode="decimal"></div>
           <div class="field"><label for="dishCarbs">Углеводы на 100 г</label><input id="dishCarbs" data-dish="carbs" inputmode="decimal"></div>
           <div class="field"><label for="dishIngredients">Состав</label><textarea id="dishIngredients" data-dish="ingredients" rows="2"></textarea></div>
           <div class="field"><label for="dishAllergens">Аллергены</label><textarea id="dishAllergens" data-dish="allergens" rows="2"></textarea></div>
-          <div class="field"><label for="dishShelfLife">Срок годности, часов</label><input id="dishShelfLife" data-dish="shelfLifeHours" inputmode="decimal" placeholder="Например, 48"></div>
+          </div></details>
+          <details class="field-group"><summary>Хранение, производитель и код <span>необязательно</span></summary><div class="fields">
           <div class="field"><label for="dishStorage">Условия хранения</label><input id="dishStorage" data-dish="storage" placeholder="Например, +2…+6 °C"></div>
           <div class="field"><label for="dishManufacturer">Производитель</label><input id="dishManufacturer" data-dish="manufacturer"></div>
           <div class="field"><label for="dishAddress">Адрес производителя</label><input id="dishAddress" data-dish="address"></div>
-          <div class="field"><label for="dishBarcode">Штрихкод товара (необязательно)</label><input id="dishBarcode" data-dish="barcode" autocomplete="off"></div>
+          <div class="field"><label for="dishBarcode">Штрихкод (если нужен)</label><input id="dishBarcode" data-dish="barcode" autocomplete="off"></div>
+          </div></details>
         </div>
-        <div class="flex" style="margin-top:14px">
-          <button id="saveDish" class="primary">Сохранить блюдо</button>
-          <button id="deleteDish" class="danger">Удалить блюдо</button>
+        <div class="custom-fields-panel">
+          <div class="flex space"><div><h4>Свои поля</h4><p class="muted">Названия должны совпадать с именами переменных в редакторе.</p></div>
+            <button id="addCustomField" type="button">＋ Добавить поле</button></div>
+          <div id="customFields"></div>
+        </div>
+        <div class="form-actions">
+          <button id="saveDish" class="primary">Сохранить позицию</button>
+          <button id="deleteDish" class="danger">Удалить</button>
         </div>
       </div>
       <div class="card">
-        <div class="flex space"><h3>Партия / холодильник</h3><span class="muted" id="selectedDishCount">Не выбрано ни одного блюда</span></div>
+        <div class="section-head"><div><h3>Печать нескольких позиций</h3><p class="muted">Выберите позиции, количество и шаблон. Можно использовать разные шаблоны.</p></div><span class="muted" id="selectedDishCount">Ничего не выбрано</span></div>
         <div class="dish-toolbar">
-          <div class="field"><label for="batchName">Название партии (для очереди)</label><input id="batchName" placeholder="Например, холодильник № 1"></div>
-          <div class="field"><label for="batchProducedAt">Изготовлено / упаковано</label><input id="batchProducedAt" type="datetime-local"></div>
-          <div class="field"><label for="batchExpiresAt">Годен до (необязательно, иначе по сроку блюда)</label><input id="batchExpiresAt" type="datetime-local"></div>
+          <div class="field"><label for="batchName">Название партии</label><input id="batchName" placeholder="Например, полка № 1"></div>
+          <div class="field"><label for="batchProducedAt">Дата и время</label><input id="batchProducedAt" type="datetime-local"></div>
+          <div class="field"><label for="batchExpiresAt">Годен до (если нужно)</label><input id="batchExpiresAt" type="datetime-local"></div>
           <div class="field"><label for="batchCode">Код партии / ШК</label><input id="batchCode" placeholder="Например, A-125"></div>
-          <div class="field"><label for="dishBatchTemplate">Шаблон по умолчанию</label><select id="dishBatchTemplate"></select></div>
+          <div class="field"><label for="dishBatchTemplate">Общий шаблон</label><select id="dishBatchTemplate"></select></div>
         </div>
-        <p class="muted" style="margin:12px 0">Можно выбрать разные макеты и количество копий в каждой строке. Данные карточек не изменяются.</p>
+        <div class="table-description">Исходные записи и шаблоны при печати не меняются. Пустые переменные строки пропускаются.</div>
         <div class="dish-table-wrap"><table class="dish-table">
-          <thead><tr><th style="width:35px"><input type="checkbox" id="selectAllDishes" title="Выбрать все видимые блюда"></th><th>Блюдо</th><th>Копий</th><th>Шаблон</th><th>Проверка</th></tr></thead>
+          <thead><tr><th style="width:35px"><input type="checkbox" id="selectAllDishes" title="Выбрать все видимые блюда"></th><th>Позиция</th><th>Копий</th><th>Шаблон</th><th>Проверка</th></tr></thead>
           <tbody id="dishBatchRows"></tbody>
         </table></div>
         <div id="dishBatchStatus" class="muted"></div>
-        <div class="flex"><button id="queueDishes" class="primary">Добавить выбранные в очередь</button><button id="clearDishSelection">Очистить выбор</button></div>
+        <div class="flex"><button id="queueDishes" class="primary">Добавить в очередь</button><button id="clearDishSelection">Очистить выбор</button></div>
         <div class="grid2" style="margin-top:17px">
-          <div><strong>Предпросмотр</strong><p id="dishPreviewError" class="warning"></p><p class="muted" id="dishPreviewCaption"></p></div>
-          <div><img id="dishPreview" alt="Предпросмотр выбранного блюда"></div>
+          <div><h4>Предпросмотр</h4><p id="dishPreviewError" class="warning"></p><p class="muted" id="dishPreviewCaption"></p></div>
+          <div><img id="dishPreview" alt="Предпросмотр выбранной позиции"></div>
         </div>
       </div>
     </div>
@@ -210,7 +220,7 @@ footer{grid-column:1/3;background:#fff;border-top:1px solid var(--line);font-siz
     <div id="editorCompatibility" class="media-note"></div>
     <iframe id="editorFrame" src="editor.html" title="Редактор этикетки"></iframe>
   </section>
-  <section class="view" id="quickView">
+  <section class="view" id="quickView" aria-hidden="true">
     <div class="page">
       <h2>Заполнение этикетки</h2>
       <p class="intro">Заполнение использует базовый макет выбранной папки. Исходный шаблон не изменяется.</p>
