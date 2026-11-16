@@ -289,6 +289,69 @@ footer{color:#8993a1}
   .page-intro{flex-direction:column;align-items:flex-start}
 }
 
+
+/* Library: folder + labels only. All operations discoverable. */
+.folder-entry{display:flex;align-items:center;position:relative;min-width:0;border-radius:8px}
+.folder-entry:hover{background:#f5f7fb}
+.folder-entry>.item{flex:1;min-width:0}
+.folder-row-actions{display:flex;gap:2px;margin-right:3px}
+.folder-row-actions button{border:0;background:transparent;color:#8793a4;
+  padding:5px;width:29px;height:30px;font-size:17px}
+.folder-row-actions button:hover{color:#111827;background:#e5eaf1}
+.folder-row-actions button[title^="Удалить"]:hover{color:#a82830;background:#fff1f1}
+#folderDetail.sidebar-panel{background:#fafbfd;border:0;padding:7px 10px;margin-top:8px}
+.library-hint{font-size:11px;color:#8190a2;line-height:1.5;margin:5px 0}
+#templateDetail.sidebar-panel{background:#fff;border:1px solid #e4e9f0;margin:12px 3px;padding:13px}
+.template-actions h3{overflow-wrap:anywhere;margin:0 0 10px;font-size:12px}
+.template-actions .actions{display:flex;flex-wrap:wrap;gap:5px}
+.template-actions .actions button{flex:1}
+.folder-choices{display:flex;gap:5px;flex-wrap:wrap;margin-top:7px}
+.folder-choices button{font-size:11px;border:1px solid #e0e5eb;background:#fff;
+  padding:6px 9px;max-width:100%;white-space:normal;text-align:left}
+.folder-choices button.selected{background:#e9edf2;color:#657285;border-color:#e9edf2}
+.folder-choices button:not(:disabled):hover{background:#eef2f7;border-color:#bcc6d3}
+.template-entry .item{max-width:100%}
+.template-entry .item small{font-size:10px}
+/* Bigger copy controls; never rely on small OS-native number spinners. */
+.copies-stepper{display:inline-flex;align-items:stretch;border:1px solid #dce2e9;
+  border-radius:9px;overflow:hidden;background:#fff;width:138px;height:39px}
+.copies-stepper button{border:0;border-radius:0;flex:0 0 39px;padding:0;
+  font-size:21px;line-height:1;background:#f6f8fa;color:#2b3647}
+.copies-stepper button:hover{background:#e8eef5}
+.copies-stepper input{border:0!important;border-radius:0;outline:none;
+  text-align:center;flex:1;min-width:0;width:55px;padding:6px 0!important;
+  font-size:14px!important;font-variant-numeric:tabular-nums}
+.copies-stepper input:focus{outline:2px solid #aab7c9;outline-offset:-2px}
+.copies-stepper input::-webkit-inner-spin-button,
+.copies-stepper input::-webkit-outer-spin-button{-webkit-appearance:none;margin:0}
+.selected-template{width:100%;min-width:145px;max-width:350px;display:flex;
+  align-items:center;gap:9px;justify-content:space-between;text-align:left;
+  border:1px solid #dce4ed;border-radius:8px;padding:9px 10px}
+.selected-template span{flex:1;overflow-wrap:anywhere}
+.selected-template b{font-size:11px;font-weight:600;color:#65768c}
+.selected-template:hover{background:#f8fafc}
+.batch-template-group{grid-column:1/-1}
+.template-chip-list{display:flex;flex-wrap:wrap;align-items:stretch;gap:7px;margin-top:7px}
+.template-chip{font-weight:600;min-width:140px;max-width:260px;text-align:left;
+  white-space:normal;padding:9px 12px;border:1px solid #e0e6ed;border-radius:8px;
+  background:#fff;color:#44546a;display:flex;flex-direction:column;gap:2px}
+.template-chip span{font-size:12px;line-height:1.4}
+.template-chip small{font-size:10px;font-weight:400;color:#8492a2}
+.template-chip.selected{background:#eef1f5;border-color:#8595a9;color:#111827}
+.template-chip.incompatible{opacity:.6}
+.template-chip:focus-visible{outline:2px solid #64748b;outline-offset:2px}
+.template-pick-row td{padding:0 14px 14px!important;border-bottom:1px solid #e7ebf0}
+.template-pick-row>td{background:#f8fafc}
+.template-pick-header{display:flex;justify-content:space-between;gap:12px;
+  align-items:center;padding:13px 0 3px}
+.template-pick-header strong{font-size:12px}
+.template-pick-header button{font-size:11px;border:0;background:transparent;color:#64748b}
+.template-pick-row .template-chip-list{padding-bottom:5px}
+.dish-table td{vertical-align:middle}
+.margin-settings{grid-template-columns:repeat(2,minmax(130px,240px))}
+.margin-settings input{width:100%}
+#saveMarginSettings{margin-top:16px}
+
 </style>
 </head>
 <body>
@@ -379,7 +442,8 @@ footer{color:#8993a1}
           <div class="field"><label for="batchProducedAt">Дата и время</label><input id="batchProducedAt" type="datetime-local"></div>
           <div class="field"><label for="batchExpiresAt">Годен до (если нужно)</label><input id="batchExpiresAt" type="datetime-local"></div>
           <div class="field"><label for="batchCode">Код партии / ШК</label><input id="batchCode" placeholder="Например, A-125"></div>
-          <div class="field"><label for="dishBatchTemplate">Общий шаблон</label><select id="dishBatchTemplate"></select></div>
+          <div class="field batch-template-group"><label>Общий шаблон для партии</label>
+            <div id="dishBatchTemplate" class="template-chip-list" aria-label="Общий шаблон"></div></div>
         </div>
         <div class="table-description">Исходные записи и шаблоны при печати не меняются. Пустые переменные строки пропускаются.</div>
         <div class="dish-table-wrap"><table class="dish-table">
@@ -471,6 +535,16 @@ footer{color:#8993a1}
         </div>
         <p id="mediaSupport" class="muted"></p>
         <p class="muted">Отдельный предел растровой команды EZ-2 — 55 мм (ESC G55). Он не равен ширине рулона; в редакторе отмечается серым, а не красным.</p>
+      </div>
+      <div class="card">
+        <h3>Отступы текстовой печати</h3>
+        <p class="muted">Расстояние от левого и правого края печатаемой области 55 мм. Применяется ко всем этикеткам в режиме CP866. Растровые макеты используют свои координаты.</p>
+        <div class="media-fields margin-settings">
+          <div><label for="marginLeft">Слева, мм</label><input id="marginLeft" type="number" min="0" max="15" step="1" value="0"></div>
+          <div><label for="marginRight">Справа, мм</label><input id="marginRight" type="number" min="0" max="15" step="1" value="0"></div>
+        </div>
+        <p class="muted">Ноль сохраняет существующее размещение. Новые значения влияют на перенос строк и показываются в редакторе.</p>
+        <button id="saveMarginSettings" type="button" class="primary">Сохранить поля печати</button>
       </div>
       <div class="card">
         <h3>RS-232</h3>
