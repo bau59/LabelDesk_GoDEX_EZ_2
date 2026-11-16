@@ -154,7 +154,7 @@
         for(const line of lines){
           cp866(line);
           const position=marginMM(el,Array.from(line).length,f.widthDots,margins.width,margins.left);
-          rows.push({kind:"text",text:line,font:f,margin:position,element:el});
+          rows.push({kind:"text",text:line,font:f,margin:position,element:el,reverse:el.reversePrint===true});
           usedDots+=f.heightDots;
         }
         continue;
@@ -226,7 +226,8 @@
       }else{
         if(row.margin!==lastMargin){esc("M"+String(row.margin).padStart(2,"0"));lastMargin=row.margin;}
         if(row.font.code!==lastFont){esc(row.font.code);lastFont=row.font.code;}
-        add(...cp866(row.text),CR);
+        if(row.reverse)esc("V");
+        add(...cp866(row.text),CR); // CR also ends ESC V inverse mode.
       }
     }
     esc("E");
