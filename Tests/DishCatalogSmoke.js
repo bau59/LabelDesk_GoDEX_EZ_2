@@ -10,6 +10,9 @@ assert.ok(html.includes('data-view="print"'),"Print must have a navigation route
 assert.ok(!catalog.includes('id="dishBatchRows"'),"Batch must not be embedded in the catalog form");
 assert.ok(print.includes('id="dishBatchRows"')&&print.includes('id="printSearch"'));
 assert.ok(html.includes('id="addItemFolder"'),"Catalog folder plus control missing");
+assert.ok(html.includes('id="catalogRecords"')&&html.includes('id="catalogEditor"'));
+assert.ok(!html.includes('id="newDish"'),"Sidebar must not duplicate main record list");
+assert.ok(html.includes('id="printCatalogResults"'),"Print catalog picker missing");
 const uuid=n=>"00000000-0000-4000-8000-"+String(n).padStart(12,"0");
 let sequence=500;
 const ids=["name","weightG","kcal","protein","fat","carbs","ingredients","allergens",
@@ -86,7 +89,7 @@ const controller=root.EZ2DishController.create(api);
 controller.bootstrap([],[]);
 $("batchProducedAt").value="2026-11-16T10:00";
 async function save(name){
- $("newDish").fire("click");
+ $("newDishMain").fire("click");
  const vals={name,weightG:"250",kcal:"80",protein:"6",fat:"2",carbs:"10",
    ingredients:"Вода, картофель",shelfLifeHours:"48",manufacturer:"Кухня"};
  for(const [key,value] of Object.entries(vals))
@@ -98,6 +101,15 @@ async function save(name){
  await save("Каша");
  assert.equal(persisted.items.length,2);
  const first=persisted.items[0];
+ assert.equal($("selectedDishCount").textContent,"0 позиций · 0 этикеток");
+ assert.doesNotMatch($("dishBatchRows").innerHTML,/copies-stepper/);
+ assert.match($("printCatalogResults").innerHTML,/Добавить/);
+ const add=id=>$("printCatalogResults").fire("click",{closest:q=>
+   q==="[data-add-print]"?{dataset:{addPrint:id}}:null});
+ add(persisted.items[0].id);
+ add(persisted.items[1].id);
+ assert.match($("dishBatchRows").innerHTML,/copies-stepper/);
+ assert.equal($("selectedDishCount").textContent,"2 позиций · 2 этикеток");
  const clickTable=(selector,dataset)=>{
    const target={closest:q=>q===selector?{dataset}:null};
    $("dishBatchRows").fire("click",target);
@@ -156,6 +168,7 @@ async function save(name){
  await $("addItemFolder").fire("click");
  assert.equal(persisted.itemFolders.length,1);
  const folder=persisted.itemFolders[0];
+ handlers.forEach(h=>h.fn({target:open}));
  $("itemFolderPicker").fire("click",{closest:q=>
    q==="[data-assign-item-folder]"?{dataset:{assignItemFolder:folder.id}}:null});
  await $("saveDish").fire("click");
@@ -169,5 +182,15 @@ async function save(name){
  await new Promise(resolve=>setImmediate(resolve));
  assert.equal(persisted.itemFolders.length,0);
  assert.equal(persisted.items.find(d=>d.id===id).folderID,null);
+ // Explicit remove from batch must leave saved catalog untouched.
+ const beforeItems=copy(persisted.items);
+ clickTable("[data-remove-print]",{removePrint:first.id});
+ assert.equal($("selectedDishCount").textContent,"1 позиций · 1 этикеток");
+ assert.equal(JSON.stringify(persisted.items),JSON.stringify(beforeItems));
+ assert.match($("printCatalogResults").innerHTML,/Добавить/);
+ add(first.id);
+ assert.equal($("selectedDishCount").textContent,"2 позиций · 2 этикеток");
+ $("clearDishSelection").fire("click");
+ assert.equal($("selectedDishCount").textContent,"0 позиций · 0 этикеток");
  console.log("Item catalog smoke passed: migration-safe saves, custom fields, omitted blanks, mixed templates and atomic queue.");
 })().catch(e=>{console.error(e);process.exitCode=1;});
