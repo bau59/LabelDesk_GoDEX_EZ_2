@@ -247,7 +247,7 @@ body[data-editor-mode="text"] #label{border-color:#c0c8d2}
 let doc=null, selected=null, zoom=8, zoomMode="fit", history=[], future=[], snap=true;
 let printerMedia={widthMM:58,heightMM:38,gapMM:2,marginLeftMM:0,marginRightMM:0};
 const $=id=>document.getElementById(id);
-const typeNames={text:"Текст",barcode:"Штрихкод",line:"Линия",rectangle:"Рамка"};
+const typeNames={text:"Текст",barcode:"Штрихкод",line:"Разделитель",rectangle:"Прямоугольник",textFrame:"Рамка CP866"};
 const patterns={"0":"nnnwwnwnn","1":"wnnwnnnnw","2":"nnwwnnnnw","3":"wnwwnnnnn","4":"nnnwwnnnw","5":"wnnwwnnnn","6":"nnwwwnnnn","7":"nnnwnnwnw","8":"wnnwnnwnn","9":"nnwwnnwnn","A":"wnnnnwnnw","B":"nnwnnwnnw","C":"wnwnnwnnn","D":"nnnnwwnnw","E":"wnnnwwnnn","F":"nnwnwwnnn","G":"nnnnnwwnw","H":"wnnnnwwnn","I":"nnwnnwwnn","J":"nnnnwwwnn","K":"wnnnnnnww","L":"nnwnnnnww","M":"wnwnnnnwn","N":"nnnnwnnww","O":"wnnnwnnwn","P":"nnwnwnnwn","Q":"nnnnnnwww","R":"wnnnnnwwn","S":"nnwnnnwwn","T":"nnnnwnwwn","U":"wwnnnnnnw","V":"nwwnnnnnw","W":"wwwnnnnnn","X":"nwnnwnnnw","Y":"wwnnwnnnn","Z":"nwwnwnnnn","-":"nwnnnnwnw",".":"wwnnnnwnn"," ":"nwwnnnwnn","$":"nwnwnwnnn","/":"nwnwnnnwn","+":"nwnnnwnwn","%":"nnnwnwnwn","*":"nwnnwnwnn"};
 const clone=o=>JSON.parse(JSON.stringify(o));
 function uid(){return "xxxxxxxx-xxxx-4xxx-yxxx-xxxxxxxxxxxx".replace(/[xy]/g,function(c){let r=Math.floor(Math.random()*16);return (c==="x"?r:(r&3|8)).toString(16)});}
@@ -266,13 +266,14 @@ function selectedObj(){return doc&&doc.elements.find(e=>e.id===selected);}
 function setSelected(id){if(!doc||(id!==null&&!doc.elements.some(e=>e.id===id)))return;selected=id;draw();}
 function newElem(kind){
  if(!doc)return;
- if(kind==="rectangle"&&doc.printMode==="text"){
-   if(!window.confirm("Прямоугольник требует растровой печати. Перевести весь макет в растр?"))return;
-   doc.printMode="raster";
+ if((kind==="rectangle"&&doc.printMode==="text")||
+    (kind==="textFrame"&&doc.printMode!=="text")){
+   window.alert("Элемент доступен только в другом режиме. Смените режим в настройках макета.");
+   return;
  }
  const full=Math.min(55,doc.widthMM), last=doc.elements.reduce((n,e)=>Math.max(n,e.yMM+e.heightMM),0);
  const defaults={text:[0,3,full,7,"Текст"],barcode:[0,12,full,13,"1234567890"],
-   line:[0,20,full,0.4,""],rectangle:[0,3,full,18,""]}[kind];
+   line:[0,20,full,0.4,""],rectangle:[0,3,full,18,""],textFrame:[0,0,full,4,"Заголовок"]}[kind];
  const dims=defaults.slice();
  if(doc.elements.length && kind!=="rectangle"){
    dims[1]=Math.max(0,Math.min(doc.heightMM-dims[3],last+1));
@@ -280,6 +281,7 @@ function newElem(kind){
  let e={id:uid(),kind:kind,xMM:dims[0],yMM:dims[1],widthMM:dims[2],heightMM:dims[3],
    value:dims[4],fontSize:12,rotation:0,showsHumanReadable:true,isBold:false,
    isVariable:kind==="text"||kind==="barcode",fieldName:"",barcodeType:"CODE128",
+   frameChars:34,frameRows:1,frameStyle:"single",
    renderMode:doc.printMode==="text"?"device":"auto",deviceFont:doc.printMode==="text"?"A00":"A11"};
  e.widthMM=Math.max(1,Math.min(e.widthMM,doc.widthMM-e.xMM));
  e.yMM=Math.min(e.yMM,Math.max(0,doc.heightMM-e.heightMM));
@@ -305,11 +307,12 @@ function renderLayers(){
  if(!doc||!doc.elements.length){let p=document.createElement("p");p.className="empty";p.textContent="Пока нет объектов. Добавьте текст или штрихкод.";root.appendChild(p);}
  else doc.elements.slice().reverse().forEach(function(e){
    const b=document.createElement("button");b.type="button";b.className="layer"+(selected===e.id?" selected":"");b.title="Выделить объект";
-   const glyph=document.createElement("span");glyph.className="glyph";glyph.textContent={text:"T",barcode:"▥",line:"━",rectangle:"▢"}[e.kind];
+   const glyph=document.createElement("span");glyph.className="glyph";glyph.textContent={text:"T",barcode:"▥",line:"━",rectangle:"▢",textFrame:"▣"}[e.kind];
    const name=document.createElement("span");name.className="label";name.textContent=labelFor(e);
    b.append(glyph,name);b.addEventListener("click",()=>setSelected(e.id));root.appendChild(b);
  });
  $("layerCount").textContent=doc?"("+doc.elements.length+")":"";
+ $("leftPanelTitle").textContent=doc?.printMode==="text"?"Строки":"Слои";
   const picker=$("layerPicker");picker.replaceChildren();
   if(doc){
    doc.elements.slice().reverse().forEach(e=>{
@@ -348,7 +351,7 @@ function barcodeSVG(item,width,height){
  }
 }
 function renderCanvas(){
- const el=$("label");el.querySelectorAll(".obj,.printzone,.mediazone,.marginguide").forEach(n=>n.remove());if(!doc)return;
+ const el=$("label");el.querySelectorAll(".obj,.printzone,.mediazone,.marginguide,.text-preview-row,.text-preview-error").forEach(n=>n.remove());if(!doc)return;
  if(zoomMode==="fit"){
    const desk=$("desk");
    const usableWidth=Math.max(220,desk.clientWidth-100);
