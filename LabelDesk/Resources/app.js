@@ -134,7 +134,7 @@
     if(state.editorReady && state.current){
       $("editorFrame").contentWindow.postMessage({
         source:"labeldesk-app",type:"load",
-        document:clone(state.current),media:{...media(),
+        document:clone(state.current),items:dishesController?.listItems?.()||[],media:{...media(),
           marginLeftMM:Number(state.profile.marginLeftMM||0),
           marginRightMM:Number(state.profile.marginRightMM||0)}
       },"*");
