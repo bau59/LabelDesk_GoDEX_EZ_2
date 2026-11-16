@@ -106,7 +106,7 @@
     $("appRoot").classList?.toggle("show-context",view==="dishes"||view==="editor");
     $("topTitle").textContent={
       dishes:"Каталог",editor:"Редактор этикеток",queue:"Очередь печати",
-      settings:"Настройки принтера"
+      settings:"Настройки принтера",print:"Печать позиций"
     }[view]||"LabelDesk";
     $("newTemplate").hidden=view!=="editor";
     $("saveTemplate").hidden=view!=="editor";
@@ -115,6 +115,7 @@
     $("saveTemplate").disabled=view!=="editor";
     $("appRoot").classList?.toggle("show-dishes",view==="dishes");
     if(view==="dishes")dishesController?.render();
+    if(view==="print")dishesController?.renderPrint();
     if(view==="editor"){syncEditor();renderEditorCompatibility();}
     if(view==="quick")renderQuick();
     if(view==="queue")renderQueue();
@@ -731,7 +732,7 @@
       });
       state.profile={...defaultProfile(),...(info.settings?.profile||{})};
       state.settingsSnapshot=info.settings||{schemaVersion:1,snapToGrid:true};
-       dishesController?.bootstrap(info.items??info.dishes);
+       dishesController?.bootstrap(info.items??info.dishes,info.itemFolders);
       state.runtimePath=info.runtimePath||"";
       const hadUserTemplates=state.templates.length>0;
       const originalFirst=state.templates.slice().sort((a,b)=>
@@ -799,6 +800,8 @@
       }
     }
   });
+  $("catalogGoPrint").addEventListener("click",()=>selectView("print"));
+  $("printGoCatalog").addEventListener("click",()=>selectView("dishes"));
   $("saveTemplate").addEventListener("click",saveCurrent);
   $("newTemplate").addEventListener("click",makeCurrent);
   $("addFolder").addEventListener("click",addFolder);
