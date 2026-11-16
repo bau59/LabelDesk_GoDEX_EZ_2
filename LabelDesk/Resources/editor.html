@@ -678,6 +678,29 @@ function renderProps(){
    return;
  }
  let h=document.createElement("strong");h.textContent=typeNames[e.kind];root.appendChild(h);
+ if(e.kind==="textFrame"){
+   root.appendChild(prop("Текст внутри рамки",textInput(e.value,v=>{e.value=v;},false,"field-value")));
+   root.appendChild(pair(
+     prop("Ширина, символов",numInput(e.frameChars??34,n=>{e.frameChars=Math.round(n);},4,55,1)),
+     prop("Строк внутри",numInput(e.frameRows??1,n=>{e.frameRows=Math.round(n);},1,5,1))));
+   const styles=document.createElement("div");styles.className="text-align-controls";
+   for(const [key,example] of [["single","┌─┐"],["double","╔═╗"]]){
+     const button=document.createElement("button");button.type="button";
+     button.textContent=example;button.title=key==="single"?"Одинарная":"Двойная";
+     button.className=(e.frameStyle||"single")===key?"current":"";
+     button.onclick=()=>{checkpoint();e.frameStyle=key;draw();commit();};
+     styles.appendChild(button);
+   }
+   root.appendChild(prop("Вид рамки",styles));
+   const help=document.createElement("p");help.className="frame-help";
+   help.textContent="Встроенный шрифт A00, символы CP866. Печатается последовательными строками: верх, боковые стороны и низ.";
+   root.appendChild(help);
+   const buttons=document.createElement("div");buttons.className="actions";
+   for(const [title,fn] of [["Дублировать",duplicate],["Удалить",remove]]){
+     const b=document.createElement("button");b.type="button";b.textContent=title;b.onclick=fn;buttons.appendChild(b);
+   }
+   root.appendChild(buttons);return;
+ }
  if(e.kind==="text"||e.kind==="barcode")root.appendChild(prop(e.kind==="text"?"Текст":"Данные штрихкода",textInput(e.value,v=>{e.value=v;},e.kind==="text","field-value")));
  if(e.prefix){
    const prefix=document.createElement("p");prefix.className="hint";
