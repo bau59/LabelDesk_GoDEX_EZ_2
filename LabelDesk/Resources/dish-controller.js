@@ -587,8 +587,8 @@
         if(!findDish(id))return;
         selected.add(id);renderSidebar();renderBatch();openPrint?.();return;
       }
-      const remove=e.target.closest("[data-dish-remove]");
-      if(remove){deleteDish(remove.dataset.dishRemove);return;}
+      const removeDish=e.target.closest("[data-dish-remove]");
+      if(removeDish){deleteDish(removeDish.dataset.dishRemove);return;}
             const open=e.target.closest("[data-dish-open]");
       if(open){openDish(open.dataset.dishOpen);return;}
       const preview=e.target.closest("[data-dish-preview]");
