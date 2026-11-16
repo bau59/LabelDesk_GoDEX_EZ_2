@@ -1,6 +1,6 @@
 # LabelDesk — original GoDEX EZ-2 on macOS (WebKit + zsh)
 
-**1.0.6 WebKit/zsh release (dish catalog, batch printing, adjustable editor).** No Node.js, Python, pip, npm, HTTP server or external dependencies are needed on the user's Mac. The system frameworks AppKit/WebKit and system commands `/bin/zsh`, `/bin/stty`, `/bin/cat` and `printf` handle the application and RS-232.
+**1.0.7 WebKit/zsh release (universal catalog, custom fields, clean navigation).** No Node.js, Python, pip, npm, HTTP server or external dependencies are needed on the user's Mac. The system frameworks AppKit/WebKit and system commands `/bin/zsh`, `/bin/stty`, `/bin/cat` and `printf` handle the application and RS-232.
 
 ## Runtime layout
 
@@ -10,21 +10,22 @@ After the initial macOS installation, the following files are copied into the us
 ~/Library/Application Support/LabelDesk/
 ├── live/
 │   ├── app.html       # all screens
-│   ├── app.js         # library, quick fill, saved queue
+│   ├── app.js         # navigation, template library and queue
 │   ├── editor.html    # original editor, same layer/geometry UI
 │   ├── raster.js      # original ESC Gnn raster
 │   ├── barcodes.js    # Code39/128/EAN generator
 │   ├── native.js      # isolated one-label diagnostic
 │   ├── text-engine.js # resident CP866 compiler
 │   ├── food-presets.js# four seeded food-container samples
-│   ├── dish-engine.js # dish-to-template field mapping
-│   ├── dish-controller.js # dish catalog and batch interface
+│   ├── dish-engine.js # optional item-to-template field mapping
+│   ├── dish-controller.js # universal catalog and batch interface
 │   ├── printer-text.sh# buffered text transport
 │   ├── printer-native.sh # native diagnostic transport
 │   └── printer.sh     # original raster driver
 ├── templates/          # existing UUID JSON templates, untouched
 ├── folders.json        # existing logical folders, untouched
-├── dishes.json         # independent, persistent dish catalog (new in 1.0.6)
+├── items.json          # universal catalog (new writes in 1.0.7)
+├── dishes.json         # legacy catalog kept for safe fallback (1.0.6)
 ├── queue.json          # existing queue and job history, untouched
 ├── settings.json       # existing port and printer options, untouched
 ├── spool/              # temporary binary files (removed after job)
@@ -36,26 +37,20 @@ The **compiled Swift app provides a WebKit window, a file/Process bridge and the
 
 On installation/update, bundled runtime files overwrite the local version **only when it is still identical to the previously installed unmodified version**. Hand edits in `live/` are intentionally preserved.
 
-## Dish-first workflow (1.0.6)
+## Catalog and printing (1.0.7)
 
-- **Блюда** is the landing screen. Save each dish once: name, net weight, energy and macronutrients per 100 g, ingredients, allergens, storage conditions, manufacturer/address, and shelf life in hours. These records live in `dishes.json`, **not** inside templates or folders.
-- **Партия / холодильник:** mark several saved dishes, enter production time and optional batch code or explicit use-by time, set copy count and a **different saved template per dish**. A dish's use-by time is calculated from production time + its saved shelf-life hours unless the batch overrides it. Actual dates and values are never fabricated.
-- **Добавить выбранные в очередь** validates every label before writing a single queue update. Saved dishes and source templates remain unchanged. The queue stores the fully resolved label snapshots. A missing required field or unsupported media prevents the whole batch from entering the queue.
-- The legacy **Макеты / Группы макетов / Разовое заполнение** workflow remains available for existing saved labels. Old UUID template files, `folders.json`, settings, and queued jobs are not migrated or deleted.
-- Main library sidebar can be resized by dragging its right edge or collapsed with **☰**. In the editor, **☷ Слои** shows/hides the layer list; the layer dropdown selects any layer directly and the slider adjusts panel width. None of these controls affect physical label dimensions.
-- CP866 text printing still uses verified resident-font commands. Rendering is only an approximate preview and batch printing on the physical GoDEX EZ-2 must be checked on a small sample before production use.
+- **Каталог** is the landing screen. One saved **position** may be a product, a dish or arbitrary data. A position can contain standard fields (name, weight, energy, protein, fat, carbohydrates, ingredients, allergens, manufacturer, storage, shelf life) and any number of custom named key/value fields, up to 40 per position.
+- **Template linking:** in **Редактор этикеток**, mark a text/barcode element as variable and set **Имя поля в карточке каталога** to exactly the name of a standard field (common Russian aliases supported) or a custom field. Values are copied to a temporary printable snapshot. **If the value is missing, blank, or the field is unknown, that whole variable element, including prefix, is omitted.** Fixed elements are preserved. Completely empty resolved labels cannot be printed.
+- **Batch printing:** select multiple positions in the catalog, choose a template per row and set copies. Production date, optional shelf-life/expiry and batch code are entered for this batch; the item catalog is not overwritten. The entire batch is validated before a single atomic queue update. Unsupported media or printer encoding still blocks printing. Hardware print output is not guaranteed by a preview.
+- **Storage:** new writes go to \`items.json\`. If it is absent, the app loads old \`dishes.json\` records as food-type positions. Only after the first save is \`items.json\` created; \`dishes.json\` is **not deleted or modified**. Existing UUID templates, folders, settings, and print queue files remain untouched.
+- **Navigation:** the left vertical sidebar contains Catalog, Label Editor, Print Queue and Settings. The Catalog sidebar lists positions; the Editor sidebar lists saved template folders and layouts. Folder/template management actions are collapsed unless opened. The old one-off Quick Fill tab is no longer exposed; its internal compatibility code remains to avoid breaking previous data. Sidebar and layer-panel widths can still be adjusted independently.
+- **Runtime constraints:** no app-time Node/Python/npm, no network storage, and no changes to the tested GoDEX EZ-2 text/CP866 or raster/serial transport. Verify first labels physically on the installed roll before production printing.
 
-## Sidebar and template workflow (1.0.3)
+## Existing template folder compatibility
 
-The library is now a real folder/template manager, not a flat shortcut list. Open a folder to display its assigned base template in **Quick Fill**, or choose any saved template to open it in the editor. Change the folder's base with the **☆** control next to a template in that folder, or with the explicit dropdown in the folder inspector. The blue/gray selection distinguishes the currently edited template from the folder's persistent base; a gold star denotes the base.
+Templates remain separate UUID JSON files; folder membership and optional base template are stored in \`folders.json\`. Selecting a folder opens the base layout in the **label editor**, not the former quick-fill form. The current implementation creates a new folder by cloning the current layout as its independent base template; the original is never moved. Saved layouts may be duplicated, moved, or reassigned to a folder. A base template cannot be moved/deleted until another base is assigned. Deleting a folder moves its templates to *Без папки* without deleting the files.
 
-Create a folder → the current editor label is **cloned into a new independent base JSON**; the original is not moved or overwritten. New templates created while inside a folder belong to it. Save them and assign them as the base using ☆. A template can be duplicated, moved between folders, or moved to *Unfiled*. Moving/deleting an active base is blocked until another base is selected. Rename folders freely. Removing a folder **moves all its templates into Unfiled** without deleting template files, and attempts to roll back on a partial write failure.
-
-Search matches templates **globally** across folders. With an empty search, the selected folder filters the list. Draft changes prompt before switching folders/templates; the editor shows the current folder/template and unsaved state. Quick-fill only changes variable text in a queued snapshot and never overwrites the saved base. Existing media incompatibility markers are retained.
-
-The interface has a wider hierarchical sidebar, direct template actions, clearer navigation and adjusted editor panel widths. Printer transport (`printer.sh`), EZ-2 serial commands, existing JSON storage paths, queue transmission and secure native updater are **unchanged**.
-
-CI exercises the actual UI controller using a fake WebKit/JSON bridge: folder creation, independent base clone, assignment by dropdown and star, duplication/move, rename/delete with file preservation, global search, draft protection, quick-fill, queue, printing invocation and failed-write rollback. Browser appearance still needs inspection in the actual application window; the connected Mac is currently offline.
+Search filters templates globally; with an empty query the selected folder controls the list. Existing unsaved-change guards and media incompatibility warnings remain. The physical roll and label geometry are independent of resizing/collapsing the UI panels.
 
 ## Installed roll and template compatibility (1.0.2)
 
