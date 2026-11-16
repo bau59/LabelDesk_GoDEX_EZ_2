@@ -1,6 +1,6 @@
 # LabelDesk — original GoDEX EZ-2 on macOS (WebKit + zsh)
 
-**1.0.11 WebKit/zsh release (main-area lists, explicit print selection, persistent text margins).** No Node.js, Python, pip, npm, HTTP server or external dependencies are needed on the user's Mac. The system frameworks AppKit/WebKit and system commands `/bin/zsh`, `/bin/stty`, `/bin/cat` and `printf` handle the application and RS-232.
+**1.0.12 WebKit/zsh release (compact print picker, saved batches, framed text).** No Node.js, Python, pip, npm, HTTP server or external dependencies are needed on the user's Mac. The system frameworks AppKit/WebKit and system commands `/bin/zsh`, `/bin/stty`, `/bin/cat` and `printf` handle the application and RS-232.
 
 ## Runtime layout
 
@@ -54,6 +54,19 @@ The **Каталог** page is for maintaining saved items. Saved positions can 
 **Печать позиций** is now a separate top-level page. Its search and folder filters are independent of catalog browsing. Select multiple items (including across folders), configure production date, expiration override, batch code, quantities, and per-item templates. **Дополнить** expands an individual row so that any standard field can be temporarily changed or missing custom fields can be added. The queued document uses a snapshot of these temporary edits; the original item and template files remain unchanged. **Подготовить печать →** validates and persists the batch atomically, then opens the existing **Очередь** page where the user explicitly starts the physical print. This avoids accidentally printing old pending jobs.
 
 The Intel Mac installer now includes `LabelDesk.icns`, generated at build time from `Scripts/make-icon.swift` with all expected 16–1024 px iconset representations. `CFBundleIconFile` points to that icon for Finder/Dock. Printer command transport and print dimensions are unchanged.
+
+## Compact batch preparation and framed text (1.0.12)
+
+The **Печать позиций** picker now shows only **six unselected catalog positions** as compact full-width rows, never a second oversized catalog. Search and folder filtering still work; **Показать ещё** reveals the next six; **Добавить показанные** adds only the visible unselected rows. Already selected positions remain in the separate party table.
+
+Use **Сохранить текущую партию** to create a named preset stored in `printPresets.json` (independent of `items.json`, `folders.json`, `queue.json`). A preset stores live catalog item IDs, layout IDs, quantities, batch code and one-time custom overrides. It does not freeze the production and expiration dates: on reopening they reset to now and blank respectively, allowing shelf-life calculations to remain current. **Открыть** lets you edit before printing. **В очередь** prepares a snapshot from the current catalog and does **not** send it directly to the serial port — physical printing is still started separately in the existing queue screen. Invalid preset references abort the entire operation.
+
+Two clearly distinct **framed text objects** are available in the corresponding editors:
+- **Text CP866:** a single editable block with multi-line content, line wrap, left/center/right alignment, selectable resident font A00–A22, single or double box-drawing borders, a 0=auto interior row setting or a fixed value up to 24. The buffered text planner validates content fitting, total label height and width before creating a packet; there is no arbitrary native XY drawing command. The on-screen CP866 box-drawing glyphs are approximated as explicit vector strokes, eliminating the previously distorted black bars.
+- **Raster:** a rectangular object with content drawn inside the border using the same 8 dots/mm raster engine as other objects. Adjustable line thickness, internal padding, multi-line content, point size, boldness and alignment; the object can be moved/resized via the canvas. The raster renderer clips text to its inner rectangle, without changing the existing ESC G protocol.
+- Both framed-text kinds support mapping a saved catalog field directly into the frame, with blank fields omitted at batch build time. Existing rectangle and text blocks remain available.
+
+Other documented EZ-2 features: an optional **ESC V reverse-text** setting (white letters on a dark line) in native text mode; Code 128/39, EAN-8/13 and built-in font scaling retain their established control paths. Native zoom/format/rotation dropdowns in the label editor have been replaced with explicit controls. A one-label physical check remains necessary for the newly exposed ESC V option and framed text.
 
 ## List and print workflow cleanup (1.0.11)
 
