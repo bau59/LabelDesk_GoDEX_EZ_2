@@ -110,12 +110,12 @@ assert.ok(framedPacket.subarray(33*frameStride+4,35*frameStride+4+frameWidth)
 assert.throws(()=>window.EZ2Raster.draw({...framed,
   elements:[{...framed.elements[0],framePaddingMM:12}]}),/Отступ внутри рамки/);
 const clipped=blank();
-clipped.elements=[{id:"clipped",kind:"text",fontSize:12,value:"строка 1\\nстрока 2\\nстрока 3",
+clipped.elements=[{id:"clipped",kind:"text",fontSize:12,value:"строка 1\nстрока 2\nстрока 3",
  xMM:2,yMM:2,widthMM:40,heightMM:2}];
 assert.throws(()=>encode(clipped),/не помещается по высоте/,
  "Text may never be silently cut to the frame height");
 const clippedFrame=blank();
-clippedFrame.elements=[{id:"frameClip",kind:"framedText",fontSize:12,value:"строка 1\\nстрока 2",
+clippedFrame.elements=[{id:"frameClip",kind:"framedText",fontSize:12,value:"строка 1\nстрока 2",
  frameBorderMM:0.25,framePaddingMM:1,xMM:2,yMM:2,widthMM:32,heightMM:5}];
 assert.throws(()=>encode(clippedFrame),/не помещается по высоте/,
  "Framed content must have the same overflow protection");
