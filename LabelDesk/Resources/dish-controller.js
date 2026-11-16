@@ -14,7 +14,7 @@
       manufacturer:"dishManufacturer",address:"dishAddress",barcode:"dishBarcode"};
     let dishes=[],chosenID=null,draft=null,dirty=false,search="",formOpen=false;
     let folders=[],catalogFolderID="all",printFolderID="all",printSearch="",printLimit=6;
-    let printPresets=[];
+    let printPresets=[],repairPresetID=null,repairSearch="";
     const rowEdits={}; let detailFor=null;
     let selected=new Set(),copies={},templateOverrides={},previewID=null,formInitialized=false;
     let defaultTemplateID=null,pickerFor=null,templateQuery="",templateLimit=6,validationErrors={};
@@ -248,16 +248,67 @@
       return item;
     }
 
+    function missingInPreset(p){
+      for(const it of p.items){
+        if(!findDish(it.itemID))return {kind:"item",oldID:it.itemID,name:it.itemName||it.itemID};
+        if(!findTemplate(it.templateID))return {kind:"template",oldID:it.templateID,
+          name:it.templateName||it.templateID};
+      }
+      return null;
+    }
+    function repairOptions(p,missing){
+      if(!missing)return "";
+      const options=missing.kind==="item"?
+        dishes.filter(d=>!p.items.some(it=>same(it.itemID,d.id))):
+        templateList().filter(t=>compatibility(t).ok);
+      const choices=options.filter(o=>String(o.name).toLocaleLowerCase("ru")
+        .includes(repairSearch.toLocaleLowerCase("ru"))).slice(0,6);
+      return '<div class="preset-repair"><strong>Нет '+(missing.kind==="item"?'позиции':'макета')+
+        ': '+esc(missing.name)+'</strong><p class="muted">Выберите замену. Исходный пресет будет обновлён.</p>'+
+        '<input type="search" data-repair-search="'+esc(p.id)+'" value="'+esc(repairSearch)+
+        '" placeholder="Поиск замены…"><div class="preset-repair-options">'+
+        (choices.length?choices.map(o=>
+          '<button type="button" data-preset-replace="'+esc(o.id)+
+          '" data-replace-kind="'+missing.kind+'" data-preset-id="'+esc(p.id)+'">'+
+          esc(o.name)+'</button>').join(""):'<span class="muted">Замена не найдена</span>')+
+        '</div></div>';
+    }
     function renderPresets(){
       $("printPresets").innerHTML=printPresets.length?printPresets.slice().sort((a,b)=>
-        String(a.name).localeCompare(String(b.name),"ru")).map(p=>
-        '<div class="print-preset"><div><strong>'+esc(p.name)+'</strong>'+
-        '<small> · '+p.items.length+' позиций</small></div>'+
-        '<div class="print-preset-actions">'+
-        '<button type="button" data-preset-load="'+esc(p.id)+'">Открыть</button>'+
-        '<button type="button" data-preset-queue="'+esc(p.id)+'" class="primary">В очередь →</button>'+
-        '<button type="button" data-preset-delete="'+esc(p.id)+'" class="danger">Удалить</button></div></div>'
-      ).join(""):'<p class="muted">Нет сохранённых партий. Соберите набор и нажмите «Сохранить».</p>';
+        String(a.name).localeCompare(String(b.name),"ru")).map(p=>{
+        const missing=missingInPreset(p),broken=!!missing;
+        return '<div class="print-preset"><div><strong>'+esc(p.name)+'</strong>'+
+          '<small> · '+p.items.length+' позиций'+(broken?' · требуется замена':'')+'</small></div>'+
+          '<div class="print-preset-actions">'+
+          (broken?'<button type="button" data-preset-repair="'+esc(p.id)+
+            '">Исправить</button>':
+            '<button type="button" data-preset-load="'+esc(p.id)+'">Открыть</button>'+
+            '<button type="button" data-preset-queue="'+esc(p.id)+'">В очередь →</button>'+
+            '<button type="button" data-preset-print="'+esc(p.id)+'" class="primary">'+
+              'Печатать…</button>')+
+          '<button type="button" data-preset-delete="'+esc(p.id)+'" class="danger">Удалить</button></div>'+
+          (repairPresetID===p.id?repairOptions(p,missing):'')+'</div>';
+      }).join(""):'<p class="muted">Нет сохранённых партий. Соберите набор и нажмите «Сохранить».</p>';
+    }
+    async function repairPreset(presetID,kind,replacementID){
+      const p=printPresets.find(x=>x.id===presetID),missing=p&&missingInPreset(p);
+      if(!missing||missing.kind!==kind)return;
+      const target=kind==="item"?findDish(replacementID):findTemplate(replacementID);
+      if(!target)return;
+      if(kind==="item"&&p.items.some(it=>same(it.itemID,replacementID))){
+        note("Эта позиция уже есть в партии",true);return;
+      }
+      const updated=clone(p);
+      const row=updated.items.find(it=>same(it[kind==="item"?"itemID":"templateID"],missing.oldID));
+      if(!row)return;
+      if(kind==="item"){row.itemID=target.id;row.itemName=target.name;}
+      else {row.templateID=target.id;row.templateName=target.name;}
+      updated.updatedAt=new Date().toISOString();
+      try{
+        await persistPresets(printPresets.map(x=>x.id===updated.id?updated:x));
+        repairSearch="";repairPresetID=missingInPreset(updated)?updated.id:null;
+        renderPresets();note("Пресет обновлён: "+p.name);
+      }catch(e){note("Не удалось заменить элемент: "+e.message,true);}
     }
     async function persistPresets(next){
       await native("saveData",{key:"printPresets",json:JSON.stringify(next)});
@@ -273,7 +324,9 @@
       const existing=printPresets.find(p=>p.name.toLocaleLowerCase("ru")===name.toLocaleLowerCase("ru"));
       if(existing&&!window.confirm("Заменить сохранённую партию «"+name+"»?"))return;
       const items=dishes.filter(d=>selected.has(d.id)).map(d=>({
-        itemID:d.id,copies:copies[d.id]||1,templateID:templateOverrides[d.id]||defaultTemplateID,
+        itemID:d.id,itemName:d.name,copies:copies[d.id]||1,
+        templateID:templateOverrides[d.id]||defaultTemplateID,
+        templateName:findTemplate(templateOverrides[d.id]||defaultTemplateID)?.name||"",
         overrides:rowEdits[d.id]?clone(rowEdits[d.id]):null
       }));
       if(items.some(it=>!findTemplate(it.templateID))){
@@ -675,10 +728,36 @@
       if(load){loadPreset(load.dataset.presetLoad);return;}
       const queue=e.target.closest("[data-preset-queue]");
       if(queue){if(loadPreset(queue.dataset.presetQueue))await queueSelected();return;}
-      const del=e.target.closest("[data-preset-delete]");
+      const direct=e.target.closest("[data-preset-print]");
+      if(direct){
+        if(loadPreset(direct.dataset.presetPrint)){
+          const ids=await queueSelected();
+          if(ids?.length)await printQueuedIDs?.(ids);
+        }
+        return;
+      }
+      const fixing=e.target.closest("[data-preset-repair]");
+      if(fixing){
+        repairPresetID=repairPresetID===fixing.dataset.presetRepair?null:fixing.dataset.presetRepair;
+        repairSearch="";renderPresets();return;
+      }
+      const swap=e.target.closest("[data-preset-replace]");
+      if(swap){
+        await repairPreset(swap.dataset.presetId,swap.dataset.replaceKind,swap.dataset.presetReplace);
+        return;
+      }
+            const del=e.target.closest("[data-preset-delete]");
       if(del)await deletePreset(del.dataset.presetDelete);
     });
-    $("printMore").addEventListener("click",()=>{printLimit+=6;renderBatch();});
+    $("printPresets").addEventListener("input",e=>{
+      if(!e.target.matches?.("[data-repair-search]"))return;
+      repairSearch=e.target.value||"";
+      const start=e.target.selectionStart;
+      renderPresets();
+      const input=$("printPresets").querySelector?.("[data-repair-search]");
+      if(input){input.focus?.();input.setSelectionRange?.(start,start);}
+    });
+        $("printMore").addEventListener("click",()=>{printLimit+=6;renderBatch();});
     $("printCatalogResults").addEventListener("click",e=>{
       const button=e.target.closest("[data-add-print]");
       if(!button||!findDish(button.dataset.addPrint))return;
