@@ -68,6 +68,23 @@
     ctx.restore();
   }
 
+
+  // A real raster object: frame geometry and contained text share one coordinate
+  // system and are clipped together. The source document is not modified.
+  function framedText(ctx,item,x,y,w,h){
+    const border=Math.max(1,Math.min(24,Math.round(Number(item.frameBorderMM||0.25)*DOTS)));
+    const pad=Math.max(0,Math.min(15,Number(item.framePaddingMM??1.5)))*DOTS;
+    const left=x+border/2,right=x+w-border/2,top=y+border/2,bottom=y+h-border/2;
+    if(pad*2+border*2>=Math.min(w,h))throw Error("Отступ внутри рамки больше размера объекта");
+    ctx.save();
+    ctx.lineWidth=border;ctx.strokeStyle="#000";
+    ctx.strokeRect(left,top,Math.max(0,right-left),Math.max(0,bottom-top));
+    if(String(item.value||"").length){
+      text(ctx,{...item,prefix:"",rotation:0},x+pad+border,y+pad+border,
+        w-2*(pad+border),h-2*(pad+border));
+    }
+    ctx.restore();
+  }
   function barcode(ctx, item, x,y,w,h) {
     if(!root.EZ2Barcodes)throw new Error("Генератор штрихкодов не загружен");
     return root.EZ2Barcodes.draw(ctx,item,x,y,w,h);
@@ -111,6 +128,7 @@
       if(e.kind==="line"){ctx.fillRect(x,y,w,h);}
       else if(e.kind==="rectangle"){ctx.lineWidth=2;ctx.strokeRect(x+1,y+1,Math.max(0,w-2),Math.max(0,h-2));}
       else if(e.kind==="text"){text(ctx,e,x,y,w,h);}
+      else if(e.kind==="framedText"){framedText(ctx,e,x,y,w,h);}
       else if(e.kind==="barcode"){barcode(ctx,e,x,y,w,h);}
       else throw new Error("Неизвестный вид слоя: "+e.kind);
       ctx.restore();
