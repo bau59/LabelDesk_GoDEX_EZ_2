@@ -421,16 +421,13 @@ function renderTextFlow(canvas,scale,widthMM){
  }catch(error){
    const warning=document.createElement("div");
    warning.className="text-preview-error";
-   warning.textContent="Проверка печати: "+error.message+
+   warning.textContent=(doc.elements.length?"Проверка печати: "+error.message:
+      "Макет пустой. Добавьте «＋ Строка» сверху, чтобы начать этикетку.")+
      "\nВыберите строку в левом списке, чтобы исправить макет.";
    canvas.appendChild(warning);
  }
- if(widthMM>55){
-   const zone=document.createElement("div");zone.className="printzone";
-   zone.style.left=(55*scale)+"px";
-   zone.style.width=((widthMM-55)*scale)+"px";
-   zone.title="За пределом подтверждённых 55 мм печати";canvas.appendChild(zone);
- }
+ // The 55-mm raster command limit is not a user-configured margin.
+ // Text mode shows the whole physical label; no misleading striped inset.
 }
 
 function renderCanvas(){
@@ -691,7 +688,12 @@ function renderProps(){
    root.appendChild(pair(prop("Ширина ленты, мм",numInput(doc.widthMM,n=>{doc.widthMM=n;},10,60,0.5)),
                         prop("Высота, мм",numInput(doc.heightMM,n=>{doc.heightMM=Math.round(n);},10,100,1))));
    root.appendChild(prop("Зазор, мм",numInput(doc.gapMM,n=>{doc.gapMM=Math.round(n);},0,10,1)));
-   let note=document.createElement("p");note.className="hint";note.textContent=doc.widthMM>55?"Ширина ленты — "+doc.widthMM+" мм. Заштрихованные справа "+(doc.widthMM-55).toFixed(1)+" мм НЕ печатаются ESC G. Печатная графика — 0…55 мм.":"Материал — до 60 мм, графика ESC G — до 55 мм. Выберите слой для редактирования.";;root.appendChild(note);
+   let note=document.createElement("p");note.className="hint";
+   note.textContent=doc.printMode==="text"?
+     "Настройка отступов: "+(printerMedia.marginLeftMM||0)+" мм слева и "+
+     (printerMedia.marginRightMM||0)+" мм справа. Заштрихованной полосы в текстовом редакторе нет: ограничение 55 мм относится к подтверждённой области ESC G и текстовому планировщику, а не к вашим полям.":
+     "Установленный рулон "+doc.widthMM+" мм. Растровая команда ESC G подтверждена до 55 мм; если лента шире, справа обозначена область за пределами подтверждённой печати.";
+   root.appendChild(note);
    const choice=document.createElement("div");choice.className="mode-choices";
    for(const [key,title,desc,icon] of [
      ["text","Текст CP866","Штатные размеры шрифта, строки подряд, рамка из символов.","≡"],
