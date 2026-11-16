@@ -71,8 +71,9 @@
   };
   const dishesController=window.EZ2DishController?.create({
     state,native,uuid,clone,note,compatibility,media,encodeJob,renderQueue,
-    openQueue:()=>selectView("queue")
+    openQueue:()=>selectView("queue"),openPrint:()=>selectView("print")
   })||null;
+  let editorEditing=false,moveTemplateID=null;
   function keySame(a,b){return String(a||"").toLowerCase()===String(b||"").toLowerCase();}
   function findTemplate(id){return state.templates.find(t=>keySame(t.id,id));}
   function findFolder(id){return state.folders.find(f=>keySame(f.id,id));}
@@ -88,7 +89,7 @@
     // Search is global; without a query, the selected folder filters the list.
     const query=state.librarySearch.trim().toLocaleLowerCase();
     return state.templates.filter(t=>{
-      if(query)return String(t.name||"").toLocaleLowerCase().includes(query);
+      if(query&&!String(t.name||"").toLocaleLowerCase().includes(query))return false;
       if(state.folderFilter==="unfiled" && t.folderID)return false;
       if(state.folderFilter!=="all" && state.folderFilter!=="unfiled" &&
          !keySame(t.folderID,state.folderFilter))return false;
@@ -101,6 +102,10 @@
     $("librarySummary").textContent=state.folders.length+" папок · "+state.templates.length+" шаблонов";
     $("portStatus").textContent=state.profile.portPath||"Порт не выбран";
   }
+  function updateEditorWorkspace(){
+    $("editorLibrary").hidden=editorEditing;
+    $("editorWorkspace").hidden=!editorEditing;
+  }
   function selectView(view){
     if(view==="quick")view="editor"; // Legacy form is not a separate screen.
     state.view=view;
@@ -109,15 +114,18 @@
       dishes:"Каталог",editor:"Редактор этикеток",queue:"Очередь печати",
       settings:"Настройки принтера",print:"Печать позиций"
     }[view]||"LabelDesk";
-    $("newTemplate").hidden=view!=="editor";
-    $("saveTemplate").hidden=view!=="editor";
+    $("newTemplate").hidden=view!=="editor"||!editorEditing;
+    $("saveTemplate").hidden=view!=="editor"||!editorEditing;
     document.querySelectorAll("nav [data-view]").forEach(b=>b.classList.toggle("active",b.dataset.view===view));
     document.querySelectorAll("main .view").forEach(v=>v.classList.toggle("active",v.id===view+"View"));
     $("saveTemplate").disabled=view!=="editor";
     $("appRoot").classList?.toggle("show-dishes",view==="dishes");
     if(view==="dishes")dishesController?.render();
     if(view==="print")dishesController?.renderPrint();
-    if(view==="editor"){syncEditor();renderEditorCompatibility();}
+    if(view==="editor"){
+      updateEditorWorkspace();renderLibrary();
+      if(editorEditing){syncEditor();renderEditorCompatibility();}
+    }
     if(view==="quick")renderQuick();
     if(view==="queue")renderQueue();
     if(view==="settings")renderSettings();
@@ -184,37 +192,35 @@
         .map(f=>folderRow(f.id,f.name,"▣",count(f.id))).join("");
     const visible=visibleTemplates();
     $("templates").innerHTML=visible.length?visible.map(t=>{
-      const check=compatibility(t);
-      return '<div class="template-entry"><button class="item '+
-        (keySame(t.id,state.selectedID)?'active':'')+'" data-template="'+esc(t.id)+
-        '"><span class="sidebar-row"><span class="glyph">▤</span><span class="item-content">'+
-        esc(t.name)+'<small>'+esc(t.widthMM)+' × '+esc(t.heightMM)+' мм</small>'+
-        (!check.ok?'<small class="media-incompatible">⚠ '+esc(check.reason)+'</small>':'')+
-        '</span></span></button></div>';
-    }).join(""):'<p class="empty">В папке нет этикеток. Нажмите «Новый шаблон».</p>';
-    const folder=selectedFolder();
-    $("folderDetail").innerHTML=folder?
-      '<p class="library-hint">Папка «'+esc(folder.name)+'» · '+count(folder.id)+
-      ' этикеток. Для новой этикетки нажмите «＋ Новый шаблон» сверху.</p>':"";
-    const chosen=findTemplate(state.selectedID);
-    if(chosen&&visible.some(t=>keySame(t.id,chosen.id))){
+      const check=compatibility(t),moving=keySame(moveTemplateID,t.id);
       const targets=[{id:"unfiled",name:"Без папки"},...state.folders];
-      $("templateDetail").innerHTML='<div class="template-actions">'+
-        '<h3>'+esc(chosen.name)+'</h3><div class="actions">'+
-        '<button data-library-action="edit-selected">Открыть</button>'+
-        '<button data-library-action="duplicate-selected">Копия</button>'+
-        '<button data-library-action="delete-selected" class="danger">Удалить</button></div>'+
-        '<p class="library-hint">Переместить в папку:</p>'+
-        '<div class="folder-choices">'+targets.map(f=>
-          '<button data-move-to="'+esc(f.id)+'"'+
-          (keySame(chosen.folderID,f.id)||(f.id==="unfiled"&&!chosen.folderID)?' class="selected" disabled':'')+
-          '>'+esc(f.name)+'</button>').join("")+'</div></div>';
-    }else $("templateDetail").innerHTML="";
+      const caption=esc(t.widthMM)+" × "+esc(t.heightMM)+" мм · "+
+        (t.printMode==="text"?"Текст CP866":"Растр")+" · "+
+        esc(findFolder(t.folderID)?.name||"Без папки");
+      return '<div class="template-record"><div class="record-main"><strong>'+
+        esc(t.name)+'</strong><small>'+caption+'</small>'+
+        (!check.ok?'<small class="media-incompatible">⚠ '+esc(check.reason)+'</small>':'')+
+        '</div><div class="record-actions">'+
+        '<button data-template="'+esc(t.id)+'" class="primary">Редактировать</button>'+
+        '<button data-template-copy="'+esc(t.id)+'">Копировать</button>'+
+        '<button data-template-move="'+esc(t.id)+'">Переместить</button>'+
+        '<button data-template-remove="'+esc(t.id)+'" class="danger">Удалить</button></div>'+
+        (moving?'<div class="record-folder-choices"><strong style="font-size:11px">В папку:</strong>'+
+          targets.map(f=>'<button type="button" data-move-to="'+esc(f.id)+'" data-template-id="'+esc(t.id)+'"'+
+          (keySame(t.folderID,f.id)||(f.id==="unfiled"&&!t.folderID)?' disabled class="selected"':'')+
+          '>'+esc(f.name)+'</button>').join("")+'</div>':'')+
+        '</div>';
+    }).join(""):'<div class="print-empty">В папке нет этикеток. Нажмите «Новая этикетка».</div>';
+    const folder=selectedFolder();
+    $("folderDetail").textContent=folder?
+      "Папка «"+folder.name+"» · "+count(folder.id)+" этикеток":"";
+    $("templateDetail").innerHTML="";
   }
   function selectTemplate(id){
     const t=findTemplate(id);
     if(!t||!confirmDiscard())return;
     state.current=clone(t);
+    editorEditing=true;moveTemplateID=null;
     state.selectedID=t.id;
     state.dirty=false;state.quickValues={};
     renderLibrary();
@@ -224,18 +230,14 @@
   function selectFolder(id){
     const filter=id==="all"||id==="unfiled"?id:String(id);
     if(filter===state.folderFilter)return;
-    if(!confirmDiscard())return;
+    if(editorEditing&&!confirmDiscard())return;
     const folder=findFolder(filter);
     if(filter!=="all"&&filter!=="unfiled"&&!folder)return;
     state.folderFilter=filter;
     state.selectedFolderID=folder?.id||null;
-    const first=visibleTemplates()[0];
-    state.current=first?clone(first):newDocument();
-    if(!first&&folder)state.current.folderID=folder.id;
-    state.selectedID=state.current.id;
-    state.dirty=false;state.quickValues={};
+    moveTemplateID=null;editorEditing=false;
     renderLibrary();selectView("editor");
-    note(folder?"Папка: "+folder.name:"Список шаблонов");
+    note(folder?"Папка: "+folder.name:"Этикетки");
   }
   async function saveTemplateDocument(doc){
     await native("saveTemplate",{document:JSON.stringify(doc)});
