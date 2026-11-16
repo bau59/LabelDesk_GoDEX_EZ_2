@@ -207,7 +207,8 @@
           '<textarea rows="2" data-row-value="'+esc(key)+'" data-dish-id="'+esc(d.id)+'">'+esc(value)+'</textarea>':
           '<input '+(["weightG","kcal","protein","fat","carbs","shelfLifeHours"].includes(key)?
              'type="number" min="0" step="0.1"':'type="text"')+
-          ' value="'+esc(String(value).replace(",", "."))+'" data-row-value="'+esc(key)+
+          ' value="'+esc(["weightG","kcal","protein","fat","carbs","shelfLifeHours"].includes(key)?
+            String(value).replace(",","."):value)+'" data-row-value="'+esc(key)+
           '" data-dish-id="'+esc(d.id)+'">';
         return '<label>'+esc(title)+control+'</label>';
       }).join("");
