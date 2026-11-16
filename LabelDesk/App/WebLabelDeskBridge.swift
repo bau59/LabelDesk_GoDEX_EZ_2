@@ -121,6 +121,10 @@ final class WebLabelDeskBridge: NSObject, WKScriptMessageHandler, WKNavigationDe
             "settings": settings,
             "folders": readJSON(root.appendingPathComponent("folders.json")) ?? [],
             "dishes": readJSON(root.appendingPathComponent("dishes.json")) ?? [],
+            // One-way, non-destructive compatibility: existing dishes are loaded
+            // until the first item save creates items.json. [] is authoritative.
+            "items": readJSON(root.appendingPathComponent("items.json"))
+                ?? readJSON(root.appendingPathComponent("dishes.json")) ?? [],
             "queue": readJSON(root.appendingPathComponent("queue.json")) ?? [],
             "runtimePath": runtime.path
         ]
@@ -275,7 +279,7 @@ final class WebLabelDeskBridge: NSObject, WKScriptMessageHandler, WKNavigationDe
                 respond(id, result: true)
             case "saveData":
                 guard let key = body["key"] as? String,
-                      ["settings", "folders", "queue", "dishes"].contains(key),
+                      ["settings", "folders", "queue", "dishes", "items"].contains(key),
                       let json = body["json"] as? String else {
                     throw NSError(domain: "LabelDesk", code: 6,
                                   userInfo: [NSLocalizedDescriptionKey: "Invalid saveData"])
