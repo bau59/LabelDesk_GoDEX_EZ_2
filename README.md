@@ -1,6 +1,6 @@
 # LabelDesk — original GoDEX EZ-2 on macOS (WebKit + zsh)
 
-**1.0.12 WebKit/zsh release (compact print picker, saved batches, framed text).** No Node.js, Python, pip, npm, HTTP server or external dependencies are needed on the user's Mac. The system frameworks AppKit/WebKit and system commands `/bin/zsh`, `/bin/stty`, `/bin/cat` and `printf` handle the application and RS-232.
+**1.0.13 WebKit/zsh release (data safety, consistent inputs, printable EZ-2 calibration atlas).** No Node.js, Python, pip, npm, HTTP server or external dependencies are needed on the user's Mac. The system frameworks AppKit/WebKit and system commands `/bin/zsh`, `/bin/stty`, `/bin/cat` and `printf` handle the application and RS-232.
 
 ## Runtime layout
 
@@ -54,6 +54,37 @@ The **Каталог** page is for maintaining saved items. Saved positions can 
 **Печать позиций** is now a separate top-level page. Its search and folder filters are independent of catalog browsing. Select multiple items (including across folders), configure production date, expiration override, batch code, quantities, and per-item templates. **Дополнить** expands an individual row so that any standard field can be temporarily changed or missing custom fields can be added. The queued document uses a snapshot of these temporary edits; the original item and template files remain unchanged. **Подготовить печать →** validates and persists the batch atomically, then opens the existing **Очередь** page where the user explicitly starts the physical print. This avoids accidentally printing old pending jobs.
 
 The Intel Mac installer now includes `LabelDesk.icns`, generated at build time from `Scripts/make-icon.swift` with all expected 16–1024 px iconset representations. `CFBundleIconFile` points to that icon for Finder/Dock. Printer command transport and print dimensions are unchanged.
+
+## Storage, calibration atlas and input consistency (1.0.13)
+
+### Reliable local data
+
+- All settings, items, folders, queue, saved parties and label templates stay under `~/Library/Application Support/LabelDesk/`. Existing JSON schemas and IDs remain unchanged.
+- **No silent reset on damaged JSON**: loading a malformed file reports its exact filename. The UI must never replace unreadable data with empty arrays.
+- Before each overwrite or template deletion, the native bridge copies the previous file into `Backups/History/<filename>/`, retaining 12 generations per file. Writes stay atomic. A full manual snapshot from Settings copies every saved JSON and template directory into `Backups/LabelDesk-<date>-<id>/`; even corrupted raw data can be included for recovery.
+- **Runtime drift**: when an edited HTML/JS/script differs from the installed bundle, Settings identifies filenames and offers to restore the installed resources, after backing up the edited ones. The catalog and labels are not touched.
+
+### Printable calibration atlas
+
+Settings → **Тестовые этикетки EZ-2** lists individually selectable, labelled samples. Tests use existing CP866 and ESC G encoders, the same 58×38 mm stock and 2 mm label gap. **Each action prints only one selected specimen, with explicit confirmation**; the preexisting queue is not drained automatically.
+
+Sample IDs:
+- `R01`: 10-mm-spaced raster ruler lines, from x=2 mm; horizontal lines y=5/15/25/32 mm. Measure from the physical label edges, not from the cut bar.
+- `R02`: rectangular borders 25×17 and 22×17 mm and raster lines 1/2/4 dots thick.
+- `F01...`: the complete supported resident font matrix A00–A04 and A11–A48 (font code and documented glyph dimensions are printed before every sample). Large fonts are split across multiple labels; select only the pages needed.
+- `C01`, `C02`, `C03`: ASCII printable range, Cyrillic CP866 and supported frame/filled glyph mapping, respectively. Byte ranges are printed for comparison.
+- `N01`: ESC V inverse/regular text, followed by a normal row to verify that CR ends inverse printing.
+- `B01...B04`: native Code128/Code39/EAN13/EAN8 and their human-readable checksums.
+- `R03`, `R04`, `R05...R08`: 6/8/10/12/16 pt raster typography, Unicode specials and comparable raster barcodes.
+
+**Suggested first physical session:** print only `R01`, `F01`, `C02` and `R02` (four labels, one at a time). Photograph each square-on with a ruler along the label's horizontal and vertical edges, and note left/top print offsets, 10-mm spacing, native font heights and frame dimensions. Afterwards adjust the display mapping from measurements, not an assumed printer response. CP866 glyph bitmaps in firmware cannot be inferred exactly from the manual alone. Do not change feed commands or paper sensor settings based only on a visual guess.
+
+### Workflows
+
+- Numeric fields in Settings, Catalog, batch details and editor properties share a common plus/minus stepper. Native multi-choice dropdowns for catalog type and port selection were replaced by segmented buttons and searchable ports. Date/time inputs remain native OS controls.
+- Search/filter available label templates from Print instead of rendering every template button. Batch preflight validates each selected snapshot and reports concrete errors in the corresponding row.
+- Saved print parties can repair deleted catalog item/template references. Confirmed `Печатать…` sends only jobs from that party, without touching older queued work. Dates are refreshed on recall.
+- Editor: choose a known catalog variable from chips, and optionally preview the same unsaved template using saved catalog data without overwriting the template.
 
 ## Compact batch preparation and framed text (1.0.12)
 
