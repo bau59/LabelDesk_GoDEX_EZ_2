@@ -350,6 +350,80 @@ function barcodeSVG(item,width,height){
   return {svg:null,label:"",error:error.message};
  }
 }
+
+function renderTextFlow(canvas,scale,widthMM){
+ const ns="http://www.w3.org/2000/svg";
+ try{
+   // Text placement is taken from the actual buffered ESC encoder plan.
+   // Glyph outlines are approximate, but character cell widths, heights,
+   // wrapping and horizontal margins reflect the selected resident font.
+   const layout=window.EZ2Text.plan({...doc,
+     marginLeftMM:printerMedia.marginLeftMM,
+     marginRightMM:printerMedia.marginRightMM},{allowPlaceholders:true});
+   let at=0;
+   for(const row of layout.rows){
+     const barcode=row.kind==="barcode";
+     const metrics=barcode?{widthDots:8,heightDots:120}:row.font;
+     const chars=barcode?45:Array.from(row.text||"").length;
+     const dots=barcode?(55-layout.margins.left-layout.margins.right)*8:
+       Math.max(1,chars*metrics.widthDots);
+     const x=barcode?layout.margins.left:(row.margin-1);
+     const node=document.createElement("div");
+     node.className="text-preview-row"+(selected===row.element.id?" sel":"");
+     node.style.left=(x*scale)+"px";
+     node.style.top=(at/8*scale)+"px";
+     node.style.width=(Math.max(1,dots)/8*scale)+"px";
+     node.style.height=(metrics.heightDots/8*scale)+"px";
+     node.title=barcode?"Встроенный штрихкод":
+       ("ESC "+metrics.code+" · "+metrics.widthDots+"×"+metrics.heightDots+" точек");
+     node.dataset.id=row.element.id;
+     if(barcode){
+       const preview=barcodeSVG(row.element,dots/8,metrics.heightDots/8);
+       if(preview.svg)node.appendChild(preview.svg);
+       else node.textContent=preview.error;
+     }else if(chars){
+       const svg=document.createElementNS(ns,"svg");
+       svg.setAttribute("viewBox","0 0 "+dots+" "+metrics.heightDots);
+       svg.setAttribute("preserveAspectRatio","none");
+       const text=document.createElementNS(ns,"text");
+       text.setAttribute("x","0");
+       text.setAttribute("y",String(metrics.heightDots*0.83));
+       text.setAttribute("font-family","Menlo, monospace");
+       text.setAttribute("font-size",String(metrics.heightDots*0.88));
+       text.setAttribute("font-weight",metrics.bold?"800":"500");
+       text.setAttribute("fill","#111");
+       text.setAttribute("textLength",String(dots));
+       text.setAttribute("lengthAdjust","spacingAndGlyphs");
+       text.textContent=row.text;
+       svg.appendChild(text);node.appendChild(svg);
+     }
+     node.addEventListener("click",event=>{event.stopPropagation();setSelected(row.element.id);});
+     canvas.appendChild(node);
+     at+=metrics.heightDots;
+   }
+   for(const g of [{width:layout.margins.left,x:0},
+     {width:layout.margins.right,x:55-layout.margins.right}]){
+     if(!g.width)continue;
+     const guide=document.createElement("div");guide.className="marginguide";
+     guide.style.left=(g.x*scale)+"px";
+     guide.style.width=(g.width*scale)+"px";
+     canvas.appendChild(guide);
+   }
+ }catch(error){
+   const warning=document.createElement("div");
+   warning.className="text-preview-error";
+   warning.textContent="Проверка печати: "+error.message+
+     "\nВыберите строку в левом списке, чтобы исправить макет.";
+   canvas.appendChild(warning);
+ }
+ if(widthMM>55){
+   const zone=document.createElement("div");zone.className="printzone";
+   zone.style.left=(55*scale)+"px";
+   zone.style.width=((widthMM-55)*scale)+"px";
+   zone.title="За пределом подтверждённых 55 мм печати";canvas.appendChild(zone);
+ }
+}
+
 function renderCanvas(){
  const el=$("label");el.querySelectorAll(".obj,.printzone,.mediazone,.marginguide,.text-preview-row,.text-preview-error").forEach(n=>n.remove());if(!doc)return;
  if(zoomMode==="fit"){
@@ -365,6 +439,10 @@ function renderCanvas(){
  el.style.width=(width*zoom)+"px";el.style.height=(height*zoom)+"px";
  $("grid").style.backgroundImage="linear-gradient(to right,#0000000d 1px,transparent 1px),linear-gradient(to bottom,#0000000d 1px,transparent 1px)";
  $("grid").style.backgroundSize=zoom+"px "+zoom+"px";
+ if(doc.printMode==="text"&&window.EZ2Text){
+   renderTextFlow(el,zoom,width);
+   return;
+ }
  const flowPositions=new Map();
  const textMode=doc.printMode==="text";
  if(textMode && window.EZ2Text){
