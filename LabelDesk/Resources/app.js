@@ -801,6 +801,9 @@
     }
   });
   $("catalogGoPrint").addEventListener("click",()=>selectView("print"));
+  $("sendDishToPrint").addEventListener("click",()=>{
+    if(dishesController?.selectCurrentForPrint())selectView("print");
+  });
   $("printGoCatalog").addEventListener("click",()=>selectView("dishes"));
   $("saveTemplate").addEventListener("click",saveCurrent);
   $("newTemplate").addEventListener("click",makeCurrent);
