@@ -90,10 +90,22 @@ async function save(name){
  await save("Каша");
  assert.equal(persisted.items.length,2);
  const first=persisted.items[0];
- $("dishBatchRows").fire("change",{dataset:{dishTemplate:first.id},value:templates[1].id});
+ const clickTable=(selector,dataset)=>{
+   const target={closest:q=>q===selector?{dataset}:null};
+   $("dishBatchRows").fire("click",target);
+ };
+ // Stepper changes quantity without depending on a native number-spinner.
+ clickTable("[data-copy-step]",{copyStep:"1",dishId:first.id});
+ assert.match($("dishBatchRows").innerHTML,/copies-stepper/);
+ assert.match($("dishBatchRows").innerHTML,/value="2"/);
+ // Template chooser is a visible card grid, not an OS-native dropdown.
+ clickTable("[data-open-template]",{openTemplate:first.id});
+ assert.match($("dishBatchRows").innerHTML,/template-pick-row/);
+ clickTable("[data-pick-template]",{pickTemplate:templates[1].id,dishId:first.id});
  await $("queueDishes").fire("click");
  assert.equal(state.jobs.length,2);
  assert.equal(persisted.queue.length,2);
+ assert.equal(state.jobs[0].copies,2);
  assert.equal(state.jobs[0].document.name,"Суп · КБЖУ");
  assert.equal(state.jobs[1].document.name,"Каша · Состав");
  assert.equal(state.jobs[1].document.elements[3].value,"18.11.2026 10:00");
@@ -104,7 +116,8 @@ async function save(name){
  assert.equal(state.jobs.length,4);
  assert.equal(state.jobs[3].document.elements.some(e=>e.fieldName==="Годен до"),false);
  // A broken template still rejects the WHOLE selected batch, with no queue mutation.
- $("dishBatchRows").fire("change",{dataset:{dishTemplate:first.id},value:"missing-template"});
+ // Removing a referenced saved template must abort the entire next batch.
+ state.templates.splice(1,1);
  await $("queueDishes").fire("click");
  assert.equal(state.jobs.length,4);
  assert.match($("dishBatchStatus").textContent,/шаблон не найден/);
