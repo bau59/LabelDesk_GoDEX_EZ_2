@@ -118,13 +118,12 @@ final class WebLabelDeskBridge: NSObject, WKScriptMessageHandler, WKNavigationDe
                     "printPresets", "queue"] {
             let source = root.appendingPathComponent(key + ".json")
             if fm.fileExists(atPath: source.path) {
-                _ = try checkedJSON(source, dictionary: key == "settings")
+                // Preserve raw bytes even when the source is damaged; recovery needs them.
                 try fm.copyItem(at: source, to: dest.appendingPathComponent(key + ".json"))
             }
         }
         let tdir = root.appendingPathComponent("templates", isDirectory: true)
         if fm.fileExists(atPath: tdir.path) {
-            _ = try templates()
             try fm.copyItem(at: tdir, to: dest.appendingPathComponent("templates"))
         }
         return dest
