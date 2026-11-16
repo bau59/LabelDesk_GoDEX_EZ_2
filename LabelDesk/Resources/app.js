@@ -99,7 +99,15 @@
     $("portStatus").textContent=state.profile.portPath||"Порт не выбран";
   }
   function selectView(view){
+    if(view==="quick")view="editor"; // Legacy form is not a separate screen.
     state.view=view;
+    $("appRoot").classList?.toggle("show-context",view==="dishes"||view==="editor");
+    $("topTitle").textContent={
+      dishes:"Каталог",editor:"Редактор этикеток",queue:"Очередь печати",
+      settings:"Настройки принтера"
+    }[view]||"LabelDesk";
+    $("newTemplate").hidden=view!=="editor";
+    $("saveTemplate").hidden=view!=="editor";
     document.querySelectorAll("nav [data-view]").forEach(b=>b.classList.toggle("active",b.dataset.view===view));
     document.querySelectorAll("main .view").forEach(v=>v.classList.toggle("active",v.id===view+"View"));
     $("saveTemplate").disabled=view!=="editor";
@@ -186,7 +194,7 @@
       const choices=state.templates.filter(t=>keySame(t.folderID,folder.id))
         .sort((a,b)=>a.name.localeCompare(b.name,"ru"));
       const base=findTemplate(folder.baseTemplateID);
-      $("folderDetail").innerHTML='<h3>'+esc(folder.name)+'</h3>'+
+      $("folderDetail").innerHTML='<details><summary>Управление папкой</summary><div><h3>'+esc(folder.name)+'</h3>'+
         '<p>Базовый макет: '+(base?esc(base.name):'<span class="media-incompatible">не назначен</span>')+'</p>'+
         '<label for="baseChoice">Назначить базовый шаблон</label>'+
         '<select id="baseChoice">'+choices.map(t=>'<option value="'+esc(t.id)+'"'+
@@ -196,14 +204,14 @@
         '>Заполнить</button><button data-library-action="edit-base" '+(!base?'disabled':'')+
         '>Изменить макет</button></div><div class="actions">'+
         '<button data-library-action="rename-folder">Переименовать</button>'+
-        '<button data-library-action="delete-folder" class="danger">Удалить папку</button></div>';
+        '<button data-library-action="delete-folder" class="danger">Удалить папку</button></div></div></details>';
     }else{
       $("folderDetail").innerHTML="";
     }
     const chosen=findTemplate(state.selectedID);
     if(chosen && visible.some(t=>keySame(t.id,chosen.id))){
       const targets=[{id:"unfiled",name:"Без папки"},...state.folders];
-      $("templateDetail").innerHTML='<h3>Действия с шаблоном</h3><p>'+
+      $("templateDetail").innerHTML='<details><summary>Управление шаблоном</summary><div><h3>Действия с шаблоном</h3><p>'+
         esc(chosen.name)+'</p><div class="actions">'+
         '<button data-library-action="edit-selected">Редактировать</button>'+
         '<button data-library-action="duplicate-selected">Создать копию</button></div>'+
@@ -216,7 +224,7 @@
         '>Переместить</button>'+
         '<button data-library-action="delete-selected" class="danger" '+
         (isBase(chosen.id)?'disabled title="Сначала назначьте другой базовый макет"':'')+
-        '>Удалить шаблон</button></div>';
+        '>Удалить шаблон</button></div></div></details>';
     }else{
       $("templateDetail").innerHTML="";
     }
@@ -249,8 +257,9 @@
     state.selectedID=base?.id||null;
     state.dirty=false;state.quickValues={};
     renderLibrary();
-    selectView("quick");
-    note("Папка: "+folder.name+(base?"":" · назначьте базовый макет"));
+    renderQuick(); // Keep old quick-fill binding for existing local data/tests.
+    selectView("editor");
+    note("Папка шаблонов: "+folder.name+(base?"":" · назначьте основной макет"));
   }
   async function saveTemplateDocument(doc){
     await native("saveTemplate",{document:JSON.stringify(doc)});
@@ -344,7 +353,7 @@
       state.folderFilter=folderID;state.selectedFolderID=folderID;
       state.current=clone(base);state.selectedID=base.id;
       state.dirty=false;state.quickValues={};
-      renderLibrary();selectView("quick");
+      renderLibrary();renderQuick();selectView("editor");
       note("Создана папка «"+name+"» с независимым базовым шаблоном");
     }catch(e){
       if(baseCreated){
@@ -379,7 +388,7 @@
         keySame(f.id,folder.id)?{...f,baseTemplateID:doc.id}:f));
       state.current=clone(doc);
       state.selectedID=doc.id;state.dirty=false;state.quickValues={};
-      renderLibrary();selectView("quick");
+      renderLibrary();renderQuick();selectView("editor");
       note("Базовый макет папки «"+folder.name+"»: "+doc.name);
     }catch(e){note("Не удалось назначить базовый макет: "+e.message,true);}
   }
@@ -773,7 +782,7 @@
       });
       state.profile={...defaultProfile(),...(info.settings?.profile||{})};
       state.settingsSnapshot=info.settings||{schemaVersion:1,snapToGrid:true};
-       dishesController?.bootstrap(info.dishes);
+       dishesController?.bootstrap(info.items??info.dishes);
       state.runtimePath=info.runtimePath||"";
       const hadUserTemplates=state.templates.length>0;
       const originalFirst=state.templates.slice().sort((a,b)=>
@@ -803,7 +812,7 @@
       const command=action.dataset.libraryAction;
       if(command==="set-base")await assignBase();
       else if(command==="set-base-row")await assignBase(action.dataset.templateId);
-      else if(command==="fill-base")selectView("quick");
+      else if(command==="fill-base"){const base=baseTemplate();if(base)selectTemplate(base.id);}
       else if(command==="edit-base"){
         const base=selectedFolder()&&findTemplate(selectedFolder().baseTemplateID);
         if(base)selectTemplate(base.id);
