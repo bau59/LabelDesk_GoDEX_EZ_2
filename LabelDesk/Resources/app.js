@@ -604,12 +604,6 @@
     await persistQueue();renderQueue();
   }
   async function testNativeOnce(){
-    const left=Number($("marginLeft").value),right=Number($("marginRight").value);
-    if(!Number.isFinite(left)||!Number.isFinite(right)||left<0||right<0||
-       left>15||right>15||left+right>=50||
-       !Number.isInteger(left)||!Number.isInteger(right)){
-      note("Отступы: целые 0–15 мм, вместе менее 50 мм",true);return;
-    }
     if(state.running){note("Сначала завершите текущую передачу",true);return;}
     if(!state.profile.portPath){note("Выберите последовательный порт в настройках",true);return;}
     let test;
@@ -681,6 +675,12 @@
        !Number.isInteger(threshold)||threshold<64||threshold>192){
       note("Интервал 0,2–10 с; порог 64–192",true);return;
     }
+    const left=Number($("marginLeft").value),right=Number($("marginRight").value);
+    if(!Number.isFinite(left)||!Number.isFinite(right)||left<0||right<0||
+       left>15||right>15||left+right>=50||
+       !Number.isInteger(left)||!Number.isInteger(right)){
+      note("Отступы: целые 0–15 мм, вместе менее 50 мм",true);return;
+    }
     const configured={widthMM:Number($("mediaWidth").value),
       heightMM:Number($("mediaHeight").value),gapMM:Number($("mediaGap").value)};
     let checked;
@@ -697,7 +697,7 @@
       state.settingsSnapshot=settings;
       renderLibrary();renderQueue();renderSettings();renderEditorCompatibility();
       syncEditor();
-      note("Рулон сохранён: "+checked.widthMM+"×"+checked.heightMM+" мм, зазор "+checked.gapMM+" мм");
+      note("Настройки сохранены: рулон "+checked.widthMM+"×"+checked.heightMM+" мм; отступы "+left+" / "+right+" мм");
     }catch(e){note(e.message,true);}
   }
   async function installFoodPresets(){
