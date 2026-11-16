@@ -58,7 +58,7 @@
   const state={view:"dishes",templates:[],folders:[],jobs:[],profile:defaultProfile(),
     selectedID:null,selectedFolderID:null,current:null,quickValues:{},editorReady:false,
     dirty:false,running:false,stopRequested:false,ports:[],runtimePath:"",log:[],
-    settingsSnapshot:{},folderFilter:"all",librarySearch:""};
+    settingsSnapshot:{},folderFilter:"all",librarySearch:"",runtimeWarnings:[]};
   const note=(message,error=false)=>{
     $("notify").textContent=message;
     $("notify").style.color=error?"#b4333e":"";
@@ -499,6 +499,7 @@
     state.jobs.push({id:uuid(),document:clone(doc),copies:n,addedAt:stamp(),
       state:"pending",errorMessage:null});
     await persistQueue();renderQueue();
+    return state.jobs.at(-1)?.id;
   }
   async function addQuick(){
     try{
@@ -566,9 +567,11 @@
     $("clearFinished").disabled=state.running||!active.some(j=>["sent","cancelled"].includes(j.state));
     $("printLog").textContent=state.log.join("\n");
   }
-  async function printQueue(one=false){
+  async function printQueue(one=false,onlyIDs=null){
     if(state.running)return;
-    const jobs=state.jobs.filter(j=>j.state==="pending" && canPrint(j.document));
+    const wanted=onlyIDs?new Set(onlyIDs):null;
+    const jobs=state.jobs.filter(j=>j.state==="pending" && canPrint(j.document) &&
+      (!wanted||wanted.has(j.id)));
     if(!jobs.length){note("Нет совместимых заданий для выбранного рулона.",true);return;}
     if(!state.profile.portPath){note("Выберите RS-232 порт в настройках",true);return;}
     if(!one&&!window.confirm("Отправить "+jobs.length+" совместимых заданий? Несовместимые останутся в очереди."))return;
@@ -651,6 +654,104 @@
     try{await native("cancelPrint");log("Запрошена остановка текущего задания.");}
     catch(e){log("Остановка: "+e.message);}
   }
+  // All calibration sheets use the ordinary production encoders and queue.
+  const diagView={group:"Все",search:"",limit:6,selected:null};
+  function diagnostics(){
+    return window.EZ2Diagnostics?.list?.()||[];
+  }
+  function filteredDiagnostics(){
+    const needle=diagView.search.toLocaleLowerCase("ru");
+    return diagnostics().filter(s=>
+      (diagView.group==="Все"||s.group===diagView.group)&&
+      (!needle||(s.title+" "+s.id+" "+s.description).toLocaleLowerCase("ru").includes(needle)));
+  }
+  function showDiagnostic(){
+    const sample=diagnostics().find(d=>d.id===diagView.selected);
+    $("diagSelected").hidden=!sample;
+    if(!sample){$("diagPreview").removeAttribute("src");return;}
+    $("diagTitle").textContent=sample.id+" · "+sample.title;
+    $("diagDescription").textContent=sample.description;
+    $("diagMode").textContent=sample.mode==="text"?"Штатный CP866":"Растр ESC G";
+    try{
+      const raw=window.EZ2Diagnostics.documentFor(sample.id);
+      const doc=sample.mode==="text"?withPrintMargins(raw):raw;
+      if(!canPrint(doc))throw Error("Тестовый рулон 58×38 / зазор 2 мм не совпадает с настройками принтера.");
+      const packet=encodeJob(doc,1);
+      if(packet.size>20000)throw Error("Диагностический пакет больше лимита транспорта");
+      $("diagPreview").src=EZ2Raster.draw(doc).toDataURL("image/png");
+      $("diagError").textContent="";
+      $("diagQueue").disabled=false;
+      $("diagPrint").disabled=!state.profile.portPath||state.running;
+    }catch(error){
+      $("diagPreview").removeAttribute("src");
+      $("diagError").textContent=error.message;
+      $("diagQueue").disabled=true;$("diagPrint").disabled=true;
+    }
+  }
+  function renderDiagnostics(){
+    const all=diagnostics(),filtered=filteredDiagnostics();
+    $("diagCount").textContent=all.length+" образцов";
+    const groups=["Все",...new Set(all.map(s=>s.group))];
+    $("diagGroups").innerHTML=groups.map(group=>
+      '<button type="button" data-diag-group="'+esc(group)+'" class="'+
+      (diagView.group===group?'current':'')+'">'+esc(group)+'</button>').join("");
+    $("diagItems").innerHTML=filtered.slice(0,diagView.limit).map(s=>
+      '<button type="button" class="diag-row'+(diagView.selected===s.id?' current':'')+
+      '" data-diag-id="'+esc(s.id)+'"><span><strong>'+esc(s.id)+' · '+
+      esc(s.title)+'</strong><small>'+esc(s.description)+'</small></span>'+
+      '<em>'+(s.mode==="text"?"CP866":"Растр")+'</em></button>').join("")||
+      '<p class="muted">Образцы не найдены</p>';
+    $("diagMore").hidden=filtered.length<=diagView.limit;
+    showDiagnostic();
+  }
+  async function queueDiagnostic(id){
+    const doc=window.EZ2Diagnostics.documentFor(id);
+    return await queueDocument(doc,1);
+  }
+  async function handleDiagnosticPrint(direct){
+    const id=diagView.selected;
+    if(!id){note("Сначала выберите тестовую этикетку",true);return;}
+    if(direct&&!window.confirm("Напечатать ОДНУ тестовую этикетку "+id+
+      "? Убедитесь, что в принтере рулон 58×38 мм с зазором 2 мм."))return;
+    try{
+      if(direct&&!state.profile.portPath)throw Error("Порт RS-232 не выбран.");
+      const jobID=await queueDiagnostic(id);
+      note("Тест "+id+" добавлен в очередь · 1 этикетка");
+      if(direct)await printQueue(true,[jobID]); // Never prints other pending jobs.
+      else selectView("queue");
+    }catch(error){note("Тест "+id+": "+error.message,true);}
+  }
+  function installNumberSteppers(){
+    for(const input of document.querySelectorAll('input[type="number"]:not([data-ld-stepper])')){
+      if(input.closest(".ld-stepper"))continue;
+      input.dataset.ldStepper="1";
+      const group=document.createElement("div");group.className="ld-stepper";
+      const minus=document.createElement("button"),plus=document.createElement("button");
+      for(const [button,label] of [[minus,"−"],[plus,"＋"]]){
+        button.type="button";button.textContent=label;
+        button.setAttribute("aria-label",label==="−"?"Уменьшить":"Увеличить");
+      }
+      input.parentNode.insertBefore(group,input);
+      group.append(minus,input,plus);
+      const adjust=dir=>{
+        if(input.disabled||input.readOnly)return;
+        const step=Number(input.step)||1;
+        const lower=input.min===""?-Infinity:Number(input.min);
+        const upper=input.max===""?Infinity:Number(input.max);
+        const value=input.value===""?Number.isFinite(lower)?lower:0:Number(input.value);
+        if(!Number.isFinite(value)||!Number.isFinite(step))return;
+        const places=String(step).split(".")[1]?.length||0;
+        const next=Math.max(lower,Math.min(upper,
+          Number((value+step*dir).toFixed(Math.min(6,places)))));
+        input.value=String(next);
+        input.dispatchEvent(new Event("input",{bubbles:true}));
+        input.dispatchEvent(new Event("change",{bubbles:true}));
+      };
+      minus.addEventListener("click",()=>adjust(-1));
+      plus.addEventListener("click",()=>adjust(1));
+    }
+  }
+
   function renderSettings(){
     $("interval").value=state.profile.labelIntervalSeconds;
     $("threshold").value=state.profile.rasterThreshold;
@@ -664,6 +765,12 @@
       "Внимание: транспорт печати пока подтверждён только для высоты 38 мм и зазора 2 мм. Другие рулоны можно указать и подготовить шаблоны, но печать будет заблокирована.";
     renderPorts();
     $("runtimePath").textContent=state.runtimePath;
+    const modified=state.runtimeWarnings||[];
+    $("runtimeWarning").textContent=modified.length?
+      "Внимание: установленные ресурсы отличаются от этой версии: "+modified.join(", ")+
+      ". Часть интерфейса или драйвера может работать по-старому.":"";
+    $("restoreRuntime").hidden=!modified.length;
+    renderDiagnostics();
   }
   function renderPorts(){
     const port=state.profile.portPath||"";
@@ -743,6 +850,7 @@
       state.settingsSnapshot=info.settings||{schemaVersion:1,snapToGrid:true};
        dishesController?.bootstrap(info.items??info.dishes,info.itemFolders,info.printPresets);
       state.runtimePath=info.runtimePath||"";
+    state.runtimeWarnings=Array.isArray(info.runtimeWarnings)?info.runtimeWarnings:[];
       const hadUserTemplates=state.templates.length>0;
       const originalFirst=state.templates.slice().sort((a,b)=>
         String(b.updatedAt||"").localeCompare(String(a.updatedAt||"")))[0];
@@ -861,6 +969,35 @@
   $("saveSettings").addEventListener("click",saveSettings);
   $("saveMarginSettings").addEventListener("click",saveSettings);
   $("openRuntime").addEventListener("click",()=>native("openRuntime").catch(e=>note(e.message,true)));
+  $("makeBackup").addEventListener("click",async()=>{
+    try{
+      const path=await native("createBackup");
+      $("backupStatus").textContent="Резервная копия создана: "+path;note("Данные сохранены");
+    }catch(e){note("Резервная копия: "+e.message,true);}
+  });
+  $("openBackups").addEventListener("click",()=>native("openBackups").catch(e=>note(e.message,true)));
+  $("restoreRuntime").addEventListener("click",async()=>{
+    if(!window.confirm("Восстановить штатные файлы интерфейса и драйвера? Ваши изменения"+
+      " останутся в истории Backups. Каталог и макеты не изменятся."))return;
+    try{await native("restoreRuntime");window.location.reload();}
+    catch(e){note("Не удалось восстановить интерфейс: "+e.message,true);}
+  });
+  $("diagGroups").addEventListener("click",event=>{
+    const button=event.target.closest("[data-diag-group]");
+    if(!button)return;
+    diagView.group=button.dataset.diagGroup;diagView.limit=6;renderDiagnostics();
+  });
+  $("diagSearch").addEventListener("input",event=>{
+    diagView.search=event.target.value||"";diagView.limit=6;renderDiagnostics();
+  });
+  $("diagItems").addEventListener("click",event=>{
+    const button=event.target.closest("[data-diag-id]");
+    if(!button)return;
+    diagView.selected=button.dataset.diagId;renderDiagnostics();
+  });
+  $("diagMore").addEventListener("click",()=>{diagView.limit+=6;renderDiagnostics();});
+  $("diagQueue").addEventListener("click",()=>handleDiagnosticPrint(false));
+  $("diagPrint").addEventListener("click",()=>handleDiagnosticPrint(true));
   // Resizable and collapsible library. Does not touch printer geometry.
   let sidebarWidth=278;
   try{
@@ -885,5 +1022,6 @@
     window.addEventListener("pointermove",move);
     window.addEventListener("pointerup",up);
   });
+  installNumberSteppers();
   bootstrap();
 })();
