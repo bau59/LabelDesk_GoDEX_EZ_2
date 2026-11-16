@@ -200,8 +200,7 @@
         '<select id="baseChoice">'+choices.map(t=>'<option value="'+esc(t.id)+'"'+
           (keySame(t.id,folder.baseTemplateID)?' selected':'')+'>'+esc(t.name)+'</option>').join("")+'</select>'+
         '<div class="actions"><button data-library-action="set-base" '+(!choices.length?'disabled':'')+
-        '>Назначить</button><button data-library-action="fill-base" '+(!base?'disabled':'')+
-        '>Заполнить</button><button data-library-action="edit-base" '+(!base?'disabled':'')+
+        '>Назначить</button><button data-library-action="edit-base" '+(!base?'disabled':'')+
         '>Изменить макет</button></div><div class="actions">'+
         '<button data-library-action="rename-folder">Переименовать</button>'+
         '<button data-library-action="delete-folder" class="danger">Удалить папку</button></div></div></details>';
