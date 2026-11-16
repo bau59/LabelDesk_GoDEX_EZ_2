@@ -1,6 +1,6 @@
 # LabelDesk — original GoDEX EZ-2 on macOS (WebKit + zsh)
 
-**1.0.9 WebKit/zsh release (dedicated printing, catalog folders, native app icon).** No Node.js, Python, pip, npm, HTTP server or external dependencies are needed on the user's Mac. The system frameworks AppKit/WebKit and system commands `/bin/zsh`, `/bin/stty`, `/bin/cat` and `printf` handle the application and RS-232.
+**1.0.10 WebKit/zsh release (separate text and raster editors, native font previews and CP866 frames).** No Node.js, Python, pip, npm, HTTP server or external dependencies are needed on the user's Mac. The system frameworks AppKit/WebKit and system commands `/bin/zsh`, `/bin/stty`, `/bin/cat` and `printf` handle the application and RS-232.
 
 ## Runtime layout
 
@@ -11,7 +11,7 @@ After the initial macOS installation, the following files are copied into the us
 ├── live/
 │   ├── app.html       # all screens
 │   ├── app.js         # navigation, template library and queue
-│   ├── editor.html    # original editor, same layer/geometry UI
+│   ├── editor.html    # separate CP866 line and raster geometry workspaces
 │   ├── raster.js      # original ESC Gnn raster
 │   ├── barcodes.js    # Code39/128/EAN generator
 │   ├── native.js      # isolated one-label diagnostic
@@ -55,6 +55,14 @@ The **Каталог** page is for maintaining saved items. Saved positions can 
 
 The Intel Mac installer now includes `LabelDesk.icns`, generated at build time from `Scripts/make-icon.swift` with all expected 16–1024 px iconset representations. `CFBundleIconFile` points to that icon for Finder/Dock. Printer command transport and print dimensions are unchanged.
 
+## Label editor redesign (1.0.10)
+
+- **Settings of each label (⚙ Макет)** now show two explicit modes: **Текст CP866** or **Растр**. No old saved template is automatically converted. A requested switch with incompatible elements is rejected rather than dropping objects. Legacy templates without a printMode flag remain raster.
+- **Text mode** has a dedicated toolbar for lines, separators, native barcodes, and CP866 frame blocks. Rows are displayed top-to-bottom as the real buffered ESC text layout prints them; arrow buttons reorder exactly this sequence. No fictitious free X/Y controls. The embedded font gallery uses the original EZ-2/4 manual: A00 8×10, A01 bold 8×10, A02 bold 8×20, A03 bold 8×30, A04 bold 16×20; A11…A48 use 16×26 scaled horizontally (1–4) and vertically (1–8). Old A01/A04 metrics are corrected. The preview uses the real native line planner for character-cell widths, wrapping and margins; **macOS glyph outlines are approximations**, not screenshots of the printer firmware.
+- **Text-frame element:** one editable object stores kind=textFrame, value, frameChars, frameRows and frameStyle (single/double). The buffered text compiler expands it into native CP866 top/bottom edges and vertical-sided content rows using A00. There is no raster command or arbitrary X/Y positioning for this element. Width, height and CP866 characters are validated before print.
+- **Raster mode** retains existing drag/resize, exact X/Y controls and the established ESC G driver. Its rectangles, lines, text and barcode objects are unchanged. Incompatible text frames must be removed before switching to raster, rather than being silently converted.
+- The visual font layout and text frame output require a **one-label physical test**. Automated checks cover font geometry and emitted CP866 bytes, but not physical positioning or glyph shape.
+
 ## Simple template library (1.0.8)
 
 - A folder is now **only a grouping of label templates**. Creating a folder saves the name, but does not clone the current label or create a hidden mandatory base template.
@@ -88,10 +96,9 @@ labels are **not yet physically verified**; use a small test job first.
 **Newly created documents use `printMode:"text"`:** the printer's sequential
 buffered line mode with built-in CP866 fonts (A00…A04, A11…A48), Mnn left
 margins and auto-wrapped text. Text and barcode blocks are printed top-to-bottom
-in the stored element order (bottom-to-top in the editor's reversed layer
-panel); **there is no arbitrary Y coordinate** in this protocol.
+in the stored element order (top-to-bottom in the text editor); **there is no arbitrary Y coordinate** in this protocol.
 The editor displays an approximate layout, prevents dragging/resizing text
-lines, and permits a mode switch in its toolbar. Switch to raster if precise
+lines, and permits the two explicit modes in ⚙ Макет. Switch to raster if precise
 XY placement, rectangles, images or unsupported characters are required.
 Existing templates without a `printMode` keep using the original working
 `printer.sh` Gnn raster driver without conversion or mutation.
