@@ -496,10 +496,12 @@
       throw new Error("Этот размер рулона ещё не поддерживается транспортом. Измените настройки перед печатью.");
     }
     encodeJob(doc,n);
-    state.jobs.push({id:uuid(),document:clone(doc),copies:n,addedAt:stamp(),
-      state:"pending",errorMessage:null});
-    await persistQueue();renderQueue();
-    return state.jobs.at(-1)?.id;
+    const job={id:uuid(),document:clone(doc),copies:n,addedAt:stamp(),
+      state:"pending",errorMessage:null};
+    const jobs=[...state.jobs,job];
+    await native("saveData",{key:"queue",json:JSON.stringify(jobs)});
+    state.jobs=jobs;renderQueue();
+    return job.id;
   }
   async function addQuick(){
     try{
