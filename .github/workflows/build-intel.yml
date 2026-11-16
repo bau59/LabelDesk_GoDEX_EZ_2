@@ -46,6 +46,7 @@ jobs:
           node --check LabelDesk/Resources/dish-engine.js
           node --check LabelDesk/Resources/text-engine.js
           node --check LabelDesk/Resources/raster.js
+          node --check LabelDesk/Resources/diagnostics.js
           python3 -c "import pathlib,re; s=pathlib.Path('LabelDesk/Resources/editor.html').read_text(); m=re.search(r'<script>(.*?)</script>',s,re.S); assert m; pathlib.Path('/tmp/label-editor.js').write_text(m.group(1))"
           node --check /tmp/label-editor.js
           node Tests/WebRasterSmoke.js
@@ -102,6 +103,7 @@ jobs:
           test -f build/LabelDesk.app/Contents/Resources/food-presets.js
           test -f build/LabelDesk.app/Contents/Resources/dish-engine.js
           test -f build/LabelDesk.app/Contents/Resources/dish-controller.js
+          test -f build/LabelDesk.app/Contents/Resources/diagnostics.js
           test -s build/LabelDesk.app/Contents/Resources/LabelDesk.icns
           test "$(/usr/libexec/PlistBuddy -c 'Print :CFBundleIconFile' build/LabelDesk.app/Contents/Info.plist)" = LabelDesk
           test -f build/LabelDesk.app/Contents/Resources/printer-text.sh
