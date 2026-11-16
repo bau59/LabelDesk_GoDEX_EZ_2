@@ -41,7 +41,21 @@ assert.ok(packet.includes(Buffer.from([0xf0])),"Capital Ё must encode to 0xF0")
 assert.ok(packet.includes(Buffer.from([0xfc])),"No. sign № must encode in CP866");
 assert.equal(packet.subarray(-6).toString("hex"),"1b451b503031");
 assert.ok(!packet.includes(Buffer.from([0x1b,0x47])),"Text cannot contain Gnn raster");
-const three=decode(printer.build(multi,3));
+// User-configurable safety margins must affect both wrapping and real Mnn bytes,
+ // without changing the verified F0/q040/M01 packet header or paper feed.
+ const insetDoc={...multi,marginLeftMM:3,marginRightMM:4};
+ const inset=printer.plan(insetDoc);
+ assert.equal(inset.margins.left,3);
+ assert.equal(inset.margins.right,4);
+ assert.ok(inset.rows.filter(r=>r.kind==="text").every(r=>
+   (r.margin-1)*8+r.text.length*r.font.widthDots<=55*8-4*8));
+ const insetPacket=decode(printer.build(insetDoc,1));
+ assert.equal(insetPacket.subarray(0,12).toString("hex"),"1b46301b713034301b4d3031");
+ assert.ok(insetPacket.includes(Buffer.from([27,77,48,52])),
+   "3 mm left margin must emit M04 in buffered text body");
+ assert.throws(()=>printer.plan({...multi,marginLeftMM:16}),/Поля печати/);
+ assert.throws(()=>printer.plan({...multi,marginRightMM:-1}),/Поля печати/);
+ const three=decode(printer.build(multi,3));
 assert.equal(three.subarray(-6).toString("hex"),"1b451b503033");
 const twoHundred=decode(printer.build(multi,200));
 assert.equal(twoHundred.subarray(-9).toString("hex"),"1b451b703230300d0a");
