@@ -31,8 +31,16 @@
   function font(fontCode){
     const code=String(fontCode||"A00");
     if(/^A0[0-4]$/.test(code)){
-      const n=Number(code.slice(-1));
-      return {code,widthDots:8,heightDots:n===0?10:n*10};
+      // EZ-2/4 manual: A00=8×10, A01=8×10 bold, A02=8×20,
+      // A03=8×30, A04=16×20 (2× horizontally and vertically).
+      const native=[
+        {widthDots:8,heightDots:10},
+        {widthDots:8,heightDots:10,bold:true},
+        {widthDots:8,heightDots:20,bold:true},
+        {widthDots:8,heightDots:30,bold:true},
+        {widthDots:16,heightDots:20,bold:true}
+      ][Number(code.slice(-1))];
+      return {code,...native};
     }
     if(/^A[1-4][1-8]$/.test(code))
       return {code,widthDots:Number(code[1])*16,heightDots:Number(code[2])*26};
@@ -93,7 +101,27 @@
     root.EZ2Barcodes.layout(type,bars.display,printWidth*8);
     return {bars,selector:type==="CODE39"?"3":type==="CODE128"?"1":"E"};
   }
-  function plan(doc, options={}){
+  function frameLines(el,capacity){
+    const style=el.frameStyle==="double"?"double":"single";
+    const glyphs=style==="double"?
+      {tl:"╔",tr:"╗",bl:"╚",br:"╝",h:"═",v:"║"}:
+      {tl:"┌",tr:"┐",bl:"└",br:"┘",h:"─",v:"│"};
+    const width=Number(el.frameChars??30);
+    const height=Number(el.frameRows??1);
+    if(!Number.isInteger(width)||width<4||width>55||width>capacity)
+      throw Error("Ширина рамки больше печатной области: "+width+" символов");
+    if(!Number.isInteger(height)||height<1||height>5)
+      throw Error("Высота рамки: 1–5 строк внутри");
+    const caption=String(el.value??"").replace(/\r?\n/g," ");
+    if(Array.from(caption).length>width-4)
+      throw Error("Текст рамки длиннее внутреннего поля ("+(width-4)+" символов)");
+    const line=glyphs.v+" "+caption.padEnd(width-4," ")+" "+glyphs.v;
+    return [glyphs.tl+glyphs.h.repeat(width-2)+glyphs.tr,
+      ...Array.from({length:height},(_,i)=>i===0?line:
+      glyphs.v+" ".repeat(width-2)+glyphs.v),
+      glyphs.bl+glyphs.h.repeat(width-2)+glyphs.br];
+  }
+    function plan(doc, options={}){
     if(!doc || doc.printMode!=="text")throw Error("Этот макет не является строковым");
     if(Math.abs(Number(doc.heightMM)-38)>0.001||Math.abs(Number(doc.gapMM)-2)>0.001)
       throw Error("Штатный драйвер подтверждён для высоты 38 мм, зазора 2 мм");
@@ -107,7 +135,22 @@
     // sequential CR, never absolute canvas coordinates.
     for(const el of doc.elements){
       if(el.rotation && Number(el.rotation)!==0)throw Error("Поворот строки невозможен в EZ-2");
-      if(el.kind==="barcode"){
+      if(el.kind==="textFrame"){
+        const f=font("A00");
+        const x=Math.max(0,Number(el.xMM||0));
+        if(x>=margins.width)throw Error("Рамка выходит за правую границу");
+        const capacity=Math.floor(Math.min(55,Math.max(1,Number(el.widthMM||55)),
+          margins.width-x)*8/f.widthDots);
+        const lines=frameLines(el,capacity);
+        for(const line of lines){
+          cp866(line);
+          const position=marginMM(el,Array.from(line).length,f.widthDots,margins.width,margins.left);
+          rows.push({kind:"text",text:line,font:f,margin:position,element:el});
+          usedDots+=f.heightDots;
+        }
+        continue;
+      }
+            if(el.kind==="barcode"){
         if(barcode)throw Error("Пока поддерживается один встроенный штрихкод на этикетке");
         if(el!==doc.elements[doc.elements.length-1])
           throw Error("Штрихкод в строковом режиме должен быть последним блоком");
@@ -189,5 +232,5 @@
       rows:layout.rows.length,usedDots:layout.usedDots,mode:"text",
       description:"Штатные строки CP866 + "+(layout.barcode?"штрихкод":"текст")};
   }
-  root.EZ2Text={cp866,font,plan,build,wrapText};
+  root.EZ2Text={cp866,font,frameLines,plan,build,wrapText};
 })(window);
