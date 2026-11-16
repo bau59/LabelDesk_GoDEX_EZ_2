@@ -63,16 +63,23 @@
     }
     return lines;
   }
-  function marginMM(e,lineWidth,fontWidth,labelWidth=55){
+  function printMargins(doc){
+    const left=Number(doc.marginLeftMM??0),right=Number(doc.marginRightMM??0);
+    if(!Number.isInteger(left)||!Number.isInteger(right)||
+       left<0||right<0||left>15||right>15||left+right>=50)
+      throw Error("Поля печати: от 0 до 15 мм слева и справа, суммарно менее 50 мм");
+    return {left,right,width:PRINTABLE_DOTS/8-left-right};
+  }
+  function marginMM(e,lineWidth,fontWidth,usableWidth,leftMM){
     const x=Math.max(0,Number(e.xMM||0));
-    const width=Math.min(55,Number(e.widthMM||labelWidth));
-    let m=x+1;
+    const width=Math.min(Number(e.widthMM||55),usableWidth-x);
+    let m=x+leftMM+1;
     const freeDots=Math.max(0,width*8-lineWidth*fontWidth);
     if(e.textAlignment==="center")m+=freeDots/16;
     if(e.textAlignment==="right")m+=freeDots/8;
     return Math.floor(m);
   }
-  function barcodeConfig(e){
+  function barcodeConfig(e,maxWidth){
     if(!root.EZ2Barcodes)throw Error("Модуль штрихкодов отсутствует");
     const type=String(e.barcodeType||"CODE39").replace(/[^A-Za-z0-9]/g,"").toUpperCase();
     const bars=root.EZ2Barcodes.generate(type,e.value);
@@ -81,7 +88,7 @@
     if(/[{}|]/.test(bars.display))throw Error("Данные штрихкода содержат управляющие скобки EZ-2");
     if(type==="CODE128"&&/[^\x20-\x7e]/.test(bars.display))
       throw Error("Code128 в штатном режиме требует ASCII");
-    const printWidth=Math.min(55,Number(e.widthMM||55));
+    const printWidth=Math.min(maxWidth,Number(e.widthMM||55));
     // At least a 2-dot module as in successful terminal tests 7–9.
     root.EZ2Barcodes.layout(type,bars.display,printWidth*8);
     return {bars,selector:type==="CODE39"?"3":type==="CODE128"?"1":"E"};
@@ -93,6 +100,7 @@
     if(!Array.isArray(doc.elements)||doc.elements.length===0)
       throw Error("Шаблон без строк: нечего печатать");
     if(doc.elements.length>32)throw Error("Для штатного режима максимум 32 блока");
+    const margins=printMargins(doc);
     const rows=[];
     let barcode=null,usedDots=0;
     // Array order is the literal printer row order; X via Mnn, Y is
@@ -103,7 +111,7 @@
         if(barcode)throw Error("Пока поддерживается один встроенный штрихкод на этикетке");
         if(el!==doc.elements[doc.elements.length-1])
           throw Error("Штрихкод в строковом режиме должен быть последним блоком");
-        barcode=barcodeConfig(el);
+        barcode=barcodeConfig(el,margins.width);
         usedDots+=120; // conservative budget for unverified native barcode height
         rows.push({kind:"barcode",data:barcode.bars.display,barcode,element:el});
         continue;
@@ -119,17 +127,19 @@
       const x=Math.max(0,Number(el.xMM||0));
       if(x+requestedWidth>Number(doc.widthMM)+0.001||x>=55)
         throw Error("Текстовый блок выходит за установленную ширину этикетки");
-      const cellCapacity=Math.floor(Math.min(requestedWidth,55-x)*8/f.widthDots);
+      if(x>=margins.width)throw Error("Блок за пределами области с отступами");
+      const usableWidth=Math.min(requestedWidth,margins.width-x);
+      const cellCapacity=Math.floor(usableWidth*8/f.widthDots);
       const value=el.kind==="line" ? "─".repeat(Math.min(cellCapacity,54)):
         String(el.prefix||"")+String(el.value??"");
       const lines=wrapText(value,cellCapacity);
       for(const line of lines){
         // Probe code points before sending anything to the port.
         cp866(line);
-        const position=marginMM(el,Array.from(line).length,f.widthDots);
+        const position=marginMM(el,Array.from(line).length,f.widthDots,margins.width,margins.left);
         if(position<1 || position>55)
           throw Error("Позиция Mnn за областью печати");
-        if((position-1)*8+Array.from(line).length*f.widthDots>PRINTABLE_DOTS)
+        if((position-1)*8+Array.from(line).length*f.widthDots>PRINTABLE_DOTS-margins.right*8)
           throw Error("Строка выходит за 55 мм печати: "+line);
         rows.push({kind:"text",text:line,font:f,margin:position,element:el});
         usedDots+=f.heightDots;
@@ -138,7 +148,7 @@
     if(usedDots>MAX_LAYOUT_DOTS)
       throw Error("Строки могут выйти за высоту 38 мм ("+usedDots+
         " точек). Уменьшите шрифт или сократите текст.");
-    return {rows,usedDots,barcode};
+    return {rows,usedDots,barcode,margins};
   }
   function build(doc,copies=1){
     const n=Number(copies);
@@ -156,7 +166,8 @@
     let lastFont=null,lastMargin=null;
     for(const row of layout.rows){
       if(row.kind==="barcode"){
-        if(lastMargin!==1)esc("M01");
+        const start=1+layout.margins.left;
+        if(lastMargin!==start)esc("M"+String(start).padStart(2,"0"));
         esc("A11");
         add(ESC,row.element.showsHumanReadable===false?124:123);
         add(...byteASCII(row.data));add(125,CR);
