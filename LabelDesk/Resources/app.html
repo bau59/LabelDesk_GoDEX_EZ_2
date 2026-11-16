@@ -512,6 +512,16 @@ input[type="number"]::-webkit-inner-spin-button,input[type="number"]::-webkit-ou
 #batchTemplateMore{margin-top:8px;font-size:11px;padding:7px 11px}
 .batch-validation-error{display:block;color:#af3344;font-size:11px;margin-top:6px}
 
+
+.port-choices{display:flex;gap:5px;flex-wrap:wrap;margin:8px 0}
+.port-choices button{font-size:11px;padding:7px 10px}
+.port-choices button.selected{background:#1e2b41;color:#fff;border-color:#1e2b41}
+.preset-repair{width:100%;border-top:1px solid #e5eaf1;margin-top:7px;padding-top:10px}
+.preset-repair strong{font-size:11px}
+.preset-repair input{max-width:450px;width:100%;margin:6px 0}
+.preset-repair-options{display:flex;flex-wrap:wrap;gap:5px;margin-top:6px}
+.preset-repair-options button{font-size:11px;padding:6px 9px}
+
 </style>
 </head>
 <body>
@@ -762,7 +772,10 @@ input[type="number"]::-webkit-inner-spin-button,input[type="number"]::-webkit-ou
       <div class="card">
         <h3>RS-232</h3>
         <label for="port">Последовательный порт</label>
-        <div class="flex"><select id="port" style="min-width:300px"></select><button id="refreshPorts">Обновить</button></div>
+        <select id="port" hidden aria-hidden="true"></select>
+        <div class="flex"><input id="portSearch" type="search" placeholder="Найти доступный последовательный порт…" style="min-width:300px">
+          <button id="refreshPorts">Обновить</button></div>
+        <div id="portChoices" class="port-choices" aria-label="Доступные порты"></div>
         <p class="muted">9600 бод, 8N1, без XON/XOFF и RTS/CTS</p>
         <label for="interval">Интервал (секунды)</label>
         <input id="interval" type="number" min="0.2" max="10" step="0.1" value="1.5">
