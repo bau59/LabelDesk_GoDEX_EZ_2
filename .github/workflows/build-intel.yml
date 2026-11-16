@@ -15,6 +15,7 @@ on:
       - feat/native-cp866-food-presets-105
       - feat/universal-items-ui-107
       - feat/simple-folders-margins-108
+      - feat/print-page-catalog-folders-icon-109
   workflow_dispatch:
 
 permissions:
@@ -71,6 +72,8 @@ jobs:
           test -f build/LabelDesk.app/Contents/Resources/food-presets.js
           test -f build/LabelDesk.app/Contents/Resources/dish-engine.js
           test -f build/LabelDesk.app/Contents/Resources/dish-controller.js
+          test -s build/LabelDesk.app/Contents/Resources/LabelDesk.icns
+          test "$(/usr/libexec/PlistBuddy -c 'Print :CFBundleIconFile' build/LabelDesk.app/Contents/Info.plist)" = LabelDesk
           test -f build/LabelDesk.app/Contents/Resources/printer-text.sh
           test -f build/LabelDesk.app/Contents/Resources/printer-native.sh
           test -f build/LabelDesk.app/Contents/Resources/printer.sh
