@@ -1,6 +1,6 @@
 # LabelDesk — original GoDEX EZ-2 on macOS (WebKit + zsh)
 
-**1.0.7 WebKit/zsh release (universal catalog, custom fields, clean navigation).** No Node.js, Python, pip, npm, HTTP server or external dependencies are needed on the user's Mac. The system frameworks AppKit/WebKit and system commands `/bin/zsh`, `/bin/stty`, `/bin/cat` and `printf` handle the application and RS-232.
+**1.0.8 WebKit/zsh release (simplified template folders, copy steppers, text margins).** No Node.js, Python, pip, npm, HTTP server or external dependencies are needed on the user's Mac. The system frameworks AppKit/WebKit and system commands `/bin/zsh`, `/bin/stty`, `/bin/cat` and `printf` handle the application and RS-232.
 
 ## Runtime layout
 
@@ -46,11 +46,14 @@ On installation/update, bundled runtime files overwrite the local version **only
 - **Navigation:** the left vertical sidebar contains Catalog, Label Editor, Print Queue and Settings. The Catalog sidebar lists positions; the Editor sidebar lists saved template folders and layouts. Folder/template management actions are collapsed unless opened. The old one-off Quick Fill tab is no longer exposed; its internal compatibility code remains to avoid breaking previous data. Sidebar and layer-panel widths can still be adjusted independently.
 - **Runtime constraints:** no app-time Node/Python/npm, no network storage, and no changes to the tested GoDEX EZ-2 text/CP866 or raster/serial transport. Verify first labels physically on the installed roll before production printing.
 
-## Existing template folder compatibility
+## Simple template library (1.0.8)
 
-Templates remain separate UUID JSON files; folder membership and optional base template are stored in \`folders.json\`. Selecting a folder opens the base layout in the **label editor**, not the former quick-fill form. The current implementation creates a new folder by cloning the current layout as its independent base template; the original is never moved. Saved layouts may be duplicated, moved, or reassigned to a folder. A base template cannot be moved/deleted until another base is assigned. Deleting a folder moves its templates to *Без папки* without deleting the files.
-
-Search filters templates globally; with an empty query the selected folder controls the list. Existing unsaved-change guards and media incompatibility warnings remain. The physical roll and label geometry are independent of resizing/collapsing the UI panels.
+- A folder is now **only a grouping of label templates**. Creating a folder saves the name, but does not clone the current label or create a hidden mandatory base template.
+- In the editor sidebar, folder rows have direct **rename (✎)** and **delete (×)** actions. Deleting a folder **moves all its templates to Без папки** (does not delete labels). Any saved label, including a previous base, can be selected, changed, duplicated, moved, or deleted.
+- Selecting a folder displays its labels and opens the first in the editor. **＋ Новый шаблон** creates a draft assigned to the folder, saved only via **Сохранить макет**. Actions and destination folders are visible without nested inspector panels.
+- In the catalog batch table, quantity uses a wide **− / count / +** control, and templates are selected from clickable tiles. Default template tiles apply to positions without an individual override.
+- **Настройки → Отступы текстовой печати:** left/right margins are stored in the printer profile (0–15 whole millimeters each, sum below 50). They reserve space within the confirmed 55-mm printable width, control actual buffered CP866 Mnn horizontal margins and wrapping, and are visualized as neutral hatching in the editor. Click **⚙ Макет** or the empty canvas to open label-level properties and the settings shortcut. **Raster printing retains explicit coordinates**; these text margins do not move raster artwork.
+- Existing folders, prior baseTemplateID metadata, templates, items, queue, settings and working files are preserved. The former base field is ignored, never used as a deletion/move restriction. Physically verify left/right positioning with one label before batch printing.
 
 ## Installed roll and template compatibility (1.0.2)
 
