@@ -233,18 +233,27 @@
       return item;
     }
     function renderBatch(){
-      const visible=printList();
+      const candidates=printList();
+      const visible=dishes.filter(d=>selected.has(d.id)).sort(byName);
       if(!findTemplate(defaultTemplateID))defaultTemplateID=defaultTemplate()?.id||null;
       const defaultID=defaultTemplateID;
       renderPrintFilters();
+      $("printCatalogResults").innerHTML=candidates.length?candidates.map(d=>
+        '<div class="print-result"><div><strong>'+esc(d.name)+'</strong><small>'+
+        esc(kindLabel(d.kind||"food")+' · '+folderName(d.folderID))+
+        '</small></div><button type="button" data-add-print="'+esc(d.id)+'"'+
+        (selected.has(d.id)?' disabled':'')+'>'+
+        (selected.has(d.id)?'В партии ✓':'＋ Добавить')+'</button></div>').join(""):
+        '<div class="print-empty">В этой папке ничего не найдено</div>';
+      $("addVisibleToPrint").disabled=!candidates.some(d=>!selected.has(d.id));
       $("dishBatchTemplate").innerHTML=templateCards(defaultID,null)||
         '<p class="muted">Создайте шаблон в редакторе</p>';
       $("dishBatchRows").innerHTML=visible.length?visible.map(d=>{
-        const marked=selected.has(d.id),count=copies[d.id]||1;
+        const count=copies[d.id]||1;
         const id=templateOverrides[d.id]||defaultID;
         const label=findTemplate(id);
-        const row='<tr><td><input type="checkbox" data-dish-select="'+esc(d.id)+'"'+
-          (marked?' checked':'')+' aria-label="Выбрать '+esc(d.name)+'"></td>'+
+        const row='<tr><td><button type="button" data-remove-print="'+esc(d.id)+
+          '" class="danger">Убрать</button></td>'+
           '<td><strong style="font-size:12px;margin:0">'+esc(d.name)+'</strong>'+
           '<small style="display:block;color:#7b899e">'+esc(kindLabel(d.kind||"food")+
             (d.weightG?" · "+d.weightG+" г":""))+' · '+esc(folderName(d.folderID))+'</small></td>'+
@@ -268,16 +277,28 @@
         }
         if(detailFor===d.id)extra+=editableRow(d);
         return row+extra;
-      }).join(""):'<tr><td colspan="5" class="empty">'+
-        (dishes.length?"В этой папке ничего не найдено":"Сначала сохраните позицию")+'</td></tr>';
-      const count=selected.size,total=Array.from(selected).reduce((n,id)=>n+(copies[id]||1),0);
+      }).join(""):'<tr><td colspan="5"><div class="print-empty">Партия пока пуста. Добавьте позиции из каталога выше.</div></td></tr>';
+      const count=selected.size,total=visible.reduce((n,d)=>n+(copies[d.id]||1),0);
       $("selectedDishCount").textContent=count+" позиций · "+total+" этикеток";
+      $("printRowCount").textContent="("+count+")";
       $("printSelectedCount").textContent=count?String(count):"";
       $("dishBatchStatus").textContent=count?
-        "Выбранные позиции остаются отмеченными при поиске и смене папки.":
-        "Отметьте нужные позиции. Изменения в «Дополнить» не сохраняются в каталог.";
+        "В партии только выбранные позиции. Дополнения действуют однократно.":
+        "Сначала добавьте нужные позиции. Ничего не выбрано по умолчанию.";
       $("queueDishes").disabled=!count||!state.templates.length||state.running;
-      $("selectAllDishes").checked=visible.length>0&&visible.every(d=>selected.has(d.id));
+    }
+    function removeFromPrint(id){
+      if(!selected.has(id))return;
+      selected.delete(id);
+      delete copies[id];delete rowEdits[id];delete templateOverrides[id];
+      if(pickerFor===id)pickerFor=null;
+      if(detailFor===id)detailFor=null;
+      if(previewID===id){
+        previewID=null;$("dishPreview").removeAttribute("src");
+        $("dishPreviewError").textContent="";
+        $("dishPreviewCaption").textContent="";
+      }
+      renderBatch();renderSidebar();
     }
     function render(){
       if(!formInitialized)editForm();
@@ -505,8 +526,7 @@
       }
     });
     $("dishBatchRows").addEventListener("change",e=>{
-      const target=e.target,id=target.dataset.dishSelect;
-      if(id){if(target.checked)selected.add(id);else selected.delete(id);}
+      const target=e.target;
       if(target.dataset.dishCopies){
         const raw=String(target.value||"").trim();
         const n=Number(raw);
@@ -516,7 +536,19 @@
       }
       renderBatch();
     });
-    $("dishBatchRows").addEventListener("click",e=>{
+    $("printCatalogResults").addEventListener("click",e=>{
+      const button=e.target.closest("[data-add-print]");
+      if(!button||!findDish(button.dataset.addPrint))return;
+      selected.add(button.dataset.addPrint);
+      renderBatch();renderSidebar();
+    });
+    $("addVisibleToPrint").addEventListener("click",()=>{
+      for(const d of printList())selected.add(d.id);
+      renderBatch();renderSidebar();
+    });
+        $("dishBatchRows").addEventListener("click",e=>{
+      const removal=e.target.closest("[data-remove-print]");
+      if(removal){removeFromPrint(removal.dataset.removePrint);return;}
       const target=e.target;
       const openDetail=target.closest("[data-open-detail]");
       if(openDetail){detailFor=detailFor===openDetail.dataset.openDetail?null:openDetail.dataset.openDetail;
@@ -562,11 +594,10 @@
         if(previewID===pick.dataset.dishId)previewDish(previewID);
       }
     });
-    $("selectAllDishes").addEventListener("change",e=>{
-      printList().forEach(d=>{if(e.target.checked)selected.add(d.id);else selected.delete(d.id);});
+    $("clearDishSelection").addEventListener("click",()=>{
+      for(const id of Array.from(selected))removeFromPrint(id);
       renderBatch();
     });
-    $("clearDishSelection").addEventListener("click",()=>{selected.clear();renderBatch();});
     $("queueDishes").addEventListener("click",queueSelected);
     for(const id of ["batchProducedAt","batchExpiresAt","batchCode"])
       $(id).addEventListener("change",()=>{if(previewID)previewDish(previewID);});
