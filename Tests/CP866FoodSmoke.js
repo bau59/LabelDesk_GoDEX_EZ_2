@@ -68,7 +68,7 @@ assert.throws(()=>printer.plan(make([{...oneFrame,value:"Длинный заго
 // block while the total 38-mm physical height safety limit still applies.
 const seven=printer.plan(make([{...oneFrame,frameRows:7}]));
 assert.equal(seven.rows.length,9);
-const multiFrame=printer.plan(make([{...oneFrame,value:"Молоко\\nПастеризованное",frameRows:0,
+const multiFrame=printer.plan(make([{...oneFrame,value:"Молоко\nПастеризованное",frameRows:0,
   frameChars:22,textAlignment:"center",deviceFont:"A00"}]));
 assert.equal(multiFrame.rows.length,4);
 assert.match(multiFrame.rows[1].text,/Молоко/);
