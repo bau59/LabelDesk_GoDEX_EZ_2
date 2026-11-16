@@ -464,6 +464,46 @@ footer{color:#8993a1}
 .print-preset-actions button.danger{color:#a73546}
 @media(max-width:660px){.print-preset{align-items:flex-start;flex-direction:column}}
 
+
+/* Unified field metrics for catalog, print, editor shell and settings. */
+input:not([type="checkbox"]):not([type="range"]),select,textarea{
+ min-height:38px;border:1px solid #d3dce8;border-radius:9px;background:#fff;
+ color:#182336;font:inherit;box-shadow:none;padding:8px 11px;min-width:0
+}
+input:focus-visible,textarea:focus-visible,select:focus-visible{outline:2px solid #91a5c4;outline-offset:0}
+button{transition:background-color .12s ease,border-color .12s ease}
+input[type="number"]::-webkit-inner-spin-button,input[type="number"]::-webkit-outer-spin-button{-webkit-appearance:none;margin:0}
+.ld-stepper{display:flex;align-items:stretch;gap:0;max-width:280px;border:1px solid #d3dce8;
+ border-radius:9px;background:#fff;overflow:hidden}
+.ld-stepper:focus-within{outline:2px solid #91a5c4}
+.ld-stepper input[type="number"]{flex:1;width:65px;max-width:100%;min-width:40px;
+ border:0!important;border-radius:0!important;text-align:center;padding:6px!important;outline:0!important}
+.ld-stepper button{width:37px;min-width:37px;border:0;border-radius:0;background:#f1f4f8;
+ color:#253448;font-size:17px;padding:0}
+.ld-stepper button:first-child{border-right:1px solid #d3dce8}
+.ld-stepper button:last-child{border-left:1px solid #d3dce8}
+.ld-stepper button:disabled{opacity:.45}
+.ld-stepper[data-small="true"]{max-width:170px}
+.diag-items{display:flex;flex-direction:column;gap:2px;margin:10px 0}
+.diag-row{display:flex;gap:12px;align-items:center;justify-content:space-between;width:100%;
+ border:0;border-bottom:1px solid #e8edf3;border-radius:6px;text-align:left;background:transparent;
+ padding:9px 11px;color:#233149}
+.diag-row:hover,.diag-row.current{background:#eef2f7}
+.diag-row strong{font-size:12px;display:block}
+.diag-row small{display:block;margin-top:3px;color:#7d899a;font-size:11px}
+.diag-row em{font-size:10px;font-style:normal;color:#788698;white-space:nowrap}
+.diag-groups{display:flex;flex-wrap:wrap;gap:5px;margin:11px 0}
+.diag-groups button{font-size:11px;padding:6px 10px}
+.diag-groups button.current{background:#1b273a;color:#fff;border-color:#1b273a}
+.diag-selected{margin-top:15px;border-top:1px solid #e7ebf1;padding-top:15px}
+.diag-selected strong{font-size:13px}
+.diag-preview-wrap{display:grid;grid-template-columns:minmax(220px,420px) 1fr;gap:20px;
+ align-items:start;margin-top:12px}
+#diagPreview{width:100%;max-width:420px;aspect-ratio:58/38;object-fit:contain;
+ border:1px solid #d1d9e4;background:#fff;image-rendering:pixelated}
+#diagMore[hidden]{display:none!important}
+@media(max-width:750px){.diag-preview-wrap{grid-template-columns:1fr}}
+
 </style>
 </head>
 <body>
@@ -717,10 +757,46 @@ footer{color:#8993a1}
         <input id="threshold" type="number" min="64" max="192" step="8" value="128">
         <div class="flex" style="margin-top:16px"><button id="saveSettings" class="primary">Сохранить настройки</button></div>
       </div>
+      <div class="card diag-section">
+        <div class="section-head"><div>
+          <h3>Тестовые этикетки EZ-2</h3>
+          <p class="muted">Печать одной выбранной наклейки за раз. Каждая размечена кодом; фото и замеры помогут уточнить предпросмотр.</p>
+        </div><span class="muted" id="diagCount"></span></div>
+        <p class="muted">Документированные команды: встроенные шрифты A00–A48, CP866, реверс ESC V, штрихкоды и графика ESC G. Неизмеренные возможности не выдаются за подтверждённые.</p>
+        <div id="diagGroups" class="diag-groups"></div>
+        <div class="library-search"><input id="diagSearch" type="search" placeholder="Поиск по названию или коду (например, F03, R01)…" aria-label="Поиск тестовых этикеток"></div>
+        <div id="diagItems" class="diag-items"></div>
+        <button id="diagMore" type="button">Показать следующие</button>
+        <div id="diagSelected" class="diag-selected" hidden>
+          <div class="flex space"><div><strong id="diagTitle"></strong><p class="muted" id="diagDescription"></p></div>
+            <span id="diagMode" class="muted"></span></div>
+          <div class="diag-preview-wrap"><img id="diagPreview" alt="Эскиз тестовой наклейки">
+            <div><p id="diagError" class="warning" role="alert"></p>
+              <p class="muted">Физический размер выбранной этикетки: 58 × 38 мм, зазор 2 мм. Расстояния и положение на реальной ленте уточняем по вашим замерам.</p>
+              <div class="flex">
+                <button id="diagQueue" class="primary" type="button">В очередь · 1 шт.</button>
+                <button id="diagPrint" type="button">Печатать этот тест · 1 шт.</button>
+              </div>
+            </div>
+          </div>
+        </div>
+      </div>
+      <div class="card">
+        <h3>Сохранность данных</h3>
+        <p class="muted">Перед изменением JSON сохраняются предыдущие версии. Сделайте полный снимок перед проверкой принтера или обновлением приложения.</p>
+        <div class="flex">
+          <button id="makeBackup" type="button">Создать резервную копию</button>
+          <button id="openBackups" type="button">Открыть резервные копии</button>
+        </div>
+        <p class="muted" id="backupStatus"></p>
+      </div>
       <div class="card">
         <h3>Изменение драйвера без пересборки</h3>
         <p>Интерфейс и скрипт лежат в <code>~/Library/Application Support/LabelDesk/live/</code>. Их можно исправлять и перезапускать LabelDesk без Xcode и GitHub Actions.</p>
         <div class="flex"><button id="openRuntime">Открыть рабочие файлы</button><span id="runtimePath" class="muted"></span></div>
+        <p id="runtimeWarning" class="warning"></p>
+        <button id="restoreRuntime" type="button" hidden>Восстановить интерфейс из установленной версии</button>
+        <p class="muted">Изменённые рабочие файлы сохраняются в истории перед восстановлением. Данные каталога и шаблоны не затрагиваются.</p>
       </div>
     </div>
   </section>
