@@ -134,11 +134,14 @@ jobs:
           node --check LabelDesk/Resources/native.js
           node --check LabelDesk/Resources/text-engine.js
           node --check LabelDesk/Resources/food-presets.js
+          node --check LabelDesk/Resources/dish-engine.js
+          node --check LabelDesk/Resources/dish-controller.js
           node --check LabelDesk/Resources/raster.js
           node --check LabelDesk/Resources/app.js
           node Tests/WebRasterSmoke.js
           node Tests/MediaCompatibilitySmoke.js
           node Tests/SidebarWorkflowSmoke.js
+          node Tests/DishCatalogSmoke.js
           node Tests/BarcodesNativeSmoke.js
           node Tests/CP866FoodSmoke.js
           zsh -n Scripts/printer.sh
@@ -210,4 +213,4 @@ jobs:
             --repo "$GITHUB_REPOSITORY" \
             --target "$GITHUB_SHA" \
             --title "LabelDesk ${APP_VERSION}" \
-            --notes "LabelDesk 1.0.5 for Intel macOS 15+. Native buffered CP866 resident-font printing is now the default for NEW text labels; existing templates and raster printer.sh are preserved unchanged. Physical EZ-2 tests confirmed Russian and Yo, multiline font variants, horizontal margins, inverse, box-drawing, Code39, Code128 and EAN13. Native text and barcode print with F0/q040/Mnn, B...E and Pnn / pnnn. The native 2+ copy and mixed-content placement still require physical confirmation; preview is approximate. Four food-container starter folders installed once without touching user data: composition/allergens, nutrition per 100g, packing/storage dates, and batch with Code128. Fields include net weight, ingredients, calories, proteins, fats, carbs, manufacturer/address, production/use-by dates, storage and lot. Placeholder examples cannot be printed until filled. Separate printer-text.sh has no startup T3, blank raster or mixed mode; legacy raster remains for old/custom graphics. Secure in-app updater retained. Ad-hoc signed, not notarized."
+            --notes "LabelDesk 1.0.6 for Intel macOS 15+. New independent local dish catalog (dishes.json), composition, weight, KBJU, manufacturer, storage and shelf-life data. Select many dishes for a refrigerator batch, set production date and copies, choose a different saved template for each dish, and queue validated snapshots without changing the dishes or templates. Missing required template fields and unsupported print media block queueing. Sidebar resizing and collapsing plus compact layer chooser and adjustable layer panel. Existing templates, folders and queue remain intact. Printer transport and CP866 protocol unchanged; hardware batch-print results are not verified by this release. In-app update from v1.0.5; ad-hoc signed and not notarized."
