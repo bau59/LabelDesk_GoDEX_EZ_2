@@ -855,7 +855,7 @@
       renderBatch();
       return true;
     }
-    return {bootstrap,render,renderPrint,selectCurrentForPrint};
+    return {bootstrap,render,renderPrint,selectCurrentForPrint,listItems:()=>clone(dishes)};
   }
   root.EZ2DishController={create};
 })(typeof window!=="undefined"?window:globalThis);
