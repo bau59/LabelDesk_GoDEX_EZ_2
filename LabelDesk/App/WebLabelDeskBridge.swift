@@ -97,7 +97,7 @@ final class WebLabelDeskBridge: NSObject, WKScriptMessageHandler, WKNavigationDe
         let label = ISO8601DateFormatter().string(from: Date())
             .replacingOccurrences(of: ":", with: "-")
         let target = parent.appendingPathComponent(label + "-" +
-            UUID().uuidString.prefix(8) + ".bak")
+            String(UUID().uuidString.prefix(8)) + ".bak")
         try fm.copyItem(at: url, to: target)
         let versions = try fm.contentsOfDirectory(at: parent,
             includingPropertiesForKeys: [.creationDateKey])
@@ -111,7 +111,7 @@ final class WebLabelDeskBridge: NSObject, WKScriptMessageHandler, WKNavigationDe
         let dir = root.appendingPathComponent("Backups", isDirectory: true)
         try fm.createDirectory(at: dir, withIntermediateDirectories: true)
         let name = "LabelDesk-" + ISO8601DateFormatter().string(from: Date())
-            .replacingOccurrences(of: ":", with: "-") + "-" + UUID().uuidString.prefix(8)
+            .replacingOccurrences(of: ":", with: "-") + "-" + String(UUID().uuidString.prefix(8))
         let dest = dir.appendingPathComponent(name, isDirectory: true)
         try fm.createDirectory(at: dest, withIntermediateDirectories: true)
         for key in ["settings", "folders", "items", "dishes", "itemFolders",
