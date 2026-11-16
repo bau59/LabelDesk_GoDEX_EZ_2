@@ -25,7 +25,12 @@ input,textarea,select{background:#fff;color:var(--fg);border:1px solid #cfd8e6;b
 input:focus,textarea:focus,select:focus{outline:2px solid #9ab9ff;outline-offset:0;border-color:var(--accent)}
 textarea{resize:vertical;min-height:86px;user-select:text;white-space:pre-wrap;line-height:1.5}
 input{user-select:text}
-.layout{display:grid;grid-template-columns:178px minmax(270px,1fr) 246px;height:100%}
+.layout{display:grid;grid-template-columns:var(--layer-width,210px) minmax(250px,1fr) minmax(225px,270px);height:100%}
+.layout.layers-hidden{grid-template-columns:0 minmax(250px,1fr) minmax(225px,270px)}
+.layout.layers-hidden .panel.left{overflow:hidden;border:0}
+.layer-picker{max-width:200px;min-width:95px;flex:1}
+.layer-width-control{width:80px;accent-color:var(--accent)}
+#toggleLayers.active{background:var(--accent-soft);color:var(--accent);border-color:#a8bef1}
 .panel{background:var(--panel);min-height:0;display:flex;flex-direction:column}
 .panel.left{border-right:1px solid var(--line)}
 .panel.right{border-left:1px solid var(--line)}
@@ -116,7 +121,11 @@ strong{font-size:14px;display:block;margin-bottom:14px}
  </aside>
  <main class="work">
    <div class="tools">
-     <button data-add="text">+ Текст</button>
+     <button id="toggleLayers" title="Показать или скрыть список слоёв">☷ Слои</button>
+      <select id="layerPicker" class="layer-picker" aria-label="Выбрать слой" title="Быстрый выбор слоя"></select>
+      <input id="layersWidth" class="layer-width-control" type="range" min="165" max="320" step="5" value="210" title="Ширина панели слоёв" aria-label="Ширина панели слоёв">
+      <div class="divider"></div>
+      <button data-add="text">+ Текст</button>
      <button data-add="barcode">+ Штрихкод</button>
      <button data-add="line">+ Линия</button>
      <button data-add="rectangle">+ Рамка</button>
@@ -195,7 +204,12 @@ function remove(){if(!selected||!doc)return;checkpoint();doc.elements=doc.elemen
 function duplicate(){const e=selectedObj();if(!e)return;checkpoint();let copy=clone(e);copy.id=uid();
  if(doc.printMode==="text"){copy.xMM=0;copy.widthMM=Math.min(55,doc.widthMM);}
  else {copy.xMM=Math.min(Math.max(0,doc.widthMM-copy.widthMM),copy.xMM+1);copy.yMM=Math.min(Math.max(0,doc.heightMM-copy.heightMM),copy.yMM+1);}doc.elements.push(copy);selected=copy.id;draw();commit();}
-function labelFor(e){const variable=((e.kind==="text"||e.kind==="barcode")&&e.isVariable!==false)?" • перем.":"";return typeNames[e.kind]+variable+" · "+(e.value||"");}
+function labelFor(e){
+ const variable=((e.kind==="text"||e.kind==="barcode")&&e.isVariable!==false)?" · перем.":"";
+ const title=String(e.fieldName||"").trim();
+ return (title||typeNames[e.kind])+variable+
+   (title?"":" · "+String(e.value||"").slice(0,38));
+}
 function renderLayers(){
  const root=$("layers");root.replaceChildren();
  if(!doc||!doc.elements.length){let p=document.createElement("p");p.className="empty";p.textContent="Пока нет объектов. Добавьте текст или штрихкод.";root.appendChild(p);}
@@ -206,6 +220,15 @@ function renderLayers(){
    b.append(glyph,name);b.addEventListener("click",()=>setSelected(e.id));root.appendChild(b);
  });
  $("layerCount").textContent=doc?"("+doc.elements.length+")":"";
+  const picker=$("layerPicker");picker.replaceChildren();
+  if(doc){
+   doc.elements.slice().reverse().forEach(e=>{
+    const option=document.createElement("option");
+    option.value=e.id;option.textContent=labelFor(e);
+    picker.appendChild(option);
+   });
+  }
+  picker.value=selected||"";picker.disabled=!doc?.elements.length;
  const pos=doc?doc.elements.findIndex(e=>e.id===selected):-1;
  $("up").disabled=pos<0||pos===doc.elements.length-1;
  $("down").disabled=pos<=0;
@@ -599,6 +622,33 @@ window.labelDeskLoad=function(next){
 };
 document.querySelectorAll("[data-add]").forEach(b=>b.addEventListener("click",()=>newElem(b.dataset.add)));
 $("docname").addEventListener("focus",()=>{if(doc)checkpoint();});
+ const layout=document.querySelector(".layout");
+ let layersOpen=true,preferredWidth=210;
+ try{
+  const savedWidth=Number(localStorage.getItem("labeldesk-layer-width"));
+  if(savedWidth>=165&&savedWidth<=320)preferredWidth=savedWidth;
+  layersOpen=localStorage.getItem("labeldesk-layers-open")!=="false";
+ }catch(_){}
+ function applyLayerUI(){
+  layout.style.setProperty("--layer-width",preferredWidth+"px");
+  layout.classList.toggle("layers-hidden",!layersOpen);
+  $("layersWidth").value=String(preferredWidth);
+  $("layersWidth").hidden=!layersOpen;
+  $("toggleLayers").classList.toggle("active",layersOpen);
+  if(doc&&zoomMode==="fit")renderCanvas();
+ }
+ $("toggleLayers").onclick=()=>{
+  layersOpen=!layersOpen;
+  try{localStorage.setItem("labeldesk-layers-open",String(layersOpen));}catch(_){}
+  applyLayerUI();
+ };
+ $("layersWidth").addEventListener("input",ev=>{
+  preferredWidth=Number(ev.target.value);
+  try{localStorage.setItem("labeldesk-layer-width",String(preferredWidth));}catch(_){}
+  applyLayerUI();
+ });
+ $("layerPicker").addEventListener("change",ev=>setSelected(ev.target.value));
+ applyLayerUI();
 $("docname").addEventListener("input",function(){if(!doc)return;doc.name=this.value;commit();});
 $("label").addEventListener("click",ev=>{ev.stopPropagation();});
 $("zoom").addEventListener("change",function(){zoomMode=this.value;if(zoomMode!=="fit")zoom=Number(this.value);renderCanvas();});
