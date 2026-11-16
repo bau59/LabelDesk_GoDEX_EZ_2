@@ -17,6 +17,7 @@ on:
       - feat/simple-folders-margins-108
       - feat/print-page-catalog-folders-icon-109
       - feat/dual-editor-font-preview-110
+      - feat/clear-catalog-print-library-111
   workflow_dispatch:
 
 permissions:
@@ -219,4 +220,4 @@ jobs:
             --repo "$GITHUB_REPOSITORY" \
             --target "$GITHUB_SHA" \
             --title "LabelDesk ${APP_VERSION}" \
-            --notes "LabelDesk 1.0.10 for Intel macOS 15+. The label editor now has clearly separated per-template modes: CP866 resident-font line editor with actual 8x10/16x26-based character geometry, and raster free-position editor retaining X/Y and existing image generation. Text preview uses the actual native print layout to show character cell widths, vertical expansion, wrapping and row order; glyph outlines are approximate. A00-A04 metrics were aligned with the original GoDEX EZ-2/4 manual, including A01 bold 8x10 and A04 16x20. Text mode has a one-click CP866 frame builder (single/double glyph borders, editable width, interior row count and caption); it produces native buffered text rows without raster commands. Existing label JSON and printer transport remain untouched. Switching modes does not silently convert unsupported elements. The native hardware text framing still requires a physical one-label check. App icon, catalog, folders, batch printing, and updater are preserved. Ad-hoc signed, not notarized."
+            --notes "LabelDesk 1.0.11 for Intel macOS 15+. Catalog sidebar and editor sidebar now contain folder filters only; saved positions and label templates are shown in readable main-area lists with direct Edit, Delete, Duplicate, Move or Add-to-print actions. The catalog edit form opens only on request. Batch print selection is empty by default, positions must be explicitly added from catalog search/folders, and each selected row has an obvious Remove button; removing does not delete saved catalog data. The print queue still requires explicit physical print confirmation. Fixed printer margin settings being rejected by undefined left/right variables: saveSettings validates and persists both values in settings.json, and restores them on re-opening Settings. The misleading 3-mm striped raster width guide is removed from CP866 text previews; raster ESC G 55-mm limit is explained separately and unchanged. Empty text templates show a non-error prompt. Existing JSON data, print engine, serial transport, templates and queue remain unchanged. All changes are UI/persistence and should be verified on the installed Mac. Ad-hoc signed, not notarized."
