@@ -13,6 +13,7 @@ on:
       - fix/sidebar-workflow-and-ui-103
       - feat/ez2-native-fonts-barcodes-editor
       - feat/native-cp866-food-presets-105
+      - feat/universal-items-ui-107
   workflow_dispatch:
 
 permissions:
@@ -213,4 +214,4 @@ jobs:
             --repo "$GITHUB_REPOSITORY" \
             --target "$GITHUB_SHA" \
             --title "LabelDesk ${APP_VERSION}" \
-            --notes "LabelDesk 1.0.6 for Intel macOS 15+. New independent local dish catalog (dishes.json), composition, weight, KBJU, manufacturer, storage and shelf-life data. Select many dishes for a refrigerator batch, set production date and copies, choose a different saved template for each dish, and queue validated snapshots without changing the dishes or templates. Missing required template fields and unsupported print media block queueing. Sidebar resizing and collapsing plus compact layer chooser and adjustable layer panel. Existing templates, folders and queue remain intact. Printer transport and CP866 protocol unchanged; hardware batch-print results are not verified by this release. In-app update from v1.0.5; ad-hoc signed and not notarized."
+            --notes "LabelDesk 1.0.7 for Intel macOS 15+. Universal item catalog (product, food or generic data) with named custom fields. Template variables match standard or user-defined item fields; missing and empty values omit the label element instead of blocking printing. Default sidebar shows catalog or template folders, not obsolete quick-fill. New clean left navigation, tighter form hierarchy, optional detail sections and adjusted label editor appearance. Old dishes.json is read non-destructively; updated records are stored in items.json. Existing templates, folders, queues, printer protocol and updater are preserved. Native CP866 and raster transport unchanged, physical output still requires user verification. Ad-hoc signed, not notarized."
