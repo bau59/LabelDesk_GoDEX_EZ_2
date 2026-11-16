@@ -2,7 +2,7 @@
 (function(root){
   "use strict";
   function create(api){
-    const {state,native,uuid,clone,note,compatibility,media,encodeJob,renderQueue,openQueue}=api;
+    const {state,native,uuid,clone,note,compatibility,media,encodeJob,renderQueue,openQueue,openPrint}=api;
     const $=id=>document.getElementById(id);
     const esc=value=>String(value??"").replace(/[&<>"']/g,c=>
       ({"&":"&amp;","<":"&lt;",">":"&gt;",'"':"&quot;","'":"&#39;"}[c]));
@@ -12,7 +12,7 @@
       ingredients:"dishIngredients",allergens:"dishAllergens",
       shelfLifeHours:"dishShelfLife",storage:"dishStorage",
       manufacturer:"dishManufacturer",address:"dishAddress",barcode:"dishBarcode"};
-    let dishes=[],chosenID=null,draft=null,dirty=false,search="";
+    let dishes=[],chosenID=null,draft=null,dirty=false,search="",formOpen=false;
     let folders=[],catalogFolderID="all",printFolderID="all",printSearch="";
     const rowEdits={}; let detailFor=null;
     let selected=new Set(),copies={},templateOverrides={},previewID=null,formInitialized=false;
@@ -80,11 +80,18 @@
       const visible=list();
       $("dishSummary").textContent=visible.length+" / "+dishes.length;
       $("dishList").innerHTML=visible.length?visible.map(d=>
-        '<button class="dish-side-row'+(same(d.id,chosenID)?' active':'')+
-        '" data-dish-open="'+esc(d.id)+'">'+esc(d.name)+
-        '<small>'+esc(kindLabel(d.kind||"food")+(d.weightG?" · "+d.weightG+" г":""))+
-        (d.shelfLifeHours?" · "+esc(d.shelfLifeHours)+" ч":"")+'</small></button>').join(""):
-        '<p class="empty">'+(dishes.length?"В этой папке ничего нет":"Добавьте первую позицию")+'</p>';
+        '<div class="catalog-record"><div class="record-main"><strong>'+esc(d.name)+'</strong>'+
+        '<small>'+esc(kindLabel(d.kind||"food")+(d.weightG?" · "+d.weightG+" г":"")+
+          (d.shelfLifeHours?" · "+d.shelfLifeHours+" ч":""))+
+        ' · '+esc(folderName(d.folderID))+'</small></div><div class="record-actions">'+
+        '<button type="button" data-dish-open="'+esc(d.id)+'">Редактировать</button>'+
+        '<button type="button" data-dish-add="'+esc(d.id)+'" class="primary">'+
+        (selected.has(d.id)?"В партии ✓":"＋ В печать")+'</button>'+
+        '<button type="button" data-dish-remove="'+esc(d.id)+'" class="danger">Удалить</button>'+
+        '</div></div>').join(""):
+        '<div class="print-empty">'+(dishes.length?"В этой папке нет позиций":"Каталог пуст. Создайте первую позицию.")+'</div>';
+      $("catalogRecords").hidden=formOpen;
+      $("catalogEditor").hidden=!formOpen;
     }
     function renderPrintFilters(){
       const filter=(id,title)=>'<button type="button" data-print-folder="'+esc(id)+
@@ -280,13 +287,13 @@
     function renderPrint(){renderBatch();}
     function newDish(){
       if(dirty&&!window.confirm("Карточка не сохранена. Отменить изменения?"))return;
-      chosenID=null;draft=fresh();dirty=false;editForm();renderSidebar();
+      chosenID=null;draft=fresh();dirty=false;formOpen=true;editForm();renderSidebar();
       $("dishName").focus?.();
     }
     function openDish(id){
       const dish=findDish(id);if(!dish)return;
       if(dirty&&!window.confirm("Карточка не сохранена. Отменить изменения?"))return;
-      chosenID=dish.id;draft=clone(dish);dirty=false;editForm();renderSidebar();
+      chosenID=dish.id;draft=clone(dish);dirty=false;formOpen=true;editForm();renderSidebar();
     }
     function validateDish(dish){
       dish.name=String(dish.name||"").trim();
@@ -326,17 +333,17 @@
       item.updatedAt=new Date().toISOString();
       try{
         await persistDishes(dishes.filter(d=>!same(d.id,item.id)).concat([item]));
-        chosenID=item.id;draft=clone(item);dirty=false;selected.add(item.id);
+        chosenID=null;draft=fresh();dirty=false;formOpen=false;
         editForm();renderSidebar();renderBatch();note("Позиция сохранена: "+item.name);
       }catch(e){note("Не удалось сохранить блюдо: "+e.message,true);}
     }
-    async function deleteDish(){
-      const dish=findDish(chosenID);if(!dish)return;
+    async function deleteDish(recordID){
+      const dish=findDish(typeof recordID==="string"?recordID:chosenID);if(!dish)return;
       if(!window.confirm("Удалить позицию «"+dish.name+"»? Задания в очереди останутся."))return;
       try{
         await persistDishes(dishes.filter(d=>!same(d.id,dish.id)));
         selected.delete(dish.id);delete copies[dish.id];delete templateOverrides[dish.id];delete rowEdits[dish.id];
-        chosenID=null;draft=fresh();dirty=false;editForm();render();
+        chosenID=null;draft=fresh();dirty=false;formOpen=false;editForm();render();
         note("Позиция удалена");
       }catch(e){note("Не удалось удалить блюдо: "+e.message,true);}
     }
@@ -403,13 +410,17 @@
       dishes=Array.isArray(raw)?raw.filter(d=>d&&d.id&&d.name)
         .map(d=>({...d,kind:d.kind||"food",
           customFields:Array.isArray(d.customFields)?d.customFields:[]})):[];
-      chosenID=dishes[0]?.id||null;draft=chosenID?clone(dishes[0]):fresh();
+      chosenID=null;draft=fresh();formOpen=false;selected.clear();
       dirty=false;formInitialized=false;
       $("batchProducedAt").value=localDateTime();
       render();
     }
     // Named buttons and delegated table events are independent from the legacy template UI.
-    for(const id of ["newDish","newDishMain"])$(id).addEventListener("click",newDish);
+    $("newDishMain").addEventListener("click",newDish);
+    $("closeDishEditor").addEventListener("click",()=>{
+      if(dirty&&!window.confirm("Отменить несохранённые изменения?"))return;
+      formOpen=false;chosenID=null;draft=fresh();dirty=false;editForm();renderSidebar();
+    });
     $("saveDish").addEventListener("click",saveDish);
     $("addItemFolder").addEventListener("click",createFolder);
     $("printSearch").addEventListener("input",e=>{
@@ -461,7 +472,7 @@
         $("dishFormHint").textContent="Есть несохранённые изменения";
       }
     });
-    $("deleteDish").addEventListener("click",deleteDish);
+    $("deleteDish").addEventListener("click",()=>deleteDish());
     $("dishSearch").addEventListener("input",e=>{search=e.target.value||"";renderSidebar();renderBatch();});
     $("dishFields").addEventListener("input",e=>{
       const key=e.target.dataset.dish;
@@ -562,14 +573,23 @@
     document.body.addEventListener("click",e=>{
       const catalogFolder=e.target.closest("[data-catalog-folder]");
       if(catalogFolder){
+        if(dirty&&!window.confirm("Отменить несохранённую карточку?"))return;
         catalogFolderID=catalogFolder.dataset.catalogFolder;
-        renderSidebar();return;
+        formOpen=false;chosenID=null;draft=fresh();dirty=false;editForm();renderSidebar();return;
       }
       const rename=e.target.closest("[data-item-folder-rename]");
       if(rename){renameFolder(rename.dataset.itemFolderRename);return;}
       const remove=e.target.closest("[data-item-folder-delete]");
       if(remove){deleteFolder(remove.dataset.itemFolderDelete);return;}
-      const open=e.target.closest("[data-dish-open]");
+      const add=e.target.closest("[data-dish-add]");
+      if(add){
+        const id=add.dataset.dishAdd;
+        if(!findDish(id))return;
+        selected.add(id);renderSidebar();renderBatch();openPrint?.();return;
+      }
+      const remove=e.target.closest("[data-dish-remove]");
+      if(remove){deleteDish(remove.dataset.dishRemove);return;}
+            const open=e.target.closest("[data-dish-open]");
       if(open){openDish(open.dataset.dishOpen);return;}
       const preview=e.target.closest("[data-dish-preview]");
       if(preview){previewDish(preview.dataset.dishPreview);}
