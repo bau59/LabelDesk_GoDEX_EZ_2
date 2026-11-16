@@ -192,5 +192,46 @@ async function save(name){
  assert.equal($("selectedDishCount").textContent,"2 позиций · 2 этикеток");
  $("clearDishSelection").fire("click");
  assert.equal($("selectedDishCount").textContent,"0 позиций · 0 этикеток");
+ // A saved production batch preserves item IDs, copy counts, template choice
+ // and nonpersistent field overrides, but never freezes the production date.
+ state.templates.push(copy(templates[1]));
+ add(first.id);
+ const presetTarget={closest:q=>q==="[data-preset-load]"?
+   {dataset:{presetLoad:persisted.printPresets?.[0]?.id}}:null};
+ $("batchName").value="Холодильник № 1";
+ $("batchCode").value="H-1";
+ prompts.push("Холодильник № 1");
+ await $("savePrintPreset").fire("click");
+ assert.equal(persisted.printPresets.length,1);
+ assert.equal(persisted.printPresets[0].items.length,1);
+ assert.match($("printPresets").innerHTML,/В очередь/);
+ $("clearDishSelection").fire("click");
+ // Simulate restart: load the saved JSON using the same native bootstrap path.
+ controller.bootstrap(persisted.items,persisted.itemFolders,persisted.printPresets);
+ $("printPresets").fire("click",presetTarget);
+ assert.equal($("selectedDishCount").textContent,"1 позиций · 1 этикеток");
+ assert.equal($("batchCode").value,"H-1");
+ assert.ok(String($("batchProducedAt").value).startsWith("20"));
+ assert.equal($("batchExpiresAt").value,"");
+ const totalBefore=state.jobs.length;
+ await $("printPresets").fire("click",{closest:q=>q==="[data-preset-queue]"?
+   {dataset:{presetQueue:persisted.printPresets[0].id}}:null});
+ assert.equal(state.jobs.length,totalBefore+1,"Preset queues one prepared snapshot");
+ assert.equal(state.jobs.at(-1).state,"pending","Physical print is never automatic");
+ assert.equal(persisted.items.find(d=>d.id===first.id).protein,"6");
+ const original=copy(persisted.items);
+ await $("printPresets").fire("click",{closest:q=>q==="[data-preset-delete]"?
+   {dataset:{presetDelete:persisted.printPresets[0].id}}:null});
+ assert.equal(persisted.printPresets.length,0);
+ assert.deepEqual(persisted.items,original);
+ // Six unselected results maximum, all rendered as compact rows.
+ const many=Array.from({length:9},(_,i)=>({...copy(first),
+   id:uuid(700+i),name:"Товар "+i}));
+ controller.bootstrap(many,[],[]);
+ assert.equal(($("printCatalogResults").innerHTML.match(/class="print-result"/g)||[]).length,6);
+ assert.equal($("printMore").hidden,false);
+ $("printMore").fire("click");
+ assert.equal(($("printCatalogResults").innerHTML.match(/class="print-result"/g)||[]).length,9);
+
  console.log("Item catalog smoke passed: migration-safe saves, custom fields, omitted blanks, mixed templates and atomic queue.");
 })().catch(e=>{console.error(e);process.exitCode=1;});
