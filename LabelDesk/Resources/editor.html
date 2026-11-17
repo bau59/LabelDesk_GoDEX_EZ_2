@@ -477,7 +477,12 @@ function renderTextFlow(canvas,scale,widthMM){
            "┌":[[mx,my,cx+cw,my],[mx,my,mx,ch]],
            "┐":[[cx,my,mx,my],[mx,my,mx,ch]],
            "└":[[mx,0,mx,my],[mx,my,cx+cw,my]],
-           "┘":[[mx,0,mx,my],[cx,my,mx,my]]
+           "┘":[[mx,0,mx,my],[cx,my,mx,my]],
+           "├":[[mx,0,mx,ch],[mx,my,cx+cw,my]],
+           "┤":[[mx,0,mx,ch],[cx,my,mx,my]],
+           "┬":[[cx,my,cx+cw,my],[mx,my,mx,ch]],
+           "┴":[[cx,my,cx+cw,my],[mx,0,mx,my]],
+           "┼":[[cx,my,cx+cw,my],[mx,0,mx,ch]]
          };
          if(single[glyph])segments=single[glyph];
          else if("═║╔╗╚╝".includes(glyph)){
