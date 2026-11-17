@@ -464,7 +464,8 @@ function renderTextFlow(canvas,scale,widthMM){
          fixedAreas.set(element.id,{
            x:Number(element.xMM||0)+layout.margins.left+nativePreviewOrigin.leftMM,
            y:at/8+nativePreviewOrigin.topMM,
-           width:Math.max(1,Number(element.widthMM||55)),
+           width:Math.max(1,Math.min(Number(element.widthMM||55),
+             layout.margins.width-Number(element.xMM||0))),
            heightDots:0,element
          });
        }
