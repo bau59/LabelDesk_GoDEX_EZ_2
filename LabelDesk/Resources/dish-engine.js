@@ -68,14 +68,17 @@
       throw Error("Не найден шаблон или позиция каталога");
     const doc=JSON.parse(JSON.stringify(template));
     const elements=[];
+    let printableCount=0;
     for(const element of doc.elements){
       if(!["text","barcode","textFrame","framedText"].includes(element.kind)||element.isVariable===false){
-        elements.push(element);continue;
+        elements.push(element);printableCount++;continue;
       }
       // An unnamed literal variable stays as authored for backward compatibility.
       const fieldName=String(element.fieldName||"").trim();
       if(!fieldName){
-        if(!/\[[^\]]+\]/.test(String(element.value||"")))elements.push(element);
+        if(!/\[[^\]]+\]/.test(String(element.value||""))){
+          elements.push(element);printableCount++;
+        }
         continue;
       }
       const value=valueFor(item,fieldName,batch);
@@ -93,10 +96,10 @@
         continue;
       }
       element.value=value;
-      elements.push(element);
+      elements.push(element);printableCount++;
     }
     doc.elements=elements;
-    if(!elements.length)throw Error("Для позиции «"+item.name+"» нет заполненных полей в этом шаблоне");
+    if(!printableCount)throw Error("Для позиции «"+item.name+"» нет заполненных полей в этом шаблоне");
     doc.name=String(item.name||"Позиция")+" · "+String(template.name||"Шаблон");
     return doc;
   }
