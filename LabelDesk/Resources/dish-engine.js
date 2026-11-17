@@ -79,8 +79,19 @@
         continue;
       }
       const value=valueFor(item,fieldName,batch);
-      // Missing, unknown or blank field = omit that entire block, including its prefix.
-      if(value===null||!String(value).trim())continue;
+      // An absent variable never prints its prefix or placeholder. When a
+      // text field has a fixed height, preserve its EMPTY row slots so later
+      // fields keep the same position for every item in the print batch.
+      if(value===null||!String(value).trim()){
+        if(element.kind==="text"&&Number.isInteger(element.fixedRows)&&
+           element.fixedRows>=1&&element.fixedRows<=20){
+          element.prefix="";
+          element.value="";
+          element.isVariable=false;
+          elements.push(element);
+        }
+        continue;
+      }
       element.value=value;
       elements.push(element);
     }
