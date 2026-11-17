@@ -168,6 +168,7 @@ body[data-editor-mode="text"] #grid{opacity:.2}
 body[data-editor-mode="text"] #label{border-color:#c0c8d2}
 .text-preview-row{position:absolute;z-index:2;overflow:visible;cursor:pointer}
 .text-preview-row svg{display:block;width:100%;height:100%;overflow:visible}
+.text-preview-row.is-reverse{background:#111}
 .text-preview-row:hover{outline:1px dashed #8194aa}
 .text-preview-row.sel{outline:2px solid #233149;background:#e7eef758}
 .text-preview-error{position:absolute;z-index:7;left:6px;right:6px;bottom:6px;
@@ -309,6 +310,9 @@ body[data-editor-mode="text"] #label{border-color:#c0c8d2}
 let doc=null, selected=null, zoom=8, zoomMode="fit", history=[], future=[], snap=true;
 let sampleItems=[],sampleID=null,sampleSearch="";
 let printerMedia={widthMM:58,heightMM:38,gapMM:2,marginLeftMM:0,marginRightMM:0};
+// Physical print-head origin estimated from G01 on 58×38 mm stock.
+// Preview only: never modifies ESC Mnn, F0, CR or paper advance commands.
+const nativePreviewOrigin={leftMM:2,topMM:1};
 const $=id=>document.getElementById(id);
 const typeNames={text:"Текст",barcode:"Штрихкод",line:"Разделитель",rectangle:"Рамка",textFrame:"Рамка CP866 с текстом",framedText:"Рамка с текстом"};
 const patterns={"0":"nnnwwnwnn","1":"wnnwnnnnw","2":"nnwwnnnnw","3":"wnwwnnnnn","4":"nnnwwnnnw","5":"wnnwwnnnn","6":"nnwwwnnnn","7":"nnnwnnwnw","8":"wnnwnnwnn","9":"nnwwnnwnn","A":"wnnnnwnnw","B":"nnwnnwnnw","C":"wnwnnwnnn","D":"nnnnwwnnw","E":"wnnnwwnnn","F":"nnwnwwnnn","G":"nnnnnwwnw","H":"wnnnnwwnn","I":"nnwnnwwnn","J":"nnnnwwwnn","K":"wnnnnnnww","L":"nnwnnnnww","M":"wnwnnnnwn","N":"nnnnwnnww","O":"wnnnwnnwn","P":"nnwnwnnwn","Q":"nnnnnnwww","R":"wnnnnnwwn","S":"nnwnnnwwn","T":"nnnnwnwwn","U":"wwnnnnnnw","V":"nwwnnnnnw","W":"wwwnnnnnn","X":"nwnnwnnnw","Y":"wwnnwnnnn","Z":"nwwnwnnnn","-":"nwnnnnwnw",".":"wwnnnnwnn"," ":"nwwnnnwnn","$":"nwnwnwnnn","/":"nwnwnnnwn","+":"nwnnnwnwn","%":"nnnwnwnwn","*":"nwnnwnwnn"};
@@ -437,10 +441,11 @@ function renderTextFlow(canvas,scale,widthMM){
      const x=barcode?layout.margins.left:(row.margin-1);
      const node=document.createElement("div");
      node.className="text-preview-row"+(selected===row.element.id?" sel":"");
-     node.style.left=(x*scale)+"px";
-     node.style.top=(at/8*scale)+"px";
+     node.style.left=((x+nativePreviewOrigin.leftMM)*scale)+"px";
+     node.style.top=((at/8+nativePreviewOrigin.topMM)*scale)+"px";
      node.style.width=(Math.max(1,dots)/8*scale)+"px";
      node.style.height=(metrics.heightDots/8*scale)+"px";
+     if(row.reverse)node.classList.add("is-reverse");
      node.title=barcode?"Встроенный штрихкод":
        ("ESC "+metrics.code+" · "+metrics.widthDots+"×"+metrics.heightDots+" точек");
      node.dataset.id=row.element.id;
@@ -486,16 +491,18 @@ function renderTextFlow(canvas,scale,widthMM){
              const line=document.createElementNS(ns,"line");
              line.setAttribute("x1",String(x1));line.setAttribute("y1",String(y1));
              line.setAttribute("x2",String(x2));line.setAttribute("y2",String(y2));
-             line.setAttribute("stroke","#111");line.setAttribute("stroke-width",metrics.bold?"1.2":"0.85");
+             line.setAttribute("stroke",row.reverse?"#fff":"#111");line.setAttribute("stroke-width",metrics.bold?"1.2":"0.85");
              svg.appendChild(line);
            }
          }else if(glyph!==" "){
            const g=document.createElementNS(ns,"text");
            g.setAttribute("x",String(mx));g.setAttribute("y",String(ch*.83));
            g.setAttribute("text-anchor","middle");g.setAttribute("font-family","Menlo, monospace");
-           g.setAttribute("font-size",String(Math.min(ch*.78,cw*1.35)));
+           g.setAttribute("font-size",String(ch*.90));
+           g.setAttribute("textLength",String(cw*.92));
+           g.setAttribute("lengthAdjust","spacingAndGlyphs");
            g.setAttribute("font-weight",metrics.bold?"800":"500");
-           g.setAttribute("fill","#111");g.textContent=glyph;svg.appendChild(g);
+           g.setAttribute("fill",row.reverse?"#fff":"#111");g.textContent=glyph;svg.appendChild(g);
          }
        }
 node.appendChild(svg);
@@ -1092,8 +1099,9 @@ function renderValidation(){
      const p=window.EZ2Text.plan({...doc,
        marginLeftMM:printerMedia.marginLeftMM,marginRightMM:printerMedia.marginRightMM},
        {allowPlaceholders:true});
-     el.textContent="CP866: "+p.usedDots+" / 256 точек по высоте · "+
-       p.rows.length+" строк";el.classList.remove("error");
+     el.textContent="CP866: "+p.usedDots+" / 256 точек · "+p.rows.length+
+       " строк · X≈"+nativePreviewOrigin.leftMM+" мм, Y≈"+
+       nativePreviewOrigin.topMM+" мм (по G01)";el.classList.remove("error");
    }else{
      window.EZ2Raster.draw(doc); // Uses the same text-overflow checks as printing.
      const beyond=doc.elements.find(e=>e.xMM+e.widthMM>55||
@@ -1110,7 +1118,7 @@ function draw(){
  $("editorModeIndicator").textContent=doc.printMode==="text"?"Текст CP866":"Растр XY";
  $("propsTitle").textContent=selectedObj()?(doc.printMode==="text"?"Настройки строки":"Свойства объекта"):"Настройки макета";
  $("foot").textContent=doc.printMode==="text"?
-   "Текст CP866: строки отображаются и печатаются сверху вниз. Стрелки меняют их порядок; X/Y свободно не задаются. Форма букв приблизительная.":
+   "Текст CP866: размеры строк и символов калиброваны по G01/G02. Положение от края приблизительное, форма букв прошивки условная. Стрелки меняют порядок.":
    "Растр: перемещайте и масштабируйте объекты, точные координаты X/Y будут сохранены.";
  renderLayers();renderCanvas();renderProps();renderValidation();
  if($("samplePanel").open)renderSample();
