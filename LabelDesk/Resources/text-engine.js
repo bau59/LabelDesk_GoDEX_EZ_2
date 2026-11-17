@@ -130,6 +130,43 @@
       ...Array.from({length:count},(_,i)=>place(lines[i]||"")),
       glyphs.bl+glyphs.h.repeat(width-2)+glyphs.br];
   }
+  function tableLines(el){
+    const widths=String(el.tableWidths||"7,22,8").split(",").map(x=>Number(x.trim()));
+    if(widths.length<2||widths.length>4||
+       widths.some(n=>!Number.isInteger(n)||n<2||n>48))
+      throw Error("Таблица: укажите 2–4 ширины колонок от 2 до 48 символов через запятую");
+    const total=widths.reduce((a,b)=>a+b,0)+widths.length+1;
+    if(total>55)throw Error("Таблица шире 55 мм: "+total+" символов A00");
+    const source=String(el.value||"").split(/\r?\n/).filter(x=>x.trim()!=="");
+    if(!source.length)throw Error("Добавьте строки таблицы");
+    if(source.length>18)throw Error("Таблица: максимум 18 строк данных");
+    const rows=source.map((line,i)=>{
+      const cells=line.split("|").map(x=>x.trim());
+      if(cells.length!==widths.length)
+        throw Error("Строка таблицы "+(i+1)+": нужно "+widths.length+" колонки через |");
+      return cells;
+    });
+    const glyph={horizontal:"─",vertical:"│",top:["┌","┬","┐"],
+      mid:["├","┼","┤"],bottom:["└","┴","┘"]};
+    const border=parts=>parts[0]+widths.map((w,i)=>glyph.horizontal.repeat(w)+
+      (i===widths.length-1?parts[2]:parts[1])).join("");
+    const content=cells=>{
+      const wrapped=cells.map((cell,i)=>wrapText(cell,widths[i]));
+      const count=Math.max(1,...wrapped.map(x=>x.length));
+      return Array.from({length:count},(_,index)=>
+        glyph.vertical+widths.map((w,i)=>{
+          const value=wrapped[i][index]||"";
+          return value+" ".repeat(w-Array.from(value).length)+glyph.vertical;
+        }).join(""));
+    };
+    const out=[border(glyph.top)];
+    for(let i=0;i<rows.length;i++){
+      out.push(...content(rows[i]));
+      if(i===0&&rows.length>1&&el.tableHeader!==false)out.push(border(glyph.mid));
+    }
+    out.push(border(glyph.bottom));
+    return out;
+  }
   function plan(doc, options={}){
     if(!doc || doc.printMode!=="text")throw Error("Этот макет не является строковым");
     if(Math.abs(Number(doc.heightMM)-38)>0.001||Math.abs(Number(doc.gapMM)-2)>0.001)
@@ -144,7 +181,24 @@
     // sequential CR, never absolute canvas coordinates.
     for(const el of doc.elements){
       if(el.rotation && Number(el.rotation)!==0)throw Error("Поворот строки невозможен в EZ-2");
-      if(el.kind==="textFrame"){
+      if(el.kind==="textTable"){
+        const f=font("A00"); // Native box characters verified at A00 in G01/G02.
+        const lines=tableLines(el);
+        const x=Math.max(0,Number(el.xMM||0));
+        const usableWidth=Math.min(55,margins.width-x);
+        for(const line of lines){
+          if(Array.from(line).length>usableWidth)
+            throw Error("Таблица выходит за правую границу: "+line.length+" мм");
+          cp866(line);
+          const position=marginMM(el,Array.from(line).length,f.widthDots,
+            margins.width,margins.left);
+          rows.push({kind:"text",text:line,font:f,margin:position,
+            element:el,reverse:false});
+          usedDots+=f.heightDots;
+        }
+        continue;
+      }
+            if(el.kind==="textFrame"){
         const f=font(el.deviceFont||"A00");
         const x=Math.max(0,Number(el.xMM||0));
         if(x>=margins.width)throw Error("Рамка выходит за правую границу");
@@ -197,7 +251,18 @@
         usedDots+=f.heightDots;
       }
     }
-    if(usedDots>MAX_LAYOUT_DOTS)
+    // G02 physical sample: ESC V bar touches the following row with no gap.
+    // A single native A00 blank row provides 1.25 mm vertical separation.
+    for(let i=0;i<rows.length-1;i++){
+      if(rows[i].reverse){
+        rows.splice(i+1,0,{kind:"text",text:"",font:font("A00"),
+          margin:rows[i].margin,element:rows[i].element,
+          reverse:false,inverseSpacer:true});
+        usedDots+=10;
+        i++;
+      }
+    }
+        if(usedDots>MAX_LAYOUT_DOTS)
       throw Error("Строки могут выйти за высоту 38 мм ("+usedDots+
         " точек). Уменьшите шрифт или сократите текст.");
     return {rows,usedDots,barcode,margins};
