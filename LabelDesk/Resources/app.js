@@ -616,7 +616,6 @@
     if(!state.profile.portPath){note("Выберите RS-232 порт в настройках",true);return;}
     if(!one&&!window.confirm("Отправить "+jobs.length+" совместимых заданий? Несовместимые останутся в очереди."))return;
     state.running=true;state.stopRequested=false;renderQueue();
-    let firstRaster=true;
     for(const job of (one?jobs.slice(0,1):jobs)){
       if(state.stopRequested)break;
       let packet;
@@ -636,11 +635,9 @@
           base64:packet.base64,
           textMode,
           copies:Number(job.copies),
-          first:!textMode&&firstRaster,
           port:state.profile.portPath,
           delay:Number(state.profile.labelIntervalSeconds)
         });
-        if(!textMode)firstRaster=false;
         job.state="sent";job.errorMessage=null;
         log(result?.output||"В порт передано; физическая печать не подтверждена");
       }catch(e){
@@ -674,7 +671,7 @@
     log("ЭКСПЕРИМЕНТ штатной печати: "+test.description+", "+test.size+" байт");
     try{
       const result=await native("printJob",{
-        base64:test.base64,nativeTrial:true,copies:1,first:false,
+        base64:test.base64,nativeTrial:true,copies:1,
         port:state.profile.portPath,delay:Number(state.profile.labelIntervalSeconds)
       });
       log(result?.output||"Штатный тест передан в порт");
@@ -861,9 +858,20 @@
       await native("saveData",{key:"settings",json:JSON.stringify(settings)});
       state.profile=profile;
       state.settingsSnapshot=settings;
+      let printerInitError=null;
+      if(port){
+        try{
+          await native("initPrinter",{port});
+          log("Позиционирование при сохранении настроек: ESC q040");
+        }catch(error){
+          printerInitError=error.message;
+          log("Ошибка инициализации принтера: "+printerInitError);
+        }
+      }
       renderLibrary();renderQueue();renderSettings();renderEditorCompatibility();
       syncEditor();
-      note("Настройки сохранены: рулон "+checked.widthMM+"×"+checked.heightMM+" мм; отступы "+left+" / "+right+" мм");
+      note(printerInitError?"Настройки сохранены, но принтер не инициализирован: "+printerInitError:
+        "Настройки сохранены: рулон "+checked.widthMM+"×"+checked.heightMM+" мм; отступы "+left+" / "+right+" мм",!!printerInitError);
     }catch(e){note(e.message,true);}
   }
   async function installFoodPresets(){
@@ -889,6 +897,7 @@
     state.settingsSnapshot=settings;
   }
   async function bootstrap(){
+    let printerInitError=null;
     try {
       const info=await native("loadAll");
       state.templates=Array.isArray(info.templates)?info.templates:[];
@@ -899,6 +908,15 @@
       });
       state.profile={...defaultProfile(),...(info.settings?.profile||{})};
       state.settingsSnapshot=info.settings||{schemaVersion:1,snapToGrid:true};
+      if(state.profile.portPath){
+        try{
+          await native("initPrinter",{port:state.profile.portPath});
+          log("При запуске отправлена ESC q040: подача по этикеткам");
+        }catch(error){
+          printerInitError=error.message;
+          log("Ошибка инициализации принтера: "+printerInitError);
+        }
+      }
        dishesController?.bootstrap(info.items??info.dishes,info.itemFolders,info.printPresets);
       state.runtimePath=info.runtimePath||"";
     state.runtimeWarnings=Array.isArray(info.runtimeWarnings)?info.runtimeWarnings:[];
@@ -918,7 +936,8 @@
       renderLibrary();renderQueue();renderSettings();syncEditor();
       await refreshPorts();
       selectView(dishesController?"dishes":"editor");
-       note("LabelDesk готов. Блюда сохраняются отдельно от макетов.");
+       note(printerInitError?"Принтер не инициализирован: "+printerInitError:
+         "LabelDesk готов. Блюда сохраняются отдельно от макетов.",!!printerInitError);
     }catch(e){note("Не удалось загрузить данные: "+e.message,true);}
   }
 
