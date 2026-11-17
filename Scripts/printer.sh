@@ -48,6 +48,7 @@ if [[ "$MODE" == "init" ]]; then
   # Physically verified: after ESC q040, FEED finds the next label gap.
   # The setting is lost when the printer is powered off.
   printf '\033q040' >&3
+  /bin/sleep 0.1  # Give the USB-RS232 adapter time to transmit before closing.
   print "ESC q040 sent; tape not advanced"
   exit 0
 fi
