@@ -258,7 +258,7 @@
       const visible=lines.slice(0,limit);
       for(let i=0;i<limit;i++){
         // A space makes an empty reserved row a normal printable CR row.
-        const line=i<visible.length?visible[i]:" ";
+        const line=i<visible.length&&visible[i]!==""?visible[i]:" ";
         cp866(line);
         const position=marginMM(el,Array.from(line).length,f.widthDots,margins.width,margins.left);
         if(position<1 || position>55)
