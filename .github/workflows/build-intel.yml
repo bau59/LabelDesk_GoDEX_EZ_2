@@ -20,6 +20,7 @@ on:
       - feat/clear-catalog-print-library-111
       - feat/compact-print-presets-framed-text-112
       - feat/print-calibration-backup-ui-113
+      - feat/editor-one-label-test-print-114
   workflow_dispatch:
 
 permissions:
@@ -45,6 +46,7 @@ jobs:
           node --check LabelDesk/Resources/app.js
           node --check LabelDesk/Resources/diagnostics.js
           node Tests/PrinterDiagnosticsSmoke.js
+          node Tests/EditorSamplePrintSmoke.js
           node --check LabelDesk/Resources/dish-controller.js
           node --check LabelDesk/Resources/dish-engine.js
           node --check LabelDesk/Resources/text-engine.js
@@ -60,6 +62,7 @@ jobs:
           node Tests/CP866FoodSmoke.js
           node Tests/EditorGeometrySmoke.js
           node Tests/PrinterDiagnosticsSmoke.js
+          node Tests/EditorSamplePrintSmoke.js
 
   build-intel:
     name: Build x86_64 .app and .dmg
@@ -254,4 +257,4 @@ jobs:
             --repo "$GITHUB_REPOSITORY" \
             --target "$GITHUB_SHA" \
             --title "LabelDesk ${APP_VERSION}" \
-            --notes "LabelDesk 1.0.13 for Intel macOS 15+. Safety: corrupted JSON/templates now block loading instead of silently showing empty data, writes create rotating history copies, and Settings can create complete data snapshots and open backups. Packaged resource mismatches are reported and can be restored with backups of edited runtime files. Raster text and framed text refuse silent height clipping; editors show height/out-of-bounds alerts. Numeric inputs use consistent plus/minus steppers in the main app and editor. Catalog type selection is segmented, and the print page adds template search and whole-batch preflight. Presets can repair deleted item/template references, and confirmed immediate print targets only jobs from the chosen preset. The editor has catalog variable pickers and read-only previews populated from actual items. Settings adds explicitly selected, one-label-per-click diagnostic samples covering supported EZ-2 CP866/ASCII/box characters, resident fonts A00-A48, ESC V, native/raster Code 39/128/EAN-8/13, ruler grid, raster geometry, and symbol/size comparisons. The same production print encoders are used; no new media motion commands. Requires physical measurements/photos to calibrate actual glyph bitmaps and start position. Ad-hoc signed, not notarized."
+            --notes "LabelDesk 1.0.14 for Intel macOS 15+. Added one-click, one-label preview printing directly from the template editor. The action uses the current unsaved template snapshot with its literal bracketed placeholders, keeps the original template unmodified, checks printer media and command compilation, requires confirmation and an RS-232 port, then sends only that single normal queue job. Production validation for real catalog data remains unchanged. This build does not change any EZ-2 feed or positioning commands. Hardware glyph and geometry measurements still require a ruler for 1:1 preview calibration. Ad-hoc signed, not notarized."
