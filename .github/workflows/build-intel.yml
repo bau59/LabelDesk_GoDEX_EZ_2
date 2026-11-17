@@ -21,6 +21,7 @@ on:
       - feat/compact-print-presets-framed-text-112
       - feat/print-calibration-backup-ui-113
       - feat/editor-one-label-test-print-114
+      - feat/native-calibrated-preview-115
   workflow_dispatch:
 
 permissions:
@@ -47,6 +48,7 @@ jobs:
           node --check LabelDesk/Resources/diagnostics.js
           node Tests/PrinterDiagnosticsSmoke.js
           node Tests/EditorSamplePrintSmoke.js
+          node Tests/NativeCalibrationSmoke.js
           node --check LabelDesk/Resources/dish-controller.js
           node --check LabelDesk/Resources/dish-engine.js
           node --check LabelDesk/Resources/text-engine.js
@@ -63,6 +65,7 @@ jobs:
           node Tests/EditorGeometrySmoke.js
           node Tests/PrinterDiagnosticsSmoke.js
           node Tests/EditorSamplePrintSmoke.js
+          node Tests/NativeCalibrationSmoke.js
 
   build-intel:
     name: Build x86_64 .app and .dmg
@@ -257,4 +260,4 @@ jobs:
             --repo "$GITHUB_REPOSITORY" \
             --target "$GITHUB_SHA" \
             --title "LabelDesk ${APP_VERSION}" \
-            --notes "LabelDesk 1.0.14 for Intel macOS 15+. Added one-click, one-label preview printing directly from the template editor. The action uses the current unsaved template snapshot with its literal bracketed placeholders, keeps the original template unmodified, checks printer media and command compilation, requires confirmation and an RS-232 port, then sends only that single normal queue job. Production validation for real catalog data remains unchanged. This build does not change any EZ-2 feed or positioning commands. Hardware glyph and geometry measurements still require a ruler for 1:1 preview calibration. Ad-hoc signed, not notarized."
+            --notes "LabelDesk 1.0.15 for Intel macOS 15+. Native CP866 editor calibrated from real G01 and G02 label prints on 58x38 mm media: approximately 2 mm left and 1 mm top print-head origin are reflected in PREVIEW ONLY, not firmware positioning or feed commands. Resident A00-A48 display glyphs use confirmed cell widths and heights rather than small browser font glyphs. ESC V reversed rows display a black background with white text and insert a single A00 blank row between inverse and the next native line to prevent observed contact/overprint. Added editable native text TABLE with 2-4 configurable column widths, CP866 junctions and wrapped cells, a one-click native black headline, and native single/double/solid line with adjustable length. Legacy templates, raster printer engine and serial transport are unchanged. Physical validation of any additional print spacing and precise firmware glyph shapes remains necessary. Ad-hoc signed, not notarized."
