@@ -361,7 +361,9 @@ function newElem(kind){
    isVariable:!inverted&&["text","barcode","textFrame","framedText"].includes(kind),fieldName:"",barcodeType:"CODE128",
    frameChars:34,frameRows:0,frameStyle:"single",
     frameBorderMM:0.25,framePaddingMM:1.5,
+   fixedRows:doc.printMode==="text"&&kind==="text"?(inverted?1:2):undefined,
    renderMode:doc.printMode==="text"?"device":"auto",deviceFont:doc.printMode==="text"?"A00":"A11"};
+ if(e.fixedRows)e.heightMM=e.fixedRows*window.EZ2Text.font(e.deviceFont).heightDots/8;
  e.widthMM=Math.max(1,Math.min(e.widthMM,doc.widthMM-e.xMM));
  e.yMM=Math.min(e.yMM,Math.max(0,doc.heightMM-e.heightMM));
  checkpoint();doc.elements.push(e);selected=e.id;draw();commit();
@@ -821,7 +823,10 @@ function fontGallery(element,codes){
   const info=document.createElement("small");
   info.textContent=f.widthDots+"×"+f.heightDots+" точек"+(f.bold?" · жирный":"");
   button.append(swatch,name,info);
-  button.onclick=()=>{checkpoint();element.deviceFont=code;draw();commit();};
+  button.onclick=()=>{checkpoint();element.deviceFont=code;
+    if(Number.isInteger(element.fixedRows)&&element.fixedRows>0)
+      element.heightMM=element.fixedRows*f.heightDots/8;
+    draw();commit();};
   box.appendChild(button);
  }
  return box;
@@ -1026,6 +1031,48 @@ function renderProps(){
    root.appendChild(flow);
  }
  if(e.kind==="text"){
+   if(doc.printMode==="text"){
+     root.appendChild(prop("Ширина поля, мм",numInput(e.widthMM||55,n=>{
+       e.widthMM=n;
+     },1,55,1)));
+     if(Number.isInteger(e.fixedRows)&&e.fixedRows>=1){
+       root.appendChild(prop("Высота поля, строк",numInput(e.fixedRows,n=>{
+         e.fixedRows=Math.round(n);
+         e.heightMM=e.fixedRows*window.EZ2Text.font(e.deviceFont||"A00").heightDots/8;
+         renderProps();
+       },1,20,1)));
+       const height=document.createElement("p");height.className="hint";
+       const f=window.EZ2Text.font(e.deviceFont||"A00");
+       const pitch=(f.heightDots+(e.reversePrint?10:0))/8;
+       height.textContent="Фиксированная высота: "+e.fixedRows+" × "+
+         pitch.toFixed(2)+" мм = "+(e.fixedRows*pitch).toFixed(2)+
+         " мм"+(e.reversePrint?" (с интервалом после инверсии)":"")+
+         ". Текст переносится внутри поля; лишний текст блокирует печать, "+
+         "недостающие строки резервируются.";
+       root.appendChild(height);
+     }else{
+       const explanation=document.createElement("p");explanation.className="warn";
+       explanation.textContent="Старый макет: высота пока зависит от длины текста. "+
+         "Закрепите высоту, чтобы другие поля не сдвигались при заполнении.";
+       root.appendChild(explanation);
+       const fix=document.createElement("button");fix.type="button";
+       fix.textContent="Зафиксировать текущую высоту поля";
+       fix.onclick=()=>{
+         try{
+           const f=window.EZ2Text.font(e.deviceFont||"A00");
+           const capacity=Math.floor(Math.min(55,Math.max(1,Number(e.widthMM||55)),
+             55-Number(printerMedia.marginLeftMM||0)-
+             Number(printerMedia.marginRightMM||0)-Number(e.xMM||0))*8/f.widthDots);
+           const rows=window.EZ2Text.wrapText(String(e.prefix||"")+String(e.value||""),capacity).length;
+           if(rows>20)throw Error("Нужно более 20 строк. Уменьшите содержимое или шрифт.");
+           checkpoint();e.fixedRows=Math.max(1,rows);
+           e.heightMM=e.fixedRows*f.heightDots/8;
+           draw();commit();
+         }catch(error){window.alert(error.message);}
+       };
+       root.appendChild(fix);
+     }
+   }
    if(doc.printMode!=="text")
      root.appendChild(prop("Кегль, pt (для растра)",numInput(e.fontSize,n=>{e.fontSize=n;},5,52,1)));
    if(doc.printMode!=="text"){
