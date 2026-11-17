@@ -55,6 +55,18 @@ The **Каталог** page is for maintaining saved items. Saved positions can 
 
 The Intel Mac installer now includes `LabelDesk.icns`, generated at build time from `Scripts/make-icon.swift` with all expected 16–1024 px iconset representations. `CFBundleIconFile` points to that icon for Finder/Dock. Printer command transport and print dimensions are unchanged.
 
+## Measured native text calibration and objects (1.0.15)
+
+Physical G01/G02 test photographs on 58×38 mm media confirmed **A00 8×10 dots** = 1 mm character pitch × 1.25 mm row pitch, CP866 corner/tee/line glyph connection, and correct scaling of A02/A03/A04/A11/A21. The physical print-head starting position is approximately 2 mm from the left edge and 1 mm from the top edge. These offsets have been introduced **only in editor preview**, never into serial commands, ESC Mnn or label feeding. The firmware's individual glyph bitmaps remain approximate in the browser.
+
+The **Текст CP866** editor has three practical native objects:
+
+- **Таблица**: enter one row per line, split cells using `|`, and specify 2–4 column widths in characters (e.g. `7,22,8`). A complete single-line CP866 outline and column junctions are compiled with fixed A00 cells. Text inside cells wraps automatically; excessive rows/widths are rejected before printing. Only the header is separated by a horizontal rule by default.
+- **Чёрная плашка**: a native text row with `ESC V` inversion, not raster. When more content follows a reversed row, a 10-dot blank A00 line is inserted so the next line doesn't touch the black fill, as observed in G02.
+- **Линия CP866**: adjustable A00 length and single `─`, double `═` or full `█` symbol styles. No slower raster rectangles.
+
+For native text, physical Y positioning still proceeds by consecutive CR lines and resident-font heights; freely dragging elements along Y is intentionally unsupported. Existing templates are read without migration. Print geometry remains bounded by the confirmed 256-dot native row budget.
+
 ## Editor sample print (1.0.14)
 
 Open an existing or new label in **Редактор этикеток** and click **Пробная печать · 1 шт.** next to **Сохранить макет**.
