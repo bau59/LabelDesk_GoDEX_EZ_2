@@ -169,6 +169,10 @@ body[data-editor-mode="text"] #label{border-color:#c0c8d2}
 .text-preview-row{position:absolute;z-index:2;overflow:visible;cursor:pointer}
 .text-preview-row svg{display:block;width:100%;height:100%;overflow:visible}
 .text-preview-row.is-reverse{background:#111}
+.native-fixed-field{position:absolute;z-index:3;pointer-events:none;box-sizing:border-box;
+ border:1px dashed #91a4bb;background:#8ea6c00d;border-radius:1px}
+.native-fixed-field.selected{border:2px solid #2e4768;background:#8ea6c014}
+.native-fixed-field.overflow{border:2px solid #bb3542;background:#ef354216}
 .text-preview-row:hover{outline:1px dashed #8194aa}
 .text-preview-row.sel{outline:2px solid #233149;background:#e7eef758}
 .text-preview-error{position:absolute;z-index:7;left:6px;right:6px;bottom:6px;
@@ -442,7 +446,9 @@ function renderTextFlow(canvas,scale,widthMM){
    // wrapping and horizontal margins reflect the selected resident font.
    const layout=window.EZ2Text.plan({...doc,
      marginLeftMM:printerMedia.marginLeftMM,
-     marginRightMM:printerMedia.marginRightMM},{allowPlaceholders:true});
+     marginRightMM:printerMedia.marginRightMM},
+     {allowPlaceholders:true,allowOverflowPreview:true});
+   const fixedAreas=new Map();
    let at=0;
    for(const row of layout.rows){
      const barcode=row.kind==="barcode";
@@ -451,6 +457,19 @@ function renderTextFlow(canvas,scale,widthMM){
      const dots=barcode?(55-layout.margins.left-layout.margins.right)*8:
        Math.max(1,chars*metrics.widthDots);
      const x=barcode?layout.margins.left:(row.margin-1);
+     if(!barcode&&row.element.kind==="text"&&
+        Number.isInteger(row.element.fixedRows)&&row.element.fixedRows>=1){
+       const element=row.element;
+       if(!fixedAreas.has(element.id)){
+         fixedAreas.set(element.id,{
+           x:Number(element.xMM||0)+layout.margins.left+nativePreviewOrigin.leftMM,
+           y:at/8+nativePreviewOrigin.topMM,
+           width:Math.max(1,Number(element.widthMM||55)),
+           heightDots:0,element
+         });
+       }
+       fixedAreas.get(element.id).heightDots+=metrics.heightDots;
+     }
      const node=document.createElement("div");
      node.className="text-preview-row"+(selected===row.element.id?" sel":"");
      node.style.left=((x+nativePreviewOrigin.leftMM)*scale)+"px";
@@ -533,6 +552,28 @@ node.appendChild(svg);
      canvas.appendChild(node);
      at+=metrics.heightDots;
    }
+   const overflowIDs=new Set((layout.issues||[]).map(issue=>issue.elementID));
+   for(const area of fixedAreas.values()){
+     const boundary=document.createElement("div");
+     boundary.className="native-fixed-field"+
+       (selected===area.element.id?" selected":"")+
+       (overflowIDs.has(area.element.id)?" overflow":"");
+     boundary.style.left=(area.x*scale)+"px";
+     boundary.style.top=(area.y*scale)+"px";
+     boundary.style.width=(area.width*scale)+"px";
+     boundary.style.height=(area.heightDots/8*scale)+"px";
+     boundary.title="Фиксированное поле: "+area.element.fixedRows+
+       " строк · "+(area.heightDots/8).toFixed(2)+" мм";
+     canvas.appendChild(boundary);
+   }
+   if(layout.issues?.length){
+     const warning=document.createElement("div");
+     warning.className="text-preview-error";
+     warning.textContent="Не помещается в поле: "+
+       layout.issues.map(issue=>issue.message).join("\n")+
+       "\nПечать запрещена до исправления.";
+     canvas.appendChild(warning);
+   }
    for(const g of [{width:layout.margins.left,x:0},
      {width:layout.margins.right,x:55-layout.margins.right}]){
      if(!g.width)continue;
@@ -554,7 +595,7 @@ node.appendChild(svg);
 }
 
 function renderCanvas(){
- const el=$("label");el.querySelectorAll(".obj,.printzone,.mediazone,.marginguide,.text-preview-row,.text-preview-error").forEach(n=>n.remove());if(!doc)return;
+ const el=$("label");el.querySelectorAll(".obj,.printzone,.mediazone,.marginguide,.text-preview-row,.text-preview-error,.native-fixed-field").forEach(n=>n.remove());if(!doc)return;
  if(zoomMode==="fit"){
    const desk=$("desk");
    const usableWidth=Math.max(220,desk.clientWidth-100);
@@ -1207,7 +1248,7 @@ function renderValidation(){
      if(beyond)throw Error("Объект за пределами 55×35 мм печати.");
      el.textContent="Растр: объекты внутри 55×35 мм";el.classList.remove("error");
    }
- }catch(e){el.textContent=e.message;el.classList.add("error");}
+ }catch(e){el.textContent=e.message;el.title=e.message;el.classList.add("error");}
 }
 function draw(){
  if(!doc)return;
