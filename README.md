@@ -2,6 +2,12 @@
 
 **1.0.13 WebKit/zsh release (data safety, consistent inputs, printable EZ-2 calibration atlas).** No Node.js, Python, pip, npm, HTTP server or external dependencies are needed on the user's Mac. The system frameworks AppKit/WebKit and system commands `/bin/zsh`, `/bin/stty`, `/bin/cat` and `printf` handle the application and RS-232.
 
+## AI catalog fill (1.0.18)
+
+The **AI-заполнение** dialog works within the existing item catalog. It discovers standard fields directly from the item form and offers already-used custom field names in the current folder. Folders are groupings, not product category dictionaries.
+
+Select fields, copy a photo/text prompt, use ChatGPT separately, then paste the returned JSON. Invalid types and values fail atomically. Unknown or unselected fields trigger warnings, while null and omitted values preserve existing data. Imported changes affect only the unsaved form; original Save remains responsible for persistence. Selection is stored locally. No external AI API or printer commands were added.
+
 ## Runtime layout
 
 After the initial macOS installation, the following files are copied into the user's existing LabelDesk application-support directory:

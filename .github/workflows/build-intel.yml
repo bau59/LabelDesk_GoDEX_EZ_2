@@ -63,6 +63,7 @@ jobs:
           node Tests/MediaCompatibilitySmoke.js
           node Tests/SidebarWorkflowSmoke.js
           node Tests/DishCatalogSmoke.js
+          node Tests/AICatalogSmoke.js
           node Tests/BarcodesNativeSmoke.js
           node Tests/CP866FoodSmoke.js
           node Tests/EditorGeometrySmoke.js
@@ -194,6 +195,7 @@ jobs:
           node Tests/MediaCompatibilitySmoke.js
           node Tests/SidebarWorkflowSmoke.js
           node Tests/DishCatalogSmoke.js
+          node Tests/AICatalogSmoke.js
           node Tests/BarcodesNativeSmoke.js
           node Tests/CP866FoodSmoke.js
           zsh -n Scripts/printer.sh
@@ -265,4 +267,4 @@ jobs:
             --repo "$GITHUB_REPOSITORY" \
             --target "$GITHUB_SHA" \
             --title "LabelDesk ${APP_VERSION}" \
-            --notes "LabelDesk 1.0.17 for Intel macOS 15+. Fixed-height native CP866 text fields: each new text field has configurable width in mm and independent fixed height in resident-font rows. Text wraps inside the allocated field; unused rows are reserved so later fields remain in place even as catalog values change. Extra content raises an explicit overflow error and blocks print instead of truncating. Editor preview shows fixed-height field borders and errors. Missing catalog values leave blank slots without printing prefixes. Legacy templates without fixedRows stay auto-height until user explicitly chooses to fix their field height. Fixed inverse fields also reserve spacing. Previous RS-232 framing, sensor, label-pitch and feed commands unchanged. Ad-hoc signed, not notarized."
+            --notes "LabelDesk 1.0.18 for Intel macOS 15+. Manual AI-assisted catalog fill: choose existing item and custom fields, copy a ChatGPT prompt, validate JSON and apply results to an unsaved item. No AI API, printer command or saving changes. Ad-hoc signed, not notarized."

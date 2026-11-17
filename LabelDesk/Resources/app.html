@@ -522,6 +522,34 @@ input[type="number"]::-webkit-inner-spin-button,input[type="number"]::-webkit-ou
 .preset-repair-options{display:flex;flex-wrap:wrap;gap:5px;margin-top:6px}
 .preset-repair-options button{font-size:11px;padding:6px 9px}
 
+
+/* AI catalog fill dialog: scoped to the item editor. */
+.ai-fill-overlay[hidden]{display:none}
+.ai-fill-overlay{position:fixed;inset:0;z-index:1500;background:#152033a8;
+  display:grid;place-items:center;padding:18px}
+.ai-fill-panel{width:min(860px,100%);max-height:92vh;overflow:auto;background:#fff;
+  border-radius:14px;border:1px solid #dae0e8;box-shadow:0 30px 90px #11182755;padding:22px}
+.ai-fill-top,.ai-fill-actions{display:flex;align-items:center;justify-content:space-between;
+  gap:10px;flex-wrap:wrap}
+.ai-fill-top h3{margin:0;font-size:18px}
+.ai-fill-section{margin-top:18px;padding-top:17px;border-top:1px solid #e6eaf0}
+.ai-fill-section h4{font-size:14px;margin:0 0 6px}
+.ai-fill-help{font-size:12px;color:#64748b;margin:4px 0 10px}
+.ai-field-list{display:grid;grid-template-columns:repeat(2,minmax(0,1fr));
+  gap:6px;margin:12px 0;max-height:240px;overflow:auto}
+.ai-field{display:flex;align-items:flex-start;gap:8px;padding:8px 9px;
+  border:1px solid #e4e8ee;border-radius:7px;font-size:12px;cursor:pointer}
+.ai-field input{margin-top:3px;accent-color:#2563eb}
+.ai-field strong,.ai-field small{display:block}
+.ai-field small{font-size:10px;color:#64748b;margin-top:2px}
+.ai-fill-panel textarea{display:block;width:100%;min-height:150px;resize:vertical;
+  font:12px/1.5 ui-monospace,Menlo,Consolas,monospace}
+.ai-fill-feedback{font-size:12px;white-space:pre-wrap;color:#b42318;margin-top:11px;
+  max-height:155px;overflow:auto}
+.ai-fill-feedback.ok{color:#236748}
+.ai-fill-inline{display:inline-flex;align-items:center;gap:7px;font-size:12px}
+@media(max-width:640px){.ai-field-list{grid-template-columns:1fr}
+  .ai-fill-panel{padding:15px}.ai-fill-overlay{padding:8px}}
 </style>
 </head>
 <body>
@@ -570,7 +598,7 @@ input[type="number"]::-webkit-inner-spin-button,input[type="number"]::-webkit-ou
         <div id="dishList" class="catalog-record-list"></div>
       </div>
       <div id="catalogEditor" class="card" hidden>
-        <div class="section-head"><div><h3 id="dishFormTitle">Новая позиция</h3><p class="muted">Заполните только нужные поля. Остальные не попадут на этикетку.</p></div><span class="muted" id="dishFormHint">Поля независимы от шаблонов</span></div>
+        <div class="section-head"><div><h3 id="dishFormTitle">Новая позиция</h3><p class="muted">Заполните только нужные поля. Остальные не попадут на этикетку.</p></div><div class="flex"><button id="openAIFill" type="button">AI-заполнение</button><span class="muted" id="dishFormHint">Поля независимы от шаблонов</span></div></div>
         <div id="dishFields" class="fields">
           <div class="field item-folder-field"><label>Папка каталога</label>
             <div id="itemFolderPicker" class="item-folder-picker"></div></div>
@@ -828,6 +856,35 @@ input[type="number"]::-webkit-inner-spin-button,input[type="number"]::-webkit-ou
     </div>
   </section>
 </main>
+
+<div id="aiFillDialog" class="ai-fill-overlay" role="dialog" aria-modal="true" aria-label="AI-заполнение карточки" hidden>
+  <div class="ai-fill-panel">
+    <div class="ai-fill-top"><h3>AI-заполнение карточки</h3>
+      <button id="aiClose" type="button" aria-label="Закрыть окно">✕ Закрыть</button></div>
+    <section class="ai-fill-section">
+      <h4>1. Генерация промпта</h4>
+      <p class="ai-fill-help">Выберите поля из текущей карточки. При наличии пользовательских полей они также доступны. Фото и текст отправьте в ChatGPT самостоятельно.</p>
+      <div class="ai-fill-actions"><span id="aiFieldCount" class="muted"></span>
+        <div class="flex"><button id="aiSelectAll" type="button">Выбрать все</button>
+          <button id="aiResetSelection" type="button">Сбросить</button></div></div>
+      <div id="aiFieldList" class="ai-field-list"></div>
+      <label class="ai-fill-inline"><input id="aiIncludeCurrent" type="checkbox">
+        Включить текущие значения выбранных полей</label>
+      <div class="ai-fill-actions" style="margin-top:12px">
+        <button id="aiCopyPrompt" class="primary" type="button">Скопировать промпт</button></div>
+    </section>
+    <section class="ai-fill-section">
+      <h4>2. Импорт JSON</h4>
+      <p class="ai-fill-help">Вставьте JSON из чата. Проверка не сохраняет товар и не отправляет его на печать.</p>
+      <textarea id="aiJSON" aria-label="JSON из ChatGPT" spellcheck="false" placeholder='{"name":"Название товара","weightG":250}'></textarea>
+      <div class="ai-fill-actions" style="margin-top:12px">
+        <button id="aiValidate" class="primary" type="button">Проверить и заполнить</button>
+        <button id="aiCopyErrors" type="button" disabled>Скопировать ошибки для ChatGPT</button>
+      </div>
+      <div id="aiFillFeedback" class="ai-fill-feedback" aria-live="polite"></div>
+    </section>
+  </div>
+</div>
 <footer><span id="notify">Загрузка…</span><span id="portStatus">Порт не выбран</span></footer>
 </div>
 <script src="barcodes.js"></script>

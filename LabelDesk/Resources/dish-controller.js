@@ -470,9 +470,9 @@
       if(dirty&&!window.confirm("Карточка не сохранена. Отменить изменения?"))return;
       chosenID=dish.id;draft=clone(dish);dirty=false;formOpen=true;editForm();renderSidebar();
     }
-    function validateDish(dish){
+    function validateDish(dish,{allowMissingName=false}={}){
       dish.name=String(dish.name||"").trim();
-      if(!dish.name)throw Error("Укажите название позиции");
+      if(!dish.name&&!allowMissingName)throw Error("Укажите название позиции");
       if(dish.name.length>140)throw Error("Название слишком длинное (максимум 140)");
       if(!["food","product","other"].includes(dish.kind))dish.kind="product";
       const custom=Array.isArray(dish.customFields)?dish.customFields:[];
@@ -610,6 +610,18 @@
       $("batchProducedAt").value=localDateTime();
       render();
     }
+    // AI fills the existing draft only. Normal saveDish remains the single persistence path.
+    root.EZ2AIFill?.mount({
+      form:$("dishFields"),dialog:$("aiFillDialog"),
+      getDraft:()=>draft,getItems:()=>dishes,
+      getFolderName:()=>draft?.folderID?folderName(draft.folderID):"",
+      apply:updated=>{
+        draft=updated;dirty=true;editForm();
+        $("dishFormHint").textContent="Есть несохранённые изменения";
+      },
+      validate:item=>validateDish(item,{allowMissingName:true}),
+      uuid,clone,note
+    });
     // Named buttons and delegated table events are independent from the legacy template UI.
     $("newDishMain").addEventListener("click",newDish);
     $("closeDishEditor").addEventListener("click",()=>{
@@ -858,4 +870,263 @@
     return {bootstrap,render,renderPrint,selectCurrentForPrint,listItems:()=>clone(dishes)};
   }
   root.EZ2DishController={create};
+})(typeof window!=="undefined"?window:globalThis);
+
+/* AI-assisted catalog form fill via copy/paste. No network requests or persistence. */
+(function(root){
+  "use strict";
+  const STORAGE_KEY="labeldesk-ai-fields-v1";
+  const DEFAULT_KEYS=new Set(["name","weightG","kcal","protein","fat","carbs",
+    "ingredients","allergens","shelfLifeHours","storage","manufacturer"]);
+  const normalize=s=>String(s??"").trim().toLocaleLowerCase("ru-RU");
+  const escapeHTML=s=>String(s??"").replace(/[&<>"']/g,c=>
+    ({"&":"&amp;","<":"&lt;",">":"&gt;",'"':"&quot;","'":"&#39;"}[c]));
+  const isObject=x=>x!==null&&typeof x==="object"&&!Array.isArray(x);
+  const customID=name=>"custom:"+normalize(name);
+
+  // The live form owns standard field names, labels, types and enum values.
+  function discoverFields(form,draft,items){
+    const fields=Array.from(form.querySelectorAll("[data-dish]")).map(el=>{
+      const key=el.dataset.dish;
+      const label=form.querySelector('label[for="'+el.id+'"]');
+      const title=String(label?.textContent||key).trim().replace(/\s*\*\s*$/,"");
+      const type=el.tagName==="SELECT"?"enum":el.type==="number"?"number":"string";
+      const values=type==="enum"?Array.from(el.options).map(o=>({value:o.value,label:o.textContent.trim()})):[];
+      return {id:key,key,title,type,required:!!el.required||/\*/.test(label?.textContent||""),
+        values,min:el.min===""?null:Number(el.min),max:el.max===""?null:Number(el.max)};
+    });
+    const names=new Map();
+    const add=f=>{
+      if(!f||!String(f.name||"").trim())return;
+      const name=String(f.name).trim(),id=customID(name);
+      if(!names.has(id))names.set(id,{id,key:"customFields",name,title:name,
+        type:"string",required:false,custom:true,values:[],min:null,max:5000});
+    };
+    for(const f of draft?.customFields||[])add(f);
+    // A folder is not a category. Reuse only attribute names already recorded
+    // in the currently selected folder, never invent a taxonomy.
+    if(draft?.folderID){
+      for(const item of items||[]){
+        if(String(item.folderID||"")===String(draft.folderID))
+          for(const f of item.customFields||[])add(f);
+      }
+    }
+    return fields.concat(Array.from(names.values()));
+  }
+
+  function buildPrompt(fields,chosen,draft,folderName,includeCurrent){
+    const selected=fields.filter(f=>chosen.has(f.id));
+    if(!selected.length)throw Error("Выберите хотя бы одно поле");
+    const standard=selected.filter(f=>!f.custom),custom=selected.filter(f=>f.custom);
+    const schema={};
+    for(const f of standard)schema[f.key]=null;
+    if(custom.length)schema.customFields=custom.map(f=>({name:f.name,value:null}));
+    const descriptions=standard.map(f=>{
+      const allowed=f.type==="enum"?" Допустимые значения: "+
+        f.values.map(x=>JSON.stringify(x.value)+" ("+x.label+")").join(", ")+".":"";
+      const min=f.type==="number"&&f.min!==null?" Минимум: "+f.min+".":"";
+      const max=f.type==="number"&&f.max!==null?" Максимум: "+f.max+".":"";
+      const bound=f.key==="name"?" Максимум 140 символов.":"";
+      return "- "+f.title+" — ключ "+JSON.stringify(f.key)+", тип "+f.type+
+        (f.required?", обязательное поле":", необязательное поле")+". "+allowed+min+max+bound;
+    });
+    if(custom.length)descriptions.push("- customFields — массив объектов {name, value}. "+
+      "Разрешены только имена: "+custom.map(f=>JSON.stringify(f.name)).join(", ")+
+      ". value: строка или null, до 5000 символов.");
+    const lines=[
+      "Заполни карточку товара по приложенным фотографиям упаковки, скриншотам и/или тексту.",
+      "Используй только подтверждённые сведения, различимые в исходных материалах.",
+      "Название, состав и текстовые характеристики пиши на русском языке.",
+      "Не придумывай производителя, штрихкод, сроки хранения, массу, КБЖУ и другие отсутствующие факты.",
+      "Не создавай новые поля, имена характеристик, категории или значения справочников.",
+      "Если значение неизвестно, поставь null. Все числа — JSON number, без единиц измерения.",
+      "Ответ: только один валидный JSON-объект, без Markdown и пояснений.",
+      "Не добавляй id, folderID, updatedAt или другие системные поля.",
+      "Доступные поля и ограничения:",
+      ...descriptions,
+      "Форма результата (ключи и структура строго такие):",
+      JSON.stringify(schema,null,2)
+    ];
+    if(folderName)lines.splice(1,0,"Контекст: папка каталога «"+folderName+
+      "». Это группировка, а не справочник категорий.");
+    if(includeCurrent){
+      const current={};
+      for(const f of standard)current[f.key]=draft?.[f.key]??null;
+      if(custom.length)current.customFields=custom.map(f=>{
+        const old=(draft?.customFields||[]).find(x=>normalize(x.name)===normalize(f.name));
+        return {name:f.name,value:old?.value??null};
+      });
+      lines.push("Текущие значения для сверки (не считай их доказанными, если им противоречит источник):");
+      lines.push(JSON.stringify(current,null,2));
+    }
+    return lines.join("\n");
+  }
+
+  function validateJSON(raw,fields,chosen,draft,clone,uuid,validate){
+    const errors=[],warnings=[],standard=new Map(fields.filter(f=>!f.custom).map(f=>[f.key,f]));
+    const allowed=new Map(fields.filter(f=>f.custom&&chosen.has(f.id)).map(f=>[f.id,f]));
+    let data;
+    try{data=JSON.parse(raw);}catch(e){
+      return {errors:["JSON: "+e.message],warnings,candidate:null,changed:0};
+    }
+    if(!isObject(data))return {errors:["Корень JSON должен быть объектом"],warnings,candidate:null,changed:0};
+    const candidate=clone(draft);
+    candidate.customFields=Array.isArray(candidate.customFields)?candidate.customFields:[];
+    let changed=0;
+    for(const [key,value] of Object.entries(data)){
+      if(key==="customFields"){
+        if(!allowed.size){warnings.push("customFields: поля не выбраны — пропущено");continue;}
+        if(value===null)continue;
+        if(!Array.isArray(value)){errors.push("customFields: ожидается массив");continue;}
+        const seen=new Set();
+        for(let i=0;i<value.length;i++){
+          const item=value[i],path="customFields["+i+"]";
+          if(!isObject(item)){errors.push(path+": ожидается объект");continue;}
+          for(const extra of Object.keys(item))
+            if(extra!=="name"&&extra!=="value")warnings.push(path+"."+extra+": неизвестный ключ — пропущен");
+          if(typeof item.name!=="string"||!item.name.trim()){
+            errors.push(path+".name: нужна строка с именем поля");continue;
+          }
+          const id=customID(item.name);
+          if(seen.has(id)){errors.push(path+".name: повторяется «"+item.name+"»");continue;}
+          seen.add(id);
+          const field=allowed.get(id);
+          if(!field){warnings.push(path+".name: поле «"+item.name+"» не выбрано — пропущено");continue;}
+          if(!Object.hasOwn(item,"value")){errors.push(path+".value: отсутствует ключ");continue;}
+          if(item.value===null)continue;
+          if(typeof item.value!=="string"){
+            errors.push(path+".value: ожидается строка или null");continue;
+          }
+          if(item.value.length>5000){
+            errors.push(path+".value: максимум 5000 символов");continue;
+          }
+          const old=candidate.customFields.find(x=>customID(x.name)===id);
+          if(old)old.value=item.value;
+          else candidate.customFields.push({id:uuid(),name:field.name,value:item.value});
+          changed++;
+        }
+        continue;
+      }
+      const field=standard.get(key);
+      if(!field){warnings.push(key+": неизвестный ключ — пропущен");continue;}
+      if(!chosen.has(field.id)){warnings.push(key+": поле не выбрано — пропущено");continue;}
+      if(value===null)continue;
+      if(field.type==="number"){
+        if(typeof value!=="number"||!Number.isFinite(value)){
+          errors.push(key+": ожидается число или null");continue;
+        }
+        candidate[key]=String(value);
+      }else if(typeof value!=="string"){
+        errors.push(key+": ожидается строка или null");continue;
+      }else if(field.type==="enum"&&!field.values.some(v=>v.value===value)){
+        errors.push(key+": недопустимое значение «"+value+"»");continue;
+      }else candidate[key]=value;
+      changed++;
+    }
+    if(!errors.length){
+      try{validate(clone(candidate));}
+      catch(e){errors.push("Карточка: "+e.message);}
+    }
+    // All-null values and ignored keys are a valid no-op; never dirty the form.
+    return {candidate:errors.length?null:candidate,errors,warnings,changed:errors.length?0:changed};
+  }
+
+  async function copyText(value){
+    if(root.navigator?.clipboard?.writeText){
+      try{await root.navigator.clipboard.writeText(value);return;}catch(_){}
+    }
+    const area=document.createElement("textarea");
+    area.value=value;area.style.position="fixed";area.style.opacity="0";
+    document.body.appendChild(area);area.focus();area.select();
+    const copied=document.execCommand("copy");
+    area.remove();
+    if(!copied)throw Error("Не удалось скопировать. Выделите текст вручную.");
+  }
+
+  function mount(config){
+    const {form,dialog,getDraft,getItems,getFolderName,apply,validate,uuid,clone,note}=config;
+    const $=id=>document.getElementById(id);
+    let fields=[],chosen=new Set(),lastErrors=[],lastJSON="";
+    const readSelection=()=>{
+      try{
+        const raw=localStorage.getItem(STORAGE_KEY);
+        if(raw!==null){
+          const ids=JSON.parse(raw);
+          if(Array.isArray(ids))return new Set(ids.filter(x=>typeof x==="string"));
+        }
+      }catch(_){}
+      return new Set(fields.filter(f=>DEFAULT_KEYS.has(f.key)||f.custom&&
+        (getDraft()?.customFields||[]).some(x=>customID(x.name)===f.id)).map(f=>f.id));
+    };
+    const saveSelection=()=>{try{localStorage.setItem(STORAGE_KEY,JSON.stringify([...chosen]));}catch(_){}};
+    const showFeedback=(messages,ok=false)=>{
+      const el=$("aiFillFeedback");
+      el.textContent=messages.join("\n");el.classList.toggle("ok",ok);
+      $("aiCopyErrors").disabled=!lastErrors.length;
+    };
+    const renderFields=()=>{
+      $("aiFieldList").innerHTML=fields.map(f=>
+        '<label class="ai-field"><input type="checkbox" data-ai-field="'+escapeHTML(f.id)+
+        '" '+(chosen.has(f.id)?"checked":"")+'><span><strong>'+escapeHTML(f.title)+
+        '</strong><small>'+escapeHTML(f.custom?"Свое поле · customFields":f.key+" · "+
+        (f.type==="enum"?"список":f.type==="number"?"число":"текст")+
+        (f.required?" · обязательное":""))+'</small></span></label>').join("");
+      $("aiFieldCount").textContent="Выбрано: "+fields.filter(f=>chosen.has(f.id)).length;
+    };
+    const close=()=>{dialog.hidden=true;};
+    $("openAIFill").addEventListener("click",()=>{
+      fields=discoverFields(form,getDraft(),getItems());
+      chosen=readSelection();
+      dialog.hidden=false;lastErrors=[];lastJSON="";
+      $("aiJSON").value="";$("aiIncludeCurrent").checked=false;
+      showFeedback([]);renderFields();
+    });
+    $("aiClose").addEventListener("click",close);
+    dialog.addEventListener("click",e=>{if(e.target===dialog)close();});
+    dialog.addEventListener("keydown",e=>{if(e.key==="Escape"){e.preventDefault();close();}});
+    $("aiFieldList").addEventListener("change",e=>{
+      const id=e.target.dataset.aiField;
+      if(!id)return;
+      if(e.target.checked)chosen.add(id);else chosen.delete(id);
+      saveSelection();renderFields();
+    });
+    $("aiSelectAll").addEventListener("click",()=>{
+      chosen=new Set(fields.map(f=>f.id));saveSelection();renderFields();
+    });
+    $("aiResetSelection").addEventListener("click",()=>{
+      chosen.clear();saveSelection();renderFields();
+    });
+    $("aiCopyPrompt").addEventListener("click",async()=>{
+      try{
+        const prompt=buildPrompt(fields,chosen,getDraft(),getFolderName(),
+          $("aiIncludeCurrent").checked);
+        await copyText(prompt);showFeedback(["Промпт скопирован"]);
+      }catch(e){showFeedback([e.message]);}
+    });
+    $("aiValidate").addEventListener("click",()=>{
+      lastJSON=$("aiJSON").value.trim();
+      const result=validateJSON(lastJSON,fields,chosen,getDraft(),clone,uuid,validate);
+      lastErrors=result.errors;
+      if(result.errors.length){
+        showFeedback(result.errors.concat(result.warnings.map(s=>"Предупреждение: "+s)));return;
+      }
+      if(!result.changed){
+        showFeedback(["Нет значений для изменения. Карточка не изменена."].concat(
+          result.warnings.map(s=>"Предупреждение: "+s)),true);return;
+      }
+      apply(result.candidate);
+      showFeedback(["Заполнено полей: "+result.changed+". Товар не сохранён."].concat(
+        result.warnings.map(s=>"Предупреждение: "+s)),true);
+    });
+    $("aiCopyErrors").addEventListener("click",async()=>{
+      if(!lastErrors.length)return;
+      const message="Исправь JSON для карточки товара. Сохрани все достоверные исходные сведения. "+
+        "Не добавляй неразрешённые поля. Верни только исправленный JSON без Markdown.\n"+
+        "Ошибки:\n"+lastErrors.map(x=>"- "+x).join("\n")+"\nИсходный JSON:\n"+lastJSON;
+      try{await copyText(message);showFeedback(["Ошибки и JSON скопированы"].concat(lastErrors));}
+      catch(e){showFeedback([e.message].concat(lastErrors));}
+    });
+  }
+
+  root.EZ2AIFill={discoverFields,buildPrompt,validateJSON,mount};
 })(typeof window!=="undefined"?window:globalThis);
