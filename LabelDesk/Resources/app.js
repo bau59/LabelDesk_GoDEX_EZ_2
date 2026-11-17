@@ -116,6 +116,7 @@
     }[view]||"LabelDesk";
     $("newTemplate").hidden=view!=="editor"||!editorEditing;
     $("saveTemplate").hidden=view!=="editor"||!editorEditing;
+    $("printEditorSample").hidden=view!=="editor"||!editorEditing;
     document.querySelectorAll("nav [data-view]").forEach(b=>b.classList.toggle("active",b.dataset.view===view));
     document.querySelectorAll("main .view").forEach(v=>v.classList.toggle("active",v.id===view+"View"));
     $("saveTemplate").disabled=view!=="editor";
@@ -502,6 +503,43 @@
     await native("saveData",{key:"queue",json:JSON.stringify(jobs)});
     state.jobs=jobs;renderQueue();
     return job.id;
+  }
+  async function printEditorSample(){
+    if(!editorEditing||!state.current){
+      note("Сначала откройте этикетку в редакторе",true);return;
+    }
+    if(state.running){note("Принтер уже выполняет другое задание",true);return;}
+    if(!state.profile.portPath){note("Укажите RS-232 порт в настройках",true);return;}
+
+    // The test prints the exact *unsaved* editor text, including [VARIABLES].
+    // Only the disposable print snapshot drops the food starter-pack guard;
+    // saved template data and regular catalog/batch validation remain unchanged.
+    const sample=clone(state.current);
+    if(!Array.isArray(sample.elements)||!sample.elements.length){
+      note("Макет пустой: добавьте текст или фигуру",true);return;
+    }
+    delete sample.starterPack;
+    sample.name="Проба макета · "+String(sample.name||"Без названия");
+    try{
+      const check=compatibility(sample);
+      if(!check.ok)throw Error("Не подходит установленный рулон: "+check.reason);
+      if(!EZ2Raster.transportReady(media()))throw Error("Для этого рулона нет проверенного режима печати");
+      encodeJob(sample,1); // physical layout and CP866 character preflight
+      if(!window.confirm("Напечатать 1 этикетку прямо из редактора?\n"+
+        "Печатаются текущие надписи и [ПЕРЕМЕННЫЕ] как обычный текст.\n"+
+        "Изменения шаблона НЕ сохраняются. Другие задания очереди не запускаются."))return;
+      $("printEditorSample").disabled=true;
+      const jobID=await queueDocument(sample,1);
+      await printQueue(true,[jobID]);
+      const job=state.jobs.find(j=>j.id===jobID);
+      if(job?.state==="sent")note("Пробный макет передан в принтер. Проверьте наклейку.");
+      else if(job?.state==="uncertain")note("Результат передачи неизвестен. Проверьте ленту.",true);
+      else if(job?.state==="failed")note("Пробная печать: "+(job.errorMessage||"Ошибка"),true);
+    }catch(error){
+      note("Пробная печать: "+error.message,true);
+    }finally{
+      $("printEditorSample").disabled=false;
+    }
   }
   async function addQuick(){
     try{
@@ -951,6 +989,7 @@
   });
   $("printGoCatalog").addEventListener("click",()=>selectView("dishes"));
   $("saveTemplate").addEventListener("click",saveCurrent);
+  $("printEditorSample").addEventListener("click",printEditorSample);
   $("newTemplate").addEventListener("click",makeCurrent);
   $("newTemplateMain").addEventListener("click",makeCurrent);
   $("backToTemplates").addEventListener("click",()=>{
