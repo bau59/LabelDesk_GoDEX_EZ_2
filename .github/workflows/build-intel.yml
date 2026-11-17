@@ -22,6 +22,7 @@ on:
       - feat/print-calibration-backup-ui-113
       - feat/editor-one-label-test-print-114
       - feat/native-calibrated-preview-115
+      - fix/native-text-fixed-field-height-116
   workflow_dispatch:
 
 permissions:
@@ -50,6 +51,7 @@ jobs:
           node Tests/PrinterTransportSmoke.js
           node Tests/EditorSamplePrintSmoke.js
           node Tests/NativeCalibrationSmoke.js
+          node Tests/FixedTextHeightSmoke.js
           node --check LabelDesk/Resources/dish-controller.js
           node --check LabelDesk/Resources/dish-engine.js
           node --check LabelDesk/Resources/text-engine.js
@@ -68,6 +70,7 @@ jobs:
           node Tests/PrinterTransportSmoke.js
           node Tests/EditorSamplePrintSmoke.js
           node Tests/NativeCalibrationSmoke.js
+          node Tests/FixedTextHeightSmoke.js
 
   build-intel:
     name: Build x86_64 .app and .dmg
@@ -262,4 +265,4 @@ jobs:
             --repo "$GITHUB_REPOSITORY" \
             --target "$GITHUB_SHA" \
             --title "LabelDesk ${APP_VERSION}" \
-            --notes "LabelDesk 1.0.16 for Intel macOS 15+. GoDEX EZ-2S LN3.400: on app startup or saving the printer port, send the physically verified ESC q040 label-pitch command without printing. Simplify raster print queue: remove the automatic T3 alignment label, remove the unverified blank separator label, and send only requested labels with the existing F0/q040/M01 raster header and configured copy interval. Keep buffered CP866 text mode and existing templates unchanged. The printer does not acknowledge physical completion on this RS-232 connection; inspect uncertain jobs before retrying. Ad-hoc signed, not notarized."
+            --notes "LabelDesk 1.0.17 for Intel macOS 15+. Fixed-height native CP866 text fields: each new text field has configurable width in mm and independent fixed height in resident-font rows. Text wraps inside the allocated field; unused rows are reserved so later fields remain in place even as catalog values change. Extra content raises an explicit overflow error and blocks print instead of truncating. Editor preview shows fixed-height field borders and errors. Missing catalog values leave blank slots without printing prefixes. Legacy templates without fixedRows stay auto-height until user explicitly chooses to fix their field height. Fixed inverse fields also reserve spacing. Previous RS-232 framing, sensor, label-pitch and feed commands unchanged. Ad-hoc signed, not notarized."
