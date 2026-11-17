@@ -1,25 +1,29 @@
 #!/bin/zsh
-# GoDEX EZ-2 printer transport: macOS system tools only.
-# Arguments: /dev/cu.*  raster-packet.bin  copies  first-in-batch(0|1)  interval-seconds
-# Protocol parameters are for the physically tested 58x38mm / 2mm-gap stock.
+# GoDEX EZ-2S, 9600 8N1. Tested media: 58x38mm with a 2mm gap.
+# --init PORT: set label pitch without printing or advancing the tape.
+# PORT PACKET COPIES DELAY: send only the requested raster labels.
 set -euo pipefail
 
-if (( $# != 5 )); then
-  print -u2 "usage: printer.sh PORT PACKET COPIES FIRST DELAY"
+if (( $# == 2 )) && [[ "$1" == "--init" ]]; then
+  MODE="init"
+  PORT="$2"
+elif (( $# == 4 )); then
+  MODE="print"
+  PORT="$1"
+  PACKET="$2"
+  integer COPIES="$3"
+  DELAY="$4"
+else
+  print -u2 "usage: printer.sh --init PORT | PORT PACKET COPIES DELAY"
   exit 2
 fi
 
-PORT="$1"
-PACKET="$2"
-integer COPIES="$3"
-FIRST="$4"
-DELAY="$5"
-
 [[ "$PORT" == /dev/cu.* && -c "$PORT" ]] || { print -u2 "Invalid serial port"; exit 2; }
-[[ -f "$PACKET" && -s "$PACKET" ]] || { print -u2 "Missing raster packet"; exit 2; }
-(( COPIES >= 1 && COPIES <= 200 )) || { print -u2 "Invalid copies"; exit 2; }
-[[ "$FIRST" == "0" || "$FIRST" == "1" ]] || { print -u2 "Invalid FIRST"; exit 2; }
-[[ "$DELAY" =~ '^[0-9]+([.][0-9]+)?$' ]] || { print -u2 "Invalid delay"; exit 2; }
+if [[ "$MODE" == "print" ]]; then
+  [[ -f "$PACKET" && -s "$PACKET" ]] || { print -u2 "Missing raster packet"; exit 2; }
+  (( COPIES >= 1 && COPIES <= 200 )) || { print -u2 "Invalid copies"; exit 2; }
+  [[ "$DELAY" =~ '^[0-9]+([.][0-9]+)?$' ]] || { print -u2 "Invalid delay"; exit 2; }
+fi
 
 integer opened=0
 close_port() {
@@ -36,22 +40,19 @@ TRAPTERM() { close_port; exit 143 }
 open_port() {
   exec 3<>"$PORT"
   opened=1
-  # OS-native 9600 8N1, no RTS/CTS or XON/XOFF. No external packages.
   /bin/stty 9600 cs8 -parenb -cstopb -ixon -ixoff -crtscts raw -echo <&3
 }
 
-# Initial alignment. This ASCII buffered packet is already physically verified.
-if [[ "$FIRST" == "1" ]]; then
-  open_port
-  printf '\033F0\033q040\033M01\033B\033A11T3\r\033E\033P01' >&3
-  /bin/sleep "$DELAY"
-  close_port
-  print "T3 sent"
+open_port
+if [[ "$MODE" == "init" ]]; then
+  # Physically verified: after ESC q040, FEED finds the next label gap.
+  # The setting is lost when the printer is powered off.
+  printf '\033q040' >&3
+  print "ESC q040 sent; tape not advanced"
+  exit 0
 fi
 
-# Original working Line Mode: F0/q040/M01 then ESC Gnn binary rows + FF.
-# Keep the same descriptor open through the last blank separator label.
-open_port
+# Protocol header for ESC Gnn raster printing; does not print an extra label.
 printf '\033F0\033q040\033M01' >&3
 integer i=1
 while (( i <= COPIES )); do
@@ -60,18 +61,5 @@ while (( i <= COPIES )); do
   print "copy $i/$COPIES sent"
   (( i += 1 ))
 done
-
-# IMPORTANT: 0.9.5 demonstrated that switching from raster Line Mode to a
-# buffered blank P01 after a job DOES NOT align the labels on this machine.
-# Do not repeat that sequence. Instead, retain Line Mode, send a blank raster
-# as a complete 280-row label, and terminate it with FF. G10 x 280 + FF
-# needs physical verification; do not run a batch before one-label inspection.
-integer row=0
-while (( row < 280 )); do
-  printf '\033G10\000\000\000\000\000\000\000\000\000\000' >&3
-  (( row += 1 ))
-done
-printf '\014' >&3
-/bin/sleep "$DELAY"
 close_port
-print "blank 280-row Line Mode separator sent; physical result not acknowledged"
+print "Requested labels sent; physical output not acknowledged"
