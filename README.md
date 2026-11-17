@@ -258,16 +258,16 @@ switch production print jobs to native output until the one-label hardware test 
 
 ## Printing protocol
 
-- Original GoDEX EZ-2, USB–RS232, **9600 8N1**, flow control disabled.
-- Physically tested label stock: **58 × 38 mm, 2 mm gap**, one pitch 40 mm.
-- Start of batch: a buffered `T3` alignment job once.
-- Actual label: `ESC F0`, `ESC q040`, `ESC M01`, then binary `ESC Gnn` rows and `FF`.
-- Canvas raster uses 8 dots/mm, maximum width 55 bytes (440 dots) and **always 280 rows** for the verified mechanical page length (35 mm). It trims unused bytes on the right for shorter text but never shortens the page height.
-- Copies share one open RS-232 port. Each label waits the configured interval (default **1.5 seconds**).
-- After **each job, not each copy**: remain in Line Mode and send 280 blank `ESC G10` rows followed by `FF` to expose a blank label for tearing. This replaces the 0.9.5 procedure that mixed modes and failed on the real printer. The new same-mode separator is **not yet physically verified**.
-- `ESC f29/f11`, buffered `P01` after raster, automatic reverse, Q calibration and silent retry have been removed.
+- Physical device confirmed by its case label: **GoDEX EZ-2S**, firmware **LN3.400**; USB–RS232 **9600 8N1**, hardware/software flow control disabled in the current driver.
+- Tested roll: **58 × 38 mm, 2 mm gap**, 40 mm pitch.
+- **On application launch**, if a port is configured, the bridge runs `printer.sh --init PORT` and sends only `ESC q040`. This does **not** print or advance the stock. Saving printer settings sends the command again. The printer loses this state after power-off, so restart LabelDesk or save settings after powering the printer back on.
+- Actual raster print: `ESC F0`, `ESC q040`, `ESC M01`, then binary `ESC Gnn` rows and `FF`. The protocol header remains; it does not print a separate label.
+- The raster encoder uses 8 dots/mm, a maximum of 55 bytes (440 dots) per row and 280 rows for the tested mechanical page. It trims unused bytes on the right but not the page height.
+- Copies share one open RS-232 port, with the configured interval (default **1.5 seconds**).
+- **No** startup `T3`, automatic blank separator, reverse feed, or extra `FF` is sent by the queue. Only requested labels are transmitted. Text-mode buffered packets retain their own native header and print count.
+- Physically verified standalone positioning commands: `ESC q040` makes the FEED button advance to the next label; `ESC f05` moves forward 5 mm; `FF` then finds the next label. These are **not** inserted automatically into the print queue. `ESC R10` caused motor noise without reverse paper movement and must not be used.
 
-Earlier Python tests confirmed G55 × 280 full-page raster printing and a standalone buffered blank label. The 0.9.5 attempt to use the blank buffered command after Line Mode **failed**. The rewrite therefore uses a fixed full-page Line Mode raster for both printed and blank separator labels. **This combined sequence still needs on-printer validation.** The adapter does not provide an acknowledgement of actual paper output. On a command failure or cancellation, the queued job becomes `uncertain`; it must only be retried after the operator inspects the paper.
+Previous attempts to add a buffered blank separator after raster printing failed on the physical printer; the later unverified 280-row blank raster separator has now been removed. RS-232 output has no reliable printer completion acknowledgement. Failed or interrupted transmission remains `uncertain` and requires inspecting the label before retrying.
 
 ## Existing files and migration
 
