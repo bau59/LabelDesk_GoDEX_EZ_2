@@ -55,6 +55,17 @@ The **Каталог** page is for maintaining saved items. Saved positions can 
 
 The Intel Mac installer now includes `LabelDesk.icns`, generated at build time from `Scripts/make-icon.swift` with all expected 16–1024 px iconset representations. `CFBundleIconFile` points to that icon for Finder/Dock. Printer command transport and print dimensions are unchanged.
 
+## Editor sample print (1.0.14)
+
+Open an existing or new label in **Редактор этикеток** and click **Пробная печать · 1 шт.** next to **Сохранить макет**.
+
+- A current unsaved editor snapshot is validated with the ordinary production encoder.
+- Literal `[НАЗВАНИЕ]`, `[МАССА]` and other bracketed text is printed exactly as written, without having to create a catalog item. This exception exists **only for the disposable test snapshot**; real catalog batch print still checks required values.
+- The stored template is never overwritten. The print goes through the normal persisted queue, one copy, and only the newly added job ID can be transmitted.
+- The printer's port and installed roll compatibility are checked first; the user must explicitly confirm before paper is fed.
+- If CP866 cannot encode a symbol or if a raster block exceeds its geometry, printing is stopped with a visible error rather than silently changing the label.
+- The feature does **not** change paper motion, native font bitmaps, or start-of-label calibration. Physical measurements are still needed to align the editor view exactly.
+
 ## Storage, calibration atlas and input consistency (1.0.13)
 
 ### Reliable local data
