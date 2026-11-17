@@ -47,6 +47,7 @@ jobs:
           node --check LabelDesk/Resources/app.js
           node --check LabelDesk/Resources/diagnostics.js
           node Tests/PrinterDiagnosticsSmoke.js
+          node Tests/PrinterTransportSmoke.js
           node Tests/EditorSamplePrintSmoke.js
           node Tests/NativeCalibrationSmoke.js
           node --check LabelDesk/Resources/dish-controller.js
@@ -64,6 +65,7 @@ jobs:
           node Tests/CP866FoodSmoke.js
           node Tests/EditorGeometrySmoke.js
           node Tests/PrinterDiagnosticsSmoke.js
+          node Tests/PrinterTransportSmoke.js
           node Tests/EditorSamplePrintSmoke.js
           node Tests/NativeCalibrationSmoke.js
 
