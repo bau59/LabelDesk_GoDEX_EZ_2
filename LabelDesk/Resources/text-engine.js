@@ -175,7 +175,7 @@
       throw Error("Шаблон без строк: нечего печатать");
     if(doc.elements.length>32)throw Error("Для штатного режима максимум 32 блока");
     const margins=printMargins(doc);
-    const rows=[];
+    const rows=[],issues=[];
     let barcode=null,usedDots=0;
     // Array order is the literal printer row order; X via Mnn, Y is
     // sequential CR, never absolute canvas coordinates.
@@ -241,22 +241,48 @@
           Math.min(cellCapacity,Math.max(1,Math.min(54,Math.round(Number(el.lineChars)||54))))):
         String(el.prefix||"")+String(el.value??"");
       const lines=wrapText(value,cellCapacity);
-      for(const line of lines){
-        // Probe code points before sending anything to the port.
+      // Existing labels without fixedRows retain their legacy auto-height.
+      // New fixed-height text fields reserve exactly N resident-font line slots,
+      // independently of how much catalog data fits into the field.
+      const fixed=el.kind==="text"&&el.fixedRows!==undefined&&el.fixedRows!==null;
+      const limit=fixed?Number(el.fixedRows):lines.length;
+      if(fixed&&(!Number.isInteger(limit)||limit<1||limit>20))
+        throw Error("Высота текстового поля: от 1 до 20 строк");
+      if(lines.length>limit){
+        const label=String(el.fieldName||el.value||"Текст").slice(0,32);
+        const message="Поле «"+label+"»: текст требует "+lines.length+
+          " строк, доступно "+limit+". Увеличьте высоту поля, ширину или уменьшите шрифт.";
+        if(!options.allowOverflowPreview)throw Error(message);
+        issues.push({elementID:el.id,message});
+      }
+      const visible=lines.slice(0,limit);
+      for(let i=0;i<limit;i++){
+        // A space makes an empty reserved row a normal printable CR row.
+        const line=i<visible.length?visible[i]:" ";
         cp866(line);
         const position=marginMM(el,Array.from(line).length,f.widthDots,margins.width,margins.left);
         if(position<1 || position>55)
           throw Error("Позиция Mnn за областью печати");
         if((position-1)*8+Array.from(line).length*f.widthDots>PRINTABLE_DOTS-margins.right*8)
           throw Error("Строка выходит за 55 мм печати: "+line);
-        rows.push({kind:"text",text:line,font:f,margin:position,element:el,reverse:el.reversePrint===true});
+        const reverse=el.reversePrint===true&&i<visible.length;
+        rows.push({kind:"text",text:line,font:f,margin:position,element:el,
+          reverse,inverseSpacingHandled:fixed&&el.reversePrint===true,
+          reserved:fixed&&i>=visible.length});
         usedDots+=f.heightDots;
+        if(fixed&&el.reversePrint===true){
+          // Same total height for one or many inverted lines. ESC V already
+          // ends with CR; the extra A00 row reserves its safe separation.
+          rows.push({kind:"text",text:" ",font:font("A00"),margin:position,
+            element:el,reverse:false,inverseSpacer:true,reserved:true});
+          usedDots+=10;
+        }
       }
     }
     // G02 physical sample: ESC V bar touches the following row with no gap.
     // A single native A00 blank row provides 1.25 mm vertical separation.
     for(let i=0;i<rows.length-1;i++){
-      if(rows[i].reverse){
+      if(rows[i].reverse&&!rows[i].inverseSpacingHandled){
         rows.splice(i+1,0,{kind:"text",text:"",font:font("A00"),
           margin:rows[i].margin,element:rows[i].element,
           reverse:false,inverseSpacer:true});
@@ -267,7 +293,7 @@
         if(usedDots>MAX_LAYOUT_DOTS)
       throw Error("Строки могут выйти за высоту 38 мм ("+usedDots+
         " точек). Уменьшите шрифт или сократите текст.");
-    return {rows,usedDots,barcode,margins};
+    return {rows,usedDots,barcode,margins,issues};
   }
   function build(doc,copies=1){
     const n=Number(copies);
