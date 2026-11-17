@@ -236,7 +236,9 @@
       if(x>=margins.width)throw Error("Блок за пределами области с отступами");
       const usableWidth=Math.min(requestedWidth,margins.width-x);
       const cellCapacity=Math.floor(usableWidth*8/f.widthDots);
-      const value=el.kind==="line" ? "─".repeat(Math.min(cellCapacity,54)):
+      const value=el.kind==="line" ?
+        (["─","═","█"].includes(el.lineSymbol)?el.lineSymbol:"─").repeat(
+          Math.min(cellCapacity,Math.max(1,Math.min(54,Math.round(Number(el.lineChars)||54))))):
         String(el.prefix||"")+String(el.value??"");
       const lines=wrapText(value,cellCapacity);
       for(const line of lines){
