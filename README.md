@@ -55,6 +55,17 @@ The **Каталог** page is for maintaining saved items. Saved positions can 
 
 The Intel Mac installer now includes `LabelDesk.icns`, generated at build time from `Scripts/make-icon.swift` with all expected 16–1024 px iconset representations. `CFBundleIconFile` points to that icon for Finder/Dock. Printer command transport and print dimensions are unchanged.
 
+## Fixed-height native text fields (1.0.17)
+
+A resident-font text field in **Текст CP866** has a fixed width in millimeters and fixed **Высота поля, строк**. The row height depends on the selected printer font (A00: 10 dots = 1.25 mm, A11: 26 dots = 3.25 mm). New text fields allocate two rows by default (inverted text: one); users can set 1–20 rows per field.
+
+- Wrapped text remains within the allocated width and row height. Fewer content lines reserve the rest as printable blank CP866 rows, so the **next field always starts at the same row** regardless of catalog values.
+- Too much content generates a visible red boundary and error in the editor, while the printer encoder refuses to enqueue that label. Overflow is not silently cut off.
+- Blank or missing catalog values reserve the fixed row slots without printing the placeholder or constant prefix; an entirely empty label is still rejected.
+- Inverted fields reserve a native A00 separator after each row, including unused slots, keeping the following field stable.
+- Existing templates without a `fixedRows` property retain their previous automatic line height. In the editor, **Зафиксировать текущую высоту поля** converts one field explicitly using its present wrapped line count. No forced migration occurs.
+- The previously confirmed serial protocol, feed, sensor settings and barcodes are unchanged. Actual physical blank-row spacing should still be checked once on a single label; browser preview is approximate for firmware glyph bitmaps.
+
 ## Measured native text calibration and objects (1.0.15)
 
 Physical G01/G02 test photographs on 58×38 mm media confirmed **A00 8×10 dots** = 1 mm character pitch × 1.25 mm row pitch, CP866 corner/tee/line glyph connection, and correct scaling of A02/A03/A04/A11/A21. The physical print-head starting position is approximately 2 mm from the left edge and 1 mm from the top edge. These offsets have been introduced **only in editor preview**, never into serial commands, ESC Mnn or label feeding. The firmware's individual glyph bitmaps remain approximate in the browser.
