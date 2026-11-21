@@ -1,5 +1,10 @@
 # LabelDesk — original GoDEX EZ-2 on macOS (WebKit + zsh)
 
+## Operator CP866 preview fix (1.0.23)
+
+The operator print dialog now uses a responsive SVG viewBox of `label.widthMM × 8` by `label.heightMM × 8` dots. Every resident-font row uses exactly the positions (`Mnn`), widths (`character count × font.widthDots`), row heights, and reverse-print information from `EZ2Text.plan()`. SVG `textLength` and `lengthAdjust="spacingAndGlyphs"` keep preview text inside its actual allocated font cells, avoiding the old clipping of “Контроль качества пройден” and full production date/time. There is no CSS font-size guess for print geometry. Text glyph shapes are still approximate; output packets, stored templates, and printer commands are unchanged.
+
+
 ## Operator print form and CP866 editor controls (1.0.22)
 
 Open **Редактор этикеток → [saved label] → Печатать**. A dedicated operator form opens without editing the original document or creating an item in the catalog:

@@ -564,6 +564,46 @@
   function closeOperator(){
     operatorTemplateID=null;$("templatePrintDialog").hidden=true;
   }
+  // SVG and the resident-font text compiler use the same dot coordinates.
+  // Never use CSS font width to determine printable character boundaries.
+  function operatorNativeSVG(doc,layout){
+    const width=Number(doc.widthMM)*8,height=Number(doc.heightMM)*8;
+    let y=0;
+    let svg='<svg class="operator-native-svg" viewBox="0 0 '+width+' '+height+
+      '" xmlns="http://www.w3.org/2000/svg" role="img" '+
+      'aria-label="Расчётный предпросмотр CP866">'+
+      '<rect width="'+width+'" height="'+height+'" fill="#fff"/>';
+    for(const row of layout.rows){
+      const rowHeight=row.kind==="barcode"?120:row.font.heightDots;
+      const x=(row.kind==="barcode"?layout.margins.left:row.margin-1)*8;
+      if(row.kind==="barcode"){
+        // Geometry only: native barcode glyphs are firmware-specific.
+        const w=Math.max(1,Math.min(width-x-8,220));
+        svg+='<rect x="'+x+'" y="'+y+'" width="'+w+'" height="'+rowHeight+
+          '" fill="#f4f5f7" stroke="#9ba5b2" stroke-dasharray="4 4"/>'+
+          '<text x="'+(x+8)+'" y="'+(y+30)+
+          '" font-family="Menlo,monospace" font-size="14" fill="#555">Штрихкод</text>';
+      }else{
+        const value=String(row.text||"");
+        const charCount=Array.from(value).length;
+        const charWidth=row.font.widthDots;
+        const textWidth=charCount*charWidth;
+        if(value.trim()){
+          if(row.reverse)
+            svg+='<rect x="'+x+'" y="'+y+'" width="'+textWidth+
+              '" height="'+rowHeight+'" fill="#111"/>';
+          svg+='<text x="'+x+'" y="'+(y+rowHeight*0.83)+
+            '" fill="'+(row.reverse?"#fff":"#111")+
+            '" font-family="Menlo,monospace" font-weight="'+(row.font.bold?"700":"500")+
+            '" font-size="'+(rowHeight*0.9)+'" textLength="'+textWidth+
+            '" lengthAdjust="spacingAndGlyphs" xml:space="preserve">'+
+            esc(value)+'</text>';
+        }
+      }
+      y+=rowHeight;
+    }
+    return svg+'</svg>';
+  }
   function renderOperatorPreview(){
     if(!operatorTemplateID)return;
     const feedback=$("operatorPrintFeedback");
@@ -582,27 +622,8 @@
         " · тираж "+count+" шт.";
       if(isTextDoc(doc)){
         const layout=EZ2Text.plan(withPrintMargins(doc));
-        let y=0;
-        const rows=layout.rows.map(row=>{
-          const height=row.kind==="barcode"?120:row.font.heightDots;
-          const left=(row.kind==="barcode"?layout.margins.left:row.margin-1)*100/doc.widthMM;
-          const top=y*100/(Number(doc.heightMM)*8);
-          y+=height;
-          if(row.kind==="barcode")
-            return '<div class="operator-native-line" style="left:'+left+
-              '%;top:'+top+'%;height:'+(height*100/(doc.heightMM*8))+
-              '%">▥ Штрихкод</div>';
-          const width=Array.from(row.text).length*row.font.widthDots*100/(doc.widthMM*8);
-          const cls=row.reverse?" operator-inverse":"";
-          return '<div class="operator-native-line'+cls+'" style="left:'+left+
-            '%;top:'+top+'%;width:'+Math.min(width,100-left)+
-            '%;height:'+(height*100/(doc.heightMM*8))+'%;font-size:'+
-            Math.max(8,Math.min(19,row.font.heightDots*0.63))+'px">'+
-            esc(row.text)+'</div>';
-        }).join("");
-        $("operatorPrintPreview").innerHTML='<div class="operator-paper" style="aspect-ratio:'+
-          Number(doc.widthMM)+' / '+Number(doc.heightMM)+'">'+rows+'</div>'+
-          '<p class="muted">Схема CP866: размеры строк расчётные; рисунок букв приблизительный.</p>';
+        $("operatorPrintPreview").innerHTML=operatorNativeSVG(doc,layout)+
+          '<p class="muted">Схема CP866: размер и позиции строк — из команды печати; рисунок букв приблизительный.</p>';
       }else{
         const img=EZ2Raster.draw(doc);
         $("operatorPrintPreview").innerHTML='<img class="operator-raster" alt="Предпросмотр макета" src="'+

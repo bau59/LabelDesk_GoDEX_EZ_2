@@ -67,6 +67,7 @@ jobs:
           node Tests/BarcodesNativeSmoke.js
           node Tests/CP866FoodSmoke.js
           node Tests/QualityLabelSmoke.js
+          node Tests/OperatorPreviewSmoke.js
           node Tests/EditorGeometrySmoke.js
           node Tests/PrinterDiagnosticsSmoke.js
           node Tests/PrinterTransportSmoke.js
@@ -200,6 +201,7 @@ jobs:
           node Tests/BarcodesNativeSmoke.js
           node Tests/CP866FoodSmoke.js
           node Tests/QualityLabelSmoke.js
+          node Tests/OperatorPreviewSmoke.js
           zsh -n Scripts/printer.sh
           zsh -n Scripts/printer-native.sh
           zsh -n Scripts/printer-text.sh
@@ -269,4 +271,4 @@ jobs:
             --repo "$GITHUB_REPOSITORY" \
             --target "$GITHUB_SHA" \
             --title "LabelDesk ${APP_VERSION}" \
-            --notes "LabelDesk 1.0.22 for Intel macOS 15+. Operator print form with editable text/barcode variables, 1-200 copies, CP866 plan or raster preview, manual or current Mac local date-time, queue or isolated print. Date/time frozen per queued print snapshot. CP866 editor now offers separate X/Y scaling for documented Axy fonts and character-capacity information. Existing saved labels and EZ-2 serial protocol unchanged. Validate one physical label before production batches. Ad-hoc signed, not notarized."
+            --notes "LabelDesk 1.0.23 for Intel macOS 15+. Fixes clipped CP866 text in the operator print preview: native font rows now render as scalable SVG on the same exact dot grid as the print compiler, keeping full captions and date/time visible. No changes to saved labels, font encoders, serial transport, or paper positioning. Ad-hoc signed, not notarized."
