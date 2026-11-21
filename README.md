@@ -1,5 +1,12 @@
 # LabelDesk — original GoDEX EZ-2 on macOS (WebKit + zsh)
 
+## Native CP866 inverse padding (1.0.27)
+
+For a native text field with **Чёрная плашка (инверсия)** enabled, the editor offers **Отступ слева, симв.** and **Отступ справа, симв.** (0–12 character cells each). They map to optional `inversePadLeft` and `inversePadRight` fields. One cell is the native font's width in printer dots, e.g. 1 mm for A03. Each side is part of the reverse `ESC V` row, including blank cells, and the full padded string is validated against print width and fixed-height text slots. The right pad is appended *after* `wrapText`, which otherwise strips trailing blanks. User-typed trailing spaces are also retained for inverted fields, while normal text wrapping remains unchanged. This applies equally to automatic date/time fields and free text. The two previews derive their width from the same native line planner.
+
+Existing labels with no padding properties use zero padding. If a one-line field no longer fits after pads, print compilation reports an overflow rather than silently clipping or moving subsequent fields. **Hardware validation is still needed:** the bytes for trailing inverted blanks are present in the packet, but some printer firmware may render trailing blank cells differently. No changes to the serial transport, media calibration or existing label content are made.
+
+
 ## Toolbar zoom/dropdown layout fix (1.0.26)
 
 The **Вписать** zoom button now sizes to its text (minimum 84px); only zoom **−** and **+** remain fixed-width 38px icon buttons. This prevents the zoom caption spilling into the adjacent redo button. The **Ещё** disclosure arrow is a CSS chevron aligned to the center of its 38px control, rotated when expanded; no OS font-dependent arrow glyph. The toolbar can wrap as needed at narrower widths. These are editor-only changes and do not affect the EZ-2 printer protocol.

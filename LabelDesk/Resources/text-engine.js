@@ -53,12 +53,12 @@
       return b;
     });
   }
-  function wrapText(s,capacity){
+  function wrapText(s,capacity,preserveTrailing=false){
     if(!Number.isInteger(capacity)||capacity<1)throw Error("Слишком крупный шрифт для ширины этикетки");
     const lines=[];
     for(const raw of String(s??"").split(/\r?\n/)){
       if(raw===""){lines.push("");continue;}
-      let remainder=raw.trimEnd();
+      let remainder=preserveTrailing?raw:raw.trimEnd();
       while(Array.from(remainder).length>capacity){
         const chars=Array.from(remainder);
         const limit=chars.slice(0,capacity).join("");
@@ -247,7 +247,19 @@
           Math.min(cellCapacity,Math.max(1,Math.min(54,Math.round(Number(el.lineChars)||54))))):
         String(el.prefix||"")+(el.dynamicValue==="printDateTime" ?
           formatPrintDateTime(options.now??new Date()):String(el.value??""));
-      const lines=wrapText(value,cellCapacity);
+      // ESC V inverts the native character cells, including blank ones.
+      // Never rely on typed trailing spaces for panel padding: wrapText()
+      // normally strips them. Reserve explicit cells on both sides AFTER wrapping.
+      const inverted=el.kind==="text"&&el.reversePrint===true;
+      const leftPad=inverted?Number(el.inversePadLeft??0):0;
+      const rightPad=inverted?Number(el.inversePadRight??0):0;
+      if(inverted&&(!Number.isInteger(leftPad)||leftPad<0||leftPad>12||
+         !Number.isInteger(rightPad)||rightPad<0||rightPad>12))
+        throw Error("Отступы инверсии: от 0 до 12 символов с каждой стороны");
+      const contentCapacity=cellCapacity-leftPad-rightPad;
+      if(contentCapacity<1)
+        throw Error("Отступы инверсии не помещаются в ширину текстового поля");
+      const lines=wrapText(value,contentCapacity,inverted);
       // Existing labels without fixedRows retain their legacy auto-height.
       // New fixed-height text fields reserve exactly N resident-font line slots,
       // independently of how much catalog data fits into the field.
@@ -265,7 +277,9 @@
       const visible=lines.slice(0,limit);
       for(let i=0;i<limit;i++){
         // A space makes an empty reserved row a normal printable CR row.
-        const line=i<visible.length&&visible[i]!==""?visible[i]:" ";
+        const raw=i<visible.length&&visible[i]!==""?visible[i]:" ";
+        const line=inverted&&i<visible.length?
+          " ".repeat(leftPad)+raw+" ".repeat(rightPad):raw;
         cp866(line);
         const position=marginMM(el,Array.from(line).length,f.widthDots,margins.width,margins.left);
         if(position<1 || position>55)

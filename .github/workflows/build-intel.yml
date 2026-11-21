@@ -52,6 +52,7 @@ jobs:
           node Tests/EditorSamplePrintSmoke.js
           node Tests/NativeCalibrationSmoke.js
           node Tests/FixedTextHeightSmoke.js
+          node Tests/InversePaddingSmoke.js
           node --check LabelDesk/Resources/dish-controller.js
           node --check LabelDesk/Resources/dish-engine.js
           node --check LabelDesk/Resources/text-engine.js
@@ -75,6 +76,7 @@ jobs:
           node Tests/EditorSamplePrintSmoke.js
           node Tests/NativeCalibrationSmoke.js
           node Tests/FixedTextHeightSmoke.js
+          node Tests/InversePaddingSmoke.js
 
   build-intel:
     name: Build x86_64 .app and .dmg
@@ -272,4 +274,4 @@ jobs:
             --repo "$GITHUB_REPOSITORY" \
             --target "$GITHUB_SHA" \
             --title "LabelDesk ${APP_VERSION}" \
-            --notes "LabelDesk 1.0.26 for Intel macOS 15+. Fixes toolbar overflow: Fit zoom button has natural text width rather than a 38px icon-only square; plus/minus remain square, and the More dropdown now uses a centered, rotating CSS chevron. No changes to printer protocol, printing, or saved templates. Ad-hoc signed, not notarized."
+            --notes "LabelDesk 1.0.27 for Intel macOS 15+. Native CP866 inverse-text labels gain independently configurable left and right padding in font-character cells (0-12). Pads are added after wrapping, preserved in ESC V packets, shown in both previews and validated against fixed field width. Explicit trailing spaces are kept for inverted lines. Existing templates default to zero padding. No serial transport or paper positioning changes. Verify one physical label before batch production. Ad-hoc signed, not notarized."

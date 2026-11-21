@@ -1092,6 +1092,20 @@ function renderNativeTextProps(root,e){
    align.appendChild(button);
  }
  root.appendChild(prop("Выравнивание",align));
+ root.appendChild(checkbox("Чёрная плашка (инверсия)",
+   e.reversePrint===true,value=>{e.reversePrint=value;renderProps();}));
+ if(e.reversePrint===true){
+   root.appendChild(pair(
+     prop("Отступ слева, симв.",numInput(e.inversePadLeft??0,
+       n=>{e.inversePadLeft=n;},0,12,1)),
+     prop("Отступ справа, симв.",numInput(e.inversePadRight??0,
+       n=>{e.inversePadRight=n;},0,12,1))));
+   const note=document.createElement("p");note.className="inline-note";
+   note.textContent="1 символ отступа = "+
+     (window.EZ2Text.font(e.deviceFont||"A00").widthDots/8)+
+     " мм. Отступы увеличивают чёрную плашку, не высоту строки.";
+   root.appendChild(note);
+ }
  const hasRows=Number.isInteger(e.fixedRows)&&e.fixedRows>=1;
  if(hasRows){
    root.appendChild(pair(
@@ -1147,8 +1161,6 @@ function renderNativeTextProps(root,e){
  const summary=document.createElement("summary");summary.textContent="Дополнительно";
  advanced.appendChild(summary);
  if(!automatic)advanced.appendChild(dateControl());
- advanced.appendChild(checkbox("Инверсия (белый текст на чёрном)",
-   e.reversePrint===true,value=>{e.reversePrint=value;renderProps();}));
  if(/^A[1-4][1-8]$/.test(code)){
    const scale=(axis,value)=>{
      checkpoint();
