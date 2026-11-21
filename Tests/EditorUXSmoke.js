@@ -17,6 +17,13 @@ assert.match(html,/root\.appendChild\(details\);[\s\S]*?return;/);
 assert.match(html,/if\(blank&&selected!==field\.id\)continue;/);
 assert.match(html,/const budget=Number\(doc\.heightMM\)\*8-48;/);
 assert.match(html,/Макет готов/);
+// All editor toolbar actions are 38px high and use the same font sizing.
+assert.match(html,/\.tools > button,[\s\S]*?\.tools \.zoom-controls > button\{[\s\S]*?height:38px;min-height:38px;/);
+assert.match(html,/\.tools \.mode-toolset > button\.tool-add-main\[data-add\]\{[\s\S]*?color:#fff;background:#172132;/);
+assert.match(html,/\.tools \.mode-toolset > button\.tool-add-main\[data-add\]:hover,[\s\S]*?color:#fff;background:#304259;/);
+assert.match(html,/\.tools \.zoom-controls > button\{width:38px;padding:0;/);
+assert(!html.includes(".tools .tool-add-main{background:#172132;"),
+  "Primary background must not be overridden by more specific data-add selector");
 const source=html.match(/function labelFor\(e\)\{[\s\S]*?(?=function renderLayers\()/);
 assert(source,"Label list caption formatter");
 const root={};

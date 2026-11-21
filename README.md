@@ -1,5 +1,9 @@
 # LabelDesk — original GoDEX EZ-2 on macOS (WebKit + zsh)
 
+## Toolbar contrast and sizing fix (1.0.25)
+
+The editor toolbar controls now share 38px height and 12px label text. The primary **＋ Текст** button has explicit sufficiently specific color, dark background, and visible hover/focus colors, overriding the older `.tools button[data-add]` white background. Secondary actions, **Ещё**, list and undo/redo/zoom controls use a consistent neutral treatment. Only editor styles were changed; printer commands and saved data were not modified.
+
 ## Editor interface refresh (1.0.24)
 
 The editor is now centered on **add → select → edit**. The toolbar shows **Этикетка**, **＋ Текст**, **▥ Штрихкод**, and **Ещё** for less common object types; zoom and undo are on the right. Other tools remain available behind the expandable menu. Selecting **Этикетка** opens concise physical width/height/gap controls, with printer mode, margins, and grid behind **Режим и дополнительные настройки**.

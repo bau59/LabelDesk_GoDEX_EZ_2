@@ -249,8 +249,38 @@ body[data-editor-mode="text"] #label{border-color:#c0c8d2}
 /* Simplified editor: primary actions first, technical controls on demand. */
 .tools{flex-wrap:nowrap;gap:8px;padding:10px 13px;min-height:57px;position:relative;z-index:12}
 .tools .mode-toolset{flex-wrap:nowrap;gap:7px}
-.tools .tool-add-main{background:#172132;border-color:#172132;color:#fff}
-.tools .tool-add-main:hover{background:#304259;color:#fff}
+/* Consistent toolbar controls: earlier .tools button[data-add] is more specific
+   than .tools .tool-add-main and used to override the dark fill to white. */
+.tools > button,
+.tools .mode-toolset > button,
+.tools .add-more > summary,
+.tools .tools-right > button,
+.tools .zoom-controls > button{
+  box-sizing:border-box;height:38px;min-height:38px;
+  display:inline-flex;align-items:center;justify-content:center;
+  padding:0 13px;font-size:12px;line-height:1.15;font-weight:600;
+  border:1px solid #dce3eb;border-radius:8px;
+  background:#fff;color:#263240;white-space:nowrap;
+}
+.tools .zoom-controls > button{width:38px;padding:0;font-size:15px}
+.tools .mode-toolset > button.tool-add-main[data-add]{
+  color:#fff;background:#172132;border-color:#172132;
+}
+.tools .mode-toolset > button.tool-add-main[data-add]:hover,
+.tools .mode-toolset > button.tool-add-main[data-add]:focus-visible{
+  color:#fff;background:#304259;border-color:#304259;
+}
+.tools .mode-toolset > button:not(.tool-add-main):hover,
+.tools > button:hover,
+.tools .tools-right > button:hover,
+.tools .zoom-controls > button:hover{
+  color:#172132;background:#f3f6f9;border-color:#cbd5e0;
+}
+.tools .mode-toolset > button:disabled,
+.tools .tools-right > button:disabled,
+.tools .zoom-controls > button:disabled{opacity:.45;cursor:default;}
+.tools .zoom-controls span{min-width:42px;text-align:center;font-size:12px}
+.tools .add-more > summary:hover{background:#f3f6f9;border-color:#cbd5e0}
 .tools-right{display:flex;gap:6px;align-items:center;margin-left:auto;min-width:0}
 .toolbar-divider{width:1px;height:22px;background:#e2e7ef;flex:none}
 .add-more{position:relative;flex:none}
