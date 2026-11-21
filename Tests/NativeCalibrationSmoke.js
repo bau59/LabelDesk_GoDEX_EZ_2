@@ -32,7 +32,7 @@ assert(!bytes.includes(Buffer.from([27,71])),"Native frame/table may not send ES
 assert(bytes.includes(Buffer.from([27,86])),"ESC V inverse command still present");
 assert(bytes.includes(Buffer.from([218,196,196])),"CP866 native top-left table line");
 assert(bytes.includes(Buffer.from([195,196,196])),"CP866 tee junction row");
-assert.throws(()=>ez.plan(make([{...table,tableWidths:"45,20,8"}])),/55 мм/);
+assert.throws(()=>ez.plan(make([{...table,tableWidths:"45,20,8"}])),/шире доступной ширины рулона/);
 assert.throws(()=>ez.plan(make([{...table,value:"ONE|TWO"}])),/колонки/);
 assert.throws(()=>ez.plan(make([{...table,tableWidths:"bad"}])),/ширины колонок/);
 assert.equal(ez.plan(make([inverse])).rows.length,1,"No trailing blank if inverse is last");
