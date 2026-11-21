@@ -6,7 +6,7 @@
   "use strict";
   const ESC=27, CR=13, LF=10;
   const PRINTABLE_DOTS=440; // verified 55-mm width at 203dpi
-  const MAX_LAYOUT_DOTS=256; // reserve headroom inside observed 38-mm pitch
+  const BOTTOM_RESERVE_DOTS=48; // original 6-mm margin (38mm -> 256 dots)
   const BOX=Object.freeze({
     "│":179,"─":196,"┌":218,"┐":191,"└":192,"┘":217,
     "├":195,"┤":180,"┬":194,"┴":193,"┼":197,"█":219,
@@ -169,8 +169,9 @@
   }
   function plan(doc, options={}){
     if(!doc || doc.printMode!=="text")throw Error("Этот макет не является строковым");
-    if(Math.abs(Number(doc.heightMM)-38)>0.001||Math.abs(Number(doc.gapMM)-2)>0.001)
-      throw Error("Штатный драйвер подтверждён для высоты 38 мм, зазора 2 мм");
+    if(!Number.isInteger(Number(doc.heightMM))||Number(doc.heightMM)<10||Number(doc.heightMM)>100||
+       !Number.isInteger(Number(doc.gapMM))||Number(doc.gapMM)<1||Number(doc.gapMM)>10)
+      throw Error("Штатный CP866: высота 10–100 мм, зазор 1–10 мм (целые значения).");
     if(!Array.isArray(doc.elements)||doc.elements.length===0)
       throw Error("Шаблон без строк: нечего печатать");
     if(doc.elements.length>32)throw Error("Для штатного режима максимум 32 блока");
@@ -290,8 +291,8 @@
         i++;
       }
     }
-        if(usedDots>MAX_LAYOUT_DOTS)
-      throw Error("Строки могут выйти за высоту 38 мм ("+usedDots+
+    if(usedDots>Number(doc.heightMM)*8-BOTTOM_RESERVE_DOTS)
+      throw Error("Строки могут выйти за высоту "+doc.heightMM+" мм ("+usedDots+
         " точек). Уменьшите шрифт или сократите текст.");
     return {rows,usedDots,barcode,margins,issues};
   }
@@ -302,7 +303,7 @@
     const out=[];
     const add=(...b)=>out.push(...b);
     const esc=s=>add(ESC,...byteASCII(s));
-    esc("F0");esc("q040");esc("M01");
+    esc("F0");esc("q"+String(Number(doc.heightMM)+Number(doc.gapMM)).padStart(3,"0"));esc("M01");
     if(layout.barcode){
       esc("?"+layout.barcode.selector);
       esc("X2");

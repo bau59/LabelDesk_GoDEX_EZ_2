@@ -1,8 +1,9 @@
-/* LabelDesk: browser Canvas -> original EZ-2 binary ESC Gnn raster.
-   No Node, Python, server, or external libraries. Fixed 280 rows, adaptive width <=55 bytes. */
+/* LabelDesk: browser Canvas -> EZ-2 ESC Gnn raster.
+   Adaptive label-height rows with the original 3-mm bottom safety reserve;
+   no Node, Python, server or external libraries. Width <=55 bytes. */
 (function (root) {
   "use strict";
-  const DOTS = 8, MAX_DOTS = 440, PRINT_ROWS = 280, GAP = 2;
+  const DOTS = 8, MAX_DOTS = 440, BOTTOM_MARGIN_MM = 3;
   const inRange = (n, min, max) => Number.isFinite(n) && n >= min && n <= max;
 
   function validate(label) {
@@ -144,30 +145,26 @@
   }
 
   function encode(label, threshold=128) {
-    // Preview works for any valid template. The real transport is deliberately
-    // restricted to the verified 280-row / q040 geometry.
-    if(Math.abs(label.heightMM-38)>0.001 || Math.abs(label.gapMM-GAP)>0.001){
-      throw new Error("Для печати проверена только высота 38 мм и зазор 2 мм.");
-    }
+    // ESC qNNN is height + gap; gapless stock requires a different sensor mode.
+    if(Number(label.gapMM)===0)throw Error("Для печати требуется рулон с зазором от 1 мм.");
     const canvas=draw(label);
     const image=canvas.getContext("2d").getImageData(0,0,canvas.width,canvas.height);
     const pixels=image.data;
     let lastRow=-1,lastByte=-1;
-    const dots=MAX_DOTS, rows=PRINT_ROWS;
+    const dots=MAX_DOTS, rows=(label.heightMM-BOTTOM_MARGIN_MM)*DOTS;
     for(let y=0;y<canvas.height;y++){
       for(let x=0;x<canvas.width;x++){
         const p=(y*canvas.width+x)*4;
         const ink=pixels[p]<threshold && pixels[p+1]<threshold && pixels[p+2]<threshold;
         if(!ink)continue;
-        if(y>=rows)throw new Error("Пиксели ниже 35 мм: этикетка не будет обрезана молча.");
+        if(y>=rows)throw new Error("Пиксели ниже "+(rows/DOTS)+" мм: оставьте 3 мм до нижнего края этикетки.");
         if(x>=dots)throw new Error("Пиксели правее 55 мм: переместите слой в область печати.");
         lastRow=Math.max(lastRow,y);
         lastByte=Math.max(lastByte,Math.floor(x/8));
       }
     }
-    // Keep the full tested 280-line mechanical step even for short text.
-    // Only the number of bytes per row is compressed.
-    const height=PRINT_ROWS;
+    // 38 mm retains the exact original 280 lines; compress only row width.
+    const height=rows;
     const width=Math.min(55,Math.max(10,lastByte+1));
     const bytes=new Uint8Array(height*(4+width)+1);
     let out=0;
@@ -227,12 +224,13 @@
         label.gapMM+" мм; в принтере "+m.widthMM+"×"+m.heightMM+" мм, зазор "+m.gapMM+" мм."
     };
   }
-  function transportReady(media) {
+  function labelPitch(media) {
     const m=validateMedia(media);
-    // The actual shell transport is currently hardcoded to q040 and 280 rows.
-    // Reject other stock rather than falsely claiming the media setting
-    // reconfigures the printer hardware. Width is limited separately by G55.
-    return m.heightMM===38 && m.gapMM===2;
+    if(m.gapMM<1)throw Error("Для датчика просвета требуется зазор от 1 мм.");
+    return m.heightMM+m.gapMM; // ESC qNNN: label height + gap in mm
   }
-  root.EZ2Raster={draw,encode,defaultMedia,mediaFromProfile,validateMedia,compatibility,transportReady};
+  function transportReady(media) {
+    return validateMedia(media).gapMM>=1; // F0 see-through sensor
+  }
+  root.EZ2Raster={draw,encode,defaultMedia,mediaFromProfile,validateMedia,compatibility,transportReady,labelPitch};
 })(window);

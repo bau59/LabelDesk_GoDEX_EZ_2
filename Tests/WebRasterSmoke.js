@@ -78,10 +78,15 @@ right.elements=[{kind:"line",xMM:56,yMM:2,widthMM:1,heightMM:1,value:""}];
 assert.throws(()=>encode(right),/правее 55/);
 const wrong=blank();wrong.gapMM=3;
 assert.doesNotThrow(()=>window.EZ2Raster.draw(wrong),"Old incompatible stock must remain previewable");
-assert.throws(()=>encode(wrong),/проверена только/);
+assert.equal(encode(wrong).rows,280,"Gap affects ESC qNNN, not 38-mm raster");
 const shorter=blank();shorter.heightMM=30;
 assert.doesNotThrow(()=>window.EZ2Raster.draw(shorter));
-assert.throws(()=>encode(shorter),/проверена только/);
+assert.equal(encode(shorter).rows,216,"30-mm label retains the 3-mm bottom safety margin");
+const taller=blank();taller.heightMM=60;
+taller.elements=[{kind:"line",xMM:1,yMM:50,widthMM:3,heightMM:1}];
+assert.equal(encode(taller).rows,456);
+assert.throws(()=>encode({...taller,elements:[{kind:"line",xMM:1,yMM:58,widthMM:3,heightMM:1}]}),/ниже 57/);
+assert.throws(()=>encode({...blank(),gapMM:0}),/зазор/);
 
 // The same shared generator must also drive actual ESC Gnn bitmap rows.
 const barcodeLabel=blank();

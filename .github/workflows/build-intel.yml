@@ -267,4 +267,4 @@ jobs:
             --repo "$GITHUB_REPOSITORY" \
             --target "$GITHUB_SHA" \
             --title "LabelDesk ${APP_VERSION}" \
-            --notes "LabelDesk 1.0.18 for Intel macOS 15+. Manual AI-assisted catalog fill: choose existing item and custom fields, copy a ChatGPT prompt, validate JSON and apply results to an unsaved item. No AI API, printer command or saving changes. Ad-hoc signed, not notarized."
+            --notes "LabelDesk 1.0.19 for Intel macOS 15+. Variable die-cut media: ESC qNNN is label height plus gap; raster and CP866 layout follow label height. Original 38+2 mm output remains unchanged. Gapless paper stays blocked. Test one label on new media before batch printing. Ad-hoc signed, not notarized."

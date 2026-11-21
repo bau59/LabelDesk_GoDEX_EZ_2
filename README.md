@@ -1,5 +1,11 @@
 # LabelDesk — original GoDEX EZ-2 on macOS (WebKit + zsh)
 
+## Variable die-cut label sizes (1.0.19)
+
+For media using the transmissive gap sensor (integer gap **1–10 mm**), LabelDesk now sets the documented `ESC qNNN` to **label height + gap** in millimeters on app launch, when saving settings and when printing. The original 38+2 mm roll still sends `q040` and retains its original 280-line raster payload. For new heights (10–100 mm), raster rows follow `8 × (height − 3 mm)` with the original 3-mm bottom safety reserve; the native CP866 engine reserves 6 mm at the bottom as before. Saved templates are never resized. Continuous stock (gap 0) is blocked because it requires a different sensor/transport mode.
+
+**Hardware verification:** Only 58×38 mm + 2 mm gap was physically tested. For a different roll, print **one label** first, verify start position, margins and FEED, then use batch printing. The isolated experimental ASCII native diagnostic remains limited to 38+2 mm. No extra feed, reverse movement or undocumented commands were added.
+
 **1.0.13 WebKit/zsh release (data safety, consistent inputs, printable EZ-2 calibration atlas).** No Node.js, Python, pip, npm, HTTP server or external dependencies are needed on the user's Mac. The system frameworks AppKit/WebKit and system commands `/bin/zsh`, `/bin/stty`, `/bin/cat` and `printf` handle the application and RS-232.
 
 ## AI catalog fill (1.0.18)
@@ -172,7 +178,7 @@ New labels use the stored media dimensions. Saved template JSON files are **neve
 
 **Two distinct boundaries:** Red editor hatching indicates a template region outside the configured physical roll. Gray hatching marks the separate, currently verified 55-mm `ESC G55` graphics limit — it is not the edge of the roll.
 
-**Safety:** The current printing transport is still verified only for **38-mm label height plus 2-mm gap** (`ESC q040`, 280 raster rows). Settings for other media sizes can be saved and used to prepare templates, but sending them to the printer is blocked until a matching transport protocol has been physically verified. Changing settings does not silently change motor commands. Width changes within the supported template bounds do not alter the fixed motor pitch.
+**Safety:** 38-mm label height plus 2-mm gap remains the physically verified reference (`ESC q040`, 280 raster rows). Since 1.0.19, the documented `ESC qNNN` and raster geometry follow the selected die-cut roll, with a confirmation before printing an unverified size. Continuous media without gaps remains blocked; print width is still limited to 55 mm.
 
 ## CP866 text printing and food-container starter labels (1.0.5)
 

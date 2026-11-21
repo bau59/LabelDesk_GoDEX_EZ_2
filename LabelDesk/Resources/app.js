@@ -453,7 +453,7 @@
       const check=compatibility(doc);
       if(!check.ok || !EZ2Raster.transportReady(media())){
         $("previewError").textContent=check.ok ?
-          "Печать этого размера рулона пока не поддерживается драйвером.":
+          "Для печати нужен рулон с зазором от 1 мм.":
           "Несовместим с рулоном. "+check.reason;
         $("quickSize").textContent="Предпросмотр доступен, передача в принтер заблокирована.";
         return;
@@ -494,7 +494,7 @@
     const check=compatibility(doc);
     if(!check.ok)throw new Error("Несовместим с рулоном. "+check.reason);
     if(!EZ2Raster.transportReady(media())){
-      throw new Error("Этот размер рулона ещё не поддерживается транспортом. Измените настройки перед печатью.");
+      throw new Error("Для печати нужен зазор между этикетками от 1 мм.");
     }
     encodeJob(doc,n);
     const job={id:uuid(),document:clone(doc),copies:n,addedAt:stamp(),
@@ -523,7 +523,7 @@
     try{
       const check=compatibility(sample);
       if(!check.ok)throw Error("Не подходит установленный рулон: "+check.reason);
-      if(!EZ2Raster.transportReady(media()))throw Error("Для этого рулона нет проверенного режима печати");
+      if(!EZ2Raster.transportReady(media()))throw Error("Для печати нужен рулон с зазором от 1 мм");
       encodeJob(sample,1); // physical layout and CP866 character preflight
       if(!window.confirm("Напечатать 1 этикетку прямо из редактора?\n"+
         "Печатаются текущие надписи и [ПЕРЕМЕННЫЕ] как обычный текст.\n"+
@@ -561,7 +561,7 @@
         el.value=value;
         const check=compatibility(doc);
         if(!check.ok)throw new Error("Несовместим с рулоном. "+check.reason);
-        if(!EZ2Raster.transportReady(media()))throw new Error("Размер рулона пока не поддерживается печатью.");
+        if(!EZ2Raster.transportReady(media()))throw new Error("Для печати нужен рулон с зазором от 1 мм.");
         encodeJob(doc,1);
         toAdd.push({id:uuid(),document:doc,copies:1,addedAt:stamp(),
           state:"pending",errorMessage:null});
@@ -596,7 +596,7 @@
     const incompatibleMessage=incompatible.length?
       "Несовместимых заданий: "+incompatible.length+". Они останутся в очереди, их размеры не изменяются.":"";
     const transportMessage=!supported?
-      " Выбранный рулон не поддерживается текущими командами печати (подтверждено только 38 мм + 2 мм).":"";
+      " Для датчика просвета необходим зазор между этикетками от 1 мм.":"";
     $("queueCompatibility").textContent=incompatibleMessage+transportMessage;
     $("printState").textContent=state.running?
       "Идёт передача. Не закрывайте приложение и не отключайте RS-232.":
@@ -615,6 +615,9 @@
     if(!jobs.length){note("Нет совместимых заданий для выбранного рулона.",true);return;}
     if(!state.profile.portPath){note("Выберите RS-232 порт в настройках",true);return;}
     if(!one&&!window.confirm("Отправить "+jobs.length+" совместимых заданий? Несовместимые останутся в очереди."))return;
+    if((media().heightMM!==38||media().gapMM!==2)&&!window.confirm(
+      "Рулон "+media().heightMM+" мм + зазор "+media().gapMM+" мм пока не проверен физически. "+
+      "Сначала напечатайте одну этикетку и проверьте позиционирование. Продолжить?"))return;
     state.running=true;state.stopRequested=false;renderQueue();
     for(const job of (one?jobs.slice(0,1):jobs)){
       if(state.stopRequested)break;
@@ -636,6 +639,7 @@
           textMode,
           copies:Number(job.copies),
           port:state.profile.portPath,
+          pitchMM:EZ2Raster.labelPitch(media()),
           delay:Number(state.profile.labelIntervalSeconds)
         });
         job.state="sent";job.errorMessage=null;
@@ -672,7 +676,8 @@
     try{
       const result=await native("printJob",{
         base64:test.base64,nativeTrial:true,copies:1,
-        port:state.profile.portPath,delay:Number(state.profile.labelIntervalSeconds)
+        port:state.profile.portPath,pitchMM:EZ2Raster.labelPitch(media()),
+        delay:Number(state.profile.labelIntervalSeconds)
       });
       log(result?.output||"Штатный тест передан в порт");
       note("Штатная команда передана. Проверьте фактическую этикетку до следующей печати.");
@@ -798,8 +803,9 @@
     $("marginLeft").value=Number(state.profile.marginLeftMM||0);
     $("marginRight").value=Number(state.profile.marginRightMM||0);
     $("mediaSupport").textContent=EZ2Raster.transportReady(media())?
-      "Транспорт для высоты 38 мм и зазора 2 мм уже проверен. Печать до 55 мм по ширине.":
-      "Внимание: транспорт печати пока подтверждён только для высоты 38 мм и зазора 2 мм. Другие рулоны можно указать и подготовить шаблоны, но печать будет заблокирована.";
+      "ESC q"+String(EZ2Raster.labelPitch(media())).padStart(3,"0")+
+      " (высота + зазор). Формат 38+2 мм проверен физически; другие форматы сначала проверьте на одной этикетке. Печать до 55 мм по ширине.":
+      "Для рулона без зазора нужен другой режим датчика. Печать доступна при зазоре от 1 мм.";
     renderPorts();
     $("runtimePath").textContent=state.runtimePath;
     const modified=state.runtimeWarnings||[];
@@ -859,10 +865,11 @@
       state.profile=profile;
       state.settingsSnapshot=settings;
       let printerInitError=null;
-      if(port){
+      if(port&&EZ2Raster.transportReady(checked)){
         try{
-          await native("initPrinter",{port});
-          log("Позиционирование при сохранении настроек: ESC q040");
+          const pitchMM=EZ2Raster.labelPitch(checked);
+          await native("initPrinter",{port,pitchMM});
+          log("Позиционирование при сохранении настроек: ESC q"+String(pitchMM).padStart(3,"0"));
         }catch(error){
           printerInitError=error.message;
           log("Ошибка инициализации принтера: "+printerInitError);
@@ -908,10 +915,12 @@
       });
       state.profile={...defaultProfile(),...(info.settings?.profile||{})};
       state.settingsSnapshot=info.settings||{schemaVersion:1,snapToGrid:true};
-      if(state.profile.portPath){
+      if(state.profile.portPath&&EZ2Raster.transportReady(media())){
         try{
-          await native("initPrinter",{port:state.profile.portPath});
-          log("При запуске отправлена ESC q040: подача по этикеткам");
+          const pitchMM=EZ2Raster.labelPitch(media());
+          await native("initPrinter",{port:state.profile.portPath,pitchMM});
+          log("При запуске отправлена ESC q"+String(pitchMM).padStart(3,"0")+
+            ": подача по этикеткам");
         }catch(error){
           printerInitError=error.message;
           log("Ошибка инициализации принтера: "+printerInitError);

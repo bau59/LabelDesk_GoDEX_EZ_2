@@ -1,24 +1,27 @@
 #!/bin/zsh
 # GoDEX EZ-2S, 9600 8N1. Tested media: 58x38mm with a 2mm gap.
-# --init PORT: set label pitch without printing or advancing the tape.
-# PORT PACKET COPIES DELAY: send only the requested raster labels.
+# --init PORT PITCH: configure label height + gap without feeding.
+# PORT PACKET COPIES DELAY PITCH: print requested raster labels.
 set -euo pipefail
 
-if (( $# == 2 )) && [[ "$1" == "--init" ]]; then
+if (( $# == 3 )) && [[ "$1" == "--init" ]]; then
   MODE="init"
   PORT="$2"
-elif (( $# == 4 )); then
+  PITCH="$3"
+elif (( $# == 5 )); then
   MODE="print"
   PORT="$1"
   PACKET="$2"
   integer COPIES="$3"
   DELAY="$4"
+  PITCH="$5"
 else
-  print -u2 "usage: printer.sh --init PORT | PORT PACKET COPIES DELAY"
+  print -u2 "usage: printer.sh --init PORT PITCH | PORT PACKET COPIES DELAY PITCH"
   exit 2
 fi
 
 [[ "$PORT" == /dev/cu.* && -c "$PORT" ]] || { print -u2 "Invalid serial port"; exit 2; }
+[[ "$PITCH" == <-> ]] && (( PITCH >= 11 && PITCH <= 110 )) || { print -u2 "Invalid label height + gap"; exit 2; }
 if [[ "$MODE" == "print" ]]; then
   [[ -f "$PACKET" && -s "$PACKET" ]] || { print -u2 "Missing raster packet"; exit 2; }
   (( COPIES >= 1 && COPIES <= 200 )) || { print -u2 "Invalid copies"; exit 2; }
@@ -45,16 +48,15 @@ open_port() {
 
 open_port
 if [[ "$MODE" == "init" ]]; then
-  # Physically verified: after ESC q040, FEED finds the next label gap.
-  # The setting is lost when the printer is powered off.
-  printf '\033q040' >&3
+  # ESC qNNN is label height + gap, in millimeters. Only q040 was tested physically.
+  printf '\033q%03d' "$PITCH" >&3
   /bin/sleep 0.1  # Give the USB-RS232 adapter time to transmit before closing.
-  print "ESC q040 sent; tape not advanced"
+  print "ESC q$(printf '%03d' "$PITCH") sent; tape not advanced"
   exit 0
 fi
 
 # Protocol header for ESC Gnn raster printing; does not print an extra label.
-printf '\033F0\033q040\033M01' >&3
+printf '\033F0\033q%03d\033M01' "$PITCH" >&3
 integer i=1
 while (( i <= COPIES )); do
   /bin/cat "$PACKET" >&3

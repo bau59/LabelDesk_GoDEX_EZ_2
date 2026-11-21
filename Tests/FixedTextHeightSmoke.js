@@ -74,6 +74,12 @@ assert.equal(txt.plan(filled1).rows.at(-1).text,"ГОТОВО");
 assert.equal(txt.plan(filled2).rows.at(-1).text,"ГОТОВО");
 assert.equal(Buffer.from(txt.build(short,1).base64,"base64").subarray(-6).toString("hex"),
   "1b451b503031");
+const variable={...short,heightMM:60,gapMM:3};
+const variableBytes=Buffer.from(txt.build(variable,1).base64,"base64");
+assert.equal(variableBytes.subarray(3,8).toString("binary"),"\x1bq063");
+assert.equal(Buffer.from(txt.build(short,1).base64,"base64").subarray(3,8).toString("binary"),"\x1bq040");
+assert.throws(()=>txt.build({...short,heightMM:10}),/высоту 10 мм/);
+assert.throws(()=>txt.build({...short,gapMM:0}),/зазор/);
 const editor=fs.readFileSync("LabelDesk/Resources/editor.html","utf8");
 assert.match(editor,/fixedRows:doc\.printMode==="text"&&kind==="text"/);
 assert.match(editor,/Высота поля, строк/);

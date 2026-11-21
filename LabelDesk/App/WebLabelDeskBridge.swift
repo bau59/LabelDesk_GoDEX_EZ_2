@@ -304,22 +304,23 @@ final class WebLabelDeskBridge: NSObject, WKScriptMessageHandler, WKNavigationDe
         }
     }
 
-    /// Set the tested label pitch on app startup or when saving the port.
+    /// Set label height + gap on startup or when saving media settings.
     /// The command does not print or advance labels.
-    private func initializePrinter(port: String) throws -> String {
+    private func initializePrinter(port: String, pitchMM: Int) throws -> String {
         guard activeProcess == nil else {
             throw dataError("Сначала завершите текущее задание печати.")
         }
         guard port.hasPrefix("/dev/cu."),
               !port.dropFirst(8).contains("/"),
-              port.utf8.count < 150 else {
-            throw dataError("Некорректный последовательный порт.")
+              port.utf8.count < 150,
+              (11...110).contains(pitchMM) else {
+            throw dataError("Некорректный порт или шаг этикетки.")
         }
 
         let process = Process()
         process.executableURL = URL(fileURLWithPath: "/bin/zsh")
         process.arguments = [runtime.appendingPathComponent("printer.sh").path,
-                             "--init", port]
+                             "--init", port, String(pitchMM)]
         let pipe = Pipe()
         process.standardOutput = pipe
         process.standardError = pipe
@@ -333,7 +334,7 @@ final class WebLabelDeskBridge: NSObject, WKScriptMessageHandler, WKNavigationDe
             appendLog("printer init FAILED port=\(port) \(details)")
             throw dataError("Инициализация принтера не выполнена: " + details)
         }
-        appendLog("printer init port=\(port) ESC q040")
+        appendLog("printer init port=\(port) ESC q\(String(format: "%03d", pitchMM))")
         return details
     }
 
@@ -350,10 +351,12 @@ final class WebLabelDeskBridge: NSObject, WKScriptMessageHandler, WKNavigationDe
               delay.isFinite, (0.2...10).contains(delay),
               let copies = body["copies"] as? Int,
               (1...200).contains(copies),
+              let pitchMM = body["pitchMM"] as? Int,
+              (11...110).contains(pitchMM),
               let base64 = body["base64"] as? String,
-              base64.utf8.count < 60_000,
+              base64.utf8.count < 80_000,
               let packet = Data(base64Encoded: base64),
-              (5...20_000).contains(packet.count) else {
+              (5...50_000).contains(packet.count) else {
             throw NSError(domain: "LabelDesk", code: 5,
                           userInfo: [NSLocalizedDescriptionKey: "Invalid serial job arguments"])
         }
@@ -364,8 +367,9 @@ final class WebLabelDeskBridge: NSObject, WKScriptMessageHandler, WKNavigationDe
                           userInfo: [NSLocalizedDescriptionKey: "Multiple serial print modes"])
         }
         if textMode {
-            let head = Data([0x1B, 0x46, 0x30, 0x1B, 0x71, 0x30, 0x34, 0x30,
-                             0x1B, 0x4D, 0x30, 0x31])
+            let head = Data([0x1B, 0x46, 0x30, 0x1B, 0x71] +
+                            Array(String(format: "%03d", pitchMM).utf8) +
+                            [0x1B, 0x4D, 0x30, 0x31])
             let end: Data
             if copies <= 99 {
                 end = Data([0x1B, 0x45, 0x1B, 0x50,
@@ -377,7 +381,7 @@ final class WebLabelDeskBridge: NSObject, WKScriptMessageHandler, WKNavigationDe
                             UInt8(48 + copies % 10), 0x0D, 0x0A])
             }
             // Payload length and framing checked before opening the device.
-            // F0/q040/M01 + optional barcode selector + B...E + Pnn/pnnn.
+            // F0/qNNN/M01 + optional barcode selector + B...E + Pnn/pnnn.
             guard packet.count <= 8192,
                   packet.starts(with: head), packet.suffix(end.count) == end,
                   !packet.contains(0x0C) else {
@@ -391,7 +395,7 @@ final class WebLabelDeskBridge: NSObject, WKScriptMessageHandler, WKNavigationDe
             let head = Data([0x1B, 0x46, 0x30, 0x1B, 0x71, 0x30, 0x34, 0x30,
                              0x1B, 0x4D, 0x30, 0x31])
             let tail = Data([0x1B, 0x45, 0x1B, 0x50, 0x30, 0x31])
-            guard copies == 1, packet.count <= 512,
+            guard pitchMM == 40, copies == 1, packet.count <= 512,
                   packet.starts(with: head), packet.suffix(tail.count) == tail,
                   !packet.contains(0x0C) else {
                 throw NSError(domain: "LabelDesk", code: 15,
@@ -409,7 +413,7 @@ final class WebLabelDeskBridge: NSObject, WKScriptMessageHandler, WKNavigationDe
             runtime.appendingPathComponent(
                 textMode ? "printer-text.sh" : (nativeTrial ? "printer-native.sh" : "printer.sh")
             ).path, port, spool.path, String(copies)
-        ] + ((textMode || nativeTrial) ? ["0", String(delay)] : [String(delay)])
+        ] + ((textMode || nativeTrial) ? ["0", String(delay)] : [String(delay), String(pitchMM)])
         let pipe = Pipe()
         process.standardOutput = pipe
         process.standardError = pipe
@@ -458,10 +462,11 @@ final class WebLabelDeskBridge: NSObject, WKScriptMessageHandler, WKNavigationDe
             case "ports":
                 respond(id, result: ports())
             case "initPrinter":
-                guard let port = body["port"] as? String else {
-                    throw dataError("Не указан последовательный порт.")
+                guard let port = body["port"] as? String,
+                      let pitchMM = body["pitchMM"] as? Int else {
+                    throw dataError("Не указан порт или шаг этикетки.")
                 }
-                respond(id, result: try initializePrinter(port: port))
+                respond(id, result: try initializePrinter(port: port, pitchMM: pitchMM))
             case "openRuntime":
                 NSWorkspace.shared.open(runtime)
                 respond(id, result: true)
