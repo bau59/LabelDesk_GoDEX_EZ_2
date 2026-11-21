@@ -39,7 +39,7 @@ assert.equal(packet.subarray(-6).toString("hex"),"1b451b503031");
 const batchPacket=Buffer.from(root.EZ2Text.build(doc,120).base64,"base64");
 assert.equal(batchPacket.subarray(-9).toString("hex"),"1b451b703132300d0a",
   "120 identical date-stamped labels must use native P120 in a single job");
-assert.equal((batchPacket.toString("binary").match(/\\d\\d\\.\\d\\d\\.\\d{4} \\d\\d:\\d\\d/g)||[]).length,1,
+assert.equal((batchPacket.toString("binary").match(/\d\d\.\d\d\.\d{4} \d\d:\d\d/g)||[]).length,1,
   "Batch payload contains a single shared print timestamp");
 const catalogFilled=root.EZ2Dishes.fill(doc,{name:"Любое блюдо"},{});
 assert.equal(catalogFilled.elements.length,3,"Catalog fill keeps automatic stamp");
