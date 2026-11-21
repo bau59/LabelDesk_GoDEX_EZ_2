@@ -17,6 +17,9 @@ const base = {
   ]
 };
 const secondary = {...JSON.parse(JSON.stringify(base)),id:uuid(2),name:"Вариант",updatedAt:"2026-11-15T12:00:00Z"};
+// Base simulates the separate quality-control timestamp template.
+base.elements[0].dynamicValue="printDateTime";
+base.elements[0].isVariable=false;
 const firstFolder = {id:uuid(10),name:"Продукты",baseTemplateID:base.id,createdAt:"2026-11-15T12:00:00Z"};
 const store = {
   templates:[JSON.parse(JSON.stringify(base)),JSON.parse(JSON.stringify(secondary))],
@@ -173,9 +176,6 @@ function assertExistsName(name){assert.ok(store.templates.some(t=>t.name===name)
   await trigger("operatorCancel");
 
   // Manual production timestamp is frozen in the queue snapshot.
-  const originalText=copy(store.templates[0].elements[0]);
-  store.templates[0].elements[0].dynamicValue="printDateTime";
-  store.templates[0].elements[0].isVariable=false;
   await click("template-print",base.id);
   assert.equal(element("operatorStampControls").hidden,false);
   element("operatorStampMode").value="manual";
@@ -188,7 +188,6 @@ function assertExistsName(name){assert.ok(store.templates.some(t=>t.name===name)
   assert.equal(store.queue.at(-1).document.elements[0].dynamicValue,undefined);
   assert.equal(store.templates[0].elements[0].dynamicValue,"printDateTime",
     "Saved template remains dynamic and unchanged");
-  store.templates[0].elements[0]=originalText;
   assert.equal(store.printJobs.length,1,"Manual timestamp queue never prints");
 
   // Folder selection shows the main label list, not an arbitrary first editor.
