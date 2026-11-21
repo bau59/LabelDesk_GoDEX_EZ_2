@@ -1,5 +1,19 @@
 # LabelDesk — original GoDEX EZ-2 on macOS (WebKit + zsh)
 
+## Quality control label, 58×30 mm (1.0.20)
+
+**Этикетки → Контроль качества → Контроль качества · 58×30** is installed once as an ordinary editable template (separate version marker `qualityPresetPack`). It has two centered, visible CP866 lines:
+
+```
+Контроль качества пройден
+Изготовлено и упаковано: 21.11.2026 13:47
+```
+
+The second line contains an explicit `dynamicValue:"printDateTime"` field: the date/time shown above is only an example. At every print, the native text compiler formats the Mac's **current local time**, without modifying saved label JSON or queued template snapshots. The inspector exposes a checkbox to disable or enable automatic date/time for this element. The layout uses native blank top rows to center the two printed lines; there are no extra feed commands.
+
+To print, change **Настройки EZ-2 → Рулон** to width **58**, height **30**, gap **2**, save the settings, select the matching label and use **Пробная печать · 1 шт.**. This media's actual positioning has not yet been verified on the physical printer. Existing 58×38 food presets and user documents are unchanged.
+
+
 ## Variable die-cut label sizes (1.0.19)
 
 For media using the transmissive gap sensor (integer gap **1–10 mm**), LabelDesk now sets the documented `ESC qNNN` to **label height + gap** in millimeters on app launch, when saving settings and when printing. The original 38+2 mm roll still sends `q040` and retains its original 280-line raster payload. For new heights (10–100 mm), raster rows follow `8 × (height − 3 mm)` with the original 3-mm bottom safety reserve; the native CP866 engine reserves 6 mm at the bottom as before. Saved templates are never resized. Continuous stock (gap 0) is blocked because it requires a different sensor/transport mode.

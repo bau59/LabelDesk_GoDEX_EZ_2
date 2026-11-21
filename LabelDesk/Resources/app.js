@@ -903,6 +903,27 @@
     await native("saveData",{key:"settings",json:JSON.stringify(settings)});
     state.settingsSnapshot=settings;
   }
+  async function installQualityPreset(){
+    const pack=window.EZ2QualityPreset;
+    if(!pack||state.settingsSnapshot.qualityPresetPack===pack.version)return;
+    const built=pack.build();
+    // Add only once; existing edits and deletions remain in user storage.
+    for(const doc of built.templates){
+      if(state.templates.some(t=>keySame(t.id,doc.id)))continue;
+      await native("saveTemplate",{document:JSON.stringify(doc)});
+      state.templates.push(clone(doc));
+    }
+    const additions=built.folders.filter(f=>
+      !state.folders.some(existing=>keySame(existing.id,f.id)));
+    if(additions.length){
+      const folders=[...state.folders,...additions];
+      await native("saveData",{key:"folders",json:JSON.stringify(folders)});
+      state.folders=folders;
+    }
+    const settings={...state.settingsSnapshot,qualityPresetPack:pack.version};
+    await native("saveData",{key:"settings",json:JSON.stringify(settings)});
+    state.settingsSnapshot=settings;
+  }
   async function bootstrap(){
     let printerInitError=null;
     try {
@@ -934,6 +955,8 @@
         String(b.updatedAt||"").localeCompare(String(a.updatedAt||"")))[0];
       try{await installFoodPresets();}
       catch(error){note("Готовые шаблоны не установлены: "+error.message,true);}
+      try{await installQualityPreset();}
+      catch(error){note("Шаблон контроля качества не установлен: "+error.message,true);}
       state.templates.sort((a,b)=>String(b.updatedAt||"").localeCompare(String(a.updatedAt||"")));
       state.current=(hadUserTemplates&&originalFirst)?clone(originalFirst):
         (state.templates.find(t=>t.starterPack==="food-v1") ?

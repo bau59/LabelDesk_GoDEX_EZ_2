@@ -66,6 +66,7 @@ jobs:
           node Tests/AICatalogSmoke.js
           node Tests/BarcodesNativeSmoke.js
           node Tests/CP866FoodSmoke.js
+          node Tests/QualityLabelSmoke.js
           node Tests/EditorGeometrySmoke.js
           node Tests/PrinterDiagnosticsSmoke.js
           node Tests/PrinterTransportSmoke.js
@@ -198,6 +199,7 @@ jobs:
           node Tests/AICatalogSmoke.js
           node Tests/BarcodesNativeSmoke.js
           node Tests/CP866FoodSmoke.js
+          node Tests/QualityLabelSmoke.js
           zsh -n Scripts/printer.sh
           zsh -n Scripts/printer-native.sh
           zsh -n Scripts/printer-text.sh
@@ -267,4 +269,4 @@ jobs:
             --repo "$GITHUB_REPOSITORY" \
             --target "$GITHUB_SHA" \
             --title "LabelDesk ${APP_VERSION}" \
-            --notes "LabelDesk 1.0.19 for Intel macOS 15+. Variable die-cut media: ESC qNNN is label height plus gap; raster and CP866 layout follow label height. Original 38+2 mm output remains unchanged. Gapless paper stays blocked. Test one label on new media before batch printing. Ad-hoc signed, not notarized."
+            --notes "LabelDesk 1.0.20 for Intel macOS 15+. Adds a 58x30 mm quality-control template with two centered CP866 text lines. The production/packing date and time use the Mac local clock at print time, not a stored timestamp. Imported once without overwriting existing templates. Set installed roll to 58x30 mm, 2 mm gap; test one label before batch printing. Ad-hoc signed, not notarized."

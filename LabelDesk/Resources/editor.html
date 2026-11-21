@@ -1056,6 +1056,19 @@ function renderProps(){
    }
    root.appendChild(actions);return;
  }
+ if(e.kind==="text"&&doc.printMode==="text"){
+   root.appendChild(checkbox("Дата и время автоматически при печати",
+     e.dynamicValue==="printDateTime",value=>{
+       if(value){e.dynamicValue="printDateTime";e.isVariable=false;}
+       else delete e.dynamicValue;
+       renderProps();renderLayers();
+     }));
+   if(e.dynamicValue==="printDateTime"){
+     const info=document.createElement("p");info.className="hint";
+     info.textContent="Дата и время Mac подставляются при печати. Значение поля «Текст» ниже не используется.";
+     root.appendChild(info);
+   }
+ }
  if(e.kind==="text"||e.kind==="barcode")root.appendChild(prop(e.kind==="text"?"Текст":"Данные штрихкода",textInput(e.value,v=>{e.value=v;},e.kind==="text","field-value")));
  if(e.prefix){
    const prefix=document.createElement("p");prefix.className="hint";

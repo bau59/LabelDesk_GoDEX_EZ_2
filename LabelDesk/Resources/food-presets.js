@@ -9,7 +9,7 @@
   const id=n=>seed+String(n).padStart(12,"0");
   const now="2026-11-16T00:00:00.000Z";
   const row=(identifier,fieldName,prefix,value,fontCode="A00",fixed=false)=>{
-    const fontHeight=fontCode==="A11"?3.5:fontCode==="A12"?7:fontCode==="A02"?2.5:1.5;
+    const fontHeight=fontCode==="A11"?3.5:fontCode==="A12"?7:fontCode==="A03"?3.75:fontCode==="A02"?2.5:1.5;
     return {id:id(identifier),kind:"text",xMM:0,yMM:0,widthMM:55,heightMM:fontHeight,
       rotation:0,isBold:false,renderMode:"device",deviceFont:fontCode,
       textAlignment:"left",isVariable:!fixed,fieldName:fieldName||"",
@@ -90,5 +90,27 @@
     }
     return {folders,templates};
   }
+  // Independent one-time pack: never reinstall deleted food-v1 examples.
+  function buildQuality(){
+    const folderID=id(1005),documentID=id(2005);
+    const spacer=row(501,null,"","","A00",true);
+    spacer.fixedRows=9;spacer.heightMM=11.25; // blank rows center the two printed lines
+    const title=row(502,null,"","Контроль качества пройден","A03",true);
+    title.fixedRows=1;title.textAlignment="center";title.yMM=11.25;
+    const date=row(503,"Дата и время печати","Изготовлено и упаковано: ","","A03",true);
+    date.fixedRows=1;date.textAlignment="center";date.yMM=15;
+    date.dynamicValue="printDateTime"; // calculated for every print, not persisted
+    return {
+      templates:[{
+        id:documentID,folderID,name:"Контроль качества · 58×30",
+        schemaVersion:1,printMode:"text",starterPack:"quality-v1",
+        widthMM:58,heightMM:30,gapMM:2,
+        elements:[spacer,title,date],updatedAt:"2026-11-21T00:00:00.000Z"
+      }],
+      folders:[{id:folderID,name:"Контроль качества",
+        createdAt:"2026-11-21T00:00:00.000Z"}]
+    };
+  }
   root.EZ2FoodPresets={version:"food-v1",build};
+  root.EZ2QualityPreset={version:"quality-58x30-v1",build:buildQuality};
 })(window);

@@ -167,6 +167,11 @@
     out.push(border(glyph.bottom));
     return out;
   }
+  function formatPrintDateTime(now=new Date()){
+    const pad=n=>String(n).padStart(2,"0");
+    return pad(now.getDate())+"."+pad(now.getMonth()+1)+"."+now.getFullYear()+
+      " "+pad(now.getHours())+":"+pad(now.getMinutes());
+  }
   function plan(doc, options={}){
     if(!doc || doc.printMode!=="text")throw Error("Этот макет не является строковым");
     if(!Number.isInteger(Number(doc.heightMM))||Number(doc.heightMM)<10||Number(doc.heightMM)>100||
@@ -240,7 +245,8 @@
       const value=el.kind==="line" ?
         (["─","═","█"].includes(el.lineSymbol)?el.lineSymbol:"─").repeat(
           Math.min(cellCapacity,Math.max(1,Math.min(54,Math.round(Number(el.lineChars)||54))))):
-        String(el.prefix||"")+String(el.value??"");
+        String(el.prefix||"")+(el.dynamicValue==="printDateTime" ?
+          formatPrintDateTime(options.now??new Date()):String(el.value??""));
       const lines=wrapText(value,cellCapacity);
       // Existing labels without fixedRows retain their legacy auto-height.
       // New fixed-height text fields reserve exactly N resident-font line slots,
