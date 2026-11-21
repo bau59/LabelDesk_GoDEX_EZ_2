@@ -284,6 +284,23 @@ function assertExistsName(name){assert.ok(store.templates.some(t=>t.name===name)
   await trigger("saveMarginSettings");
   assert.equal(store.settings.profile.marginLeftMM,3,"Invalid margins must not be saved");
   assert.match(element("notify").textContent,/Отступы/);
+  // The explicit reset only edits inputs; nothing persists until Save.
+  await trigger("zeroTextMargins");
+  assert.equal(element("marginLeft").value,"0");
+  assert.equal(element("marginRight").value,"0");
+  assert.match(element("marginPositionInfo").textContent,/ESC M01/);
+  assert.match(element("marginPositionInfo").textContent,/≈2 мм/);
+  assert.equal(store.settings.profile.marginLeftMM,3,"Reset requires a save");
+  await trigger("saveMarginSettings");
+  assert.equal(store.settings.profile.marginLeftMM,0);
+  assert.equal(store.settings.profile.marginRightMM,0);
+  assert.equal(element("marginLeft").value,0);
+  assert.equal(element("marginRight").value,0);
+  element("marginLeft").value="1";
+  await trigger("marginLeft","input");
+  assert.match(element("marginPositionInfo").textContent,/ESC M02/);
+  assert.match(element("marginPositionInfo").textContent,/≈3 мм/);
+
 
   console.log("Sidebar workflow passed: pure folders, direct rename/delete, template edit/move/delete, draft guard, rollback.");
 })().catch(err=>{console.error(err);process.exitCode=1;});

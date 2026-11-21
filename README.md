@@ -1,5 +1,16 @@
 # LabelDesk — original GoDEX EZ-2 on macOS (WebKit + zsh)
 
+## CP866 print origin and operator margins (1.0.29)
+
+The original GoDEX EZ-2/4 command reference documents `ESC Mnn` with allowed values **M01–M99** (default M03), so **M00 is not supported**. In LabelDesk, zero additional left margin already maps to **M01**, the earliest documented printable position. G01/G02 physical tests estimated an additional **≈2 mm** paper-edge displacement (specific to the tested roll/printer alignment). The app cannot cancel that physical displacement by specifying a negative ESC margin.
+
+The Settings screen explicitly distinguishes the two: **physical left origin ≈2 mm**, **extra user left/right CP866 margins 0–15 mm**, and a live left-side summary (`0 → ESC M01, approximate start 2 mm`; `1 → ESC M02, approximate start 3 mm`). **Установить 0 / 0 мм** fills both inputs with zero; the user then presses **Сохранить отступы** to persist. Existing saved margins are not silently reset.
+
+The editor continues to position native text using `EZ2Text.plan()` and the measured origin, but now displays separate shaded bands for hardware origin and added left margin instead of incorrectly shading the optional margin from the label edge. Both views share the same `EZ2Text.previewOrigin` constant; it is **preview only**, not a transmitted printer command. Old templates and their contents, serial transport and feed are unchanged.
+
+If actual paper has an unexpected offset after M01, verify the label guide and physical loading; there is no smaller documented left-margin parameter for this printer model.
+
+
 ## Native CP866 print width follows roll (1.0.28)
 
 The 55 mm **software** ceiling for native CP866 rows is removed. On a 58 mm label, a new native text element uses a 58 mm width and the editor can set existing fields to 58 mm. Resident font wrapping, alignment, inverse spacing, text margins, preview and native output checks use `doc.widthMM` instead of 55 mm (rolls are configurable in the 10–60 mm range). Existing saved labels keep their widths unless explicitly edited; duplicate preserves original width. The native row margin `ESC Mnn` can now express positions up to the configured roll width. Text tables and frame capacity use the same available roll width.

@@ -17,6 +17,17 @@ const label=make([table,inverse,after,separator]);
 const plan=ez.plan(label);
 assert.equal(plan.rows.length,10);
 assert.equal(plan.usedDots,100,"A00 rows are 10 dots each; 8 dots=1mm");
+assert.equal(ez.previewOrigin.leftMM,2,"Measured physical preview offset remains approximate");
+assert.equal(ez.previewOrigin.topMM,1);
+const atMinimum={...make([after]),marginLeftMM:0,marginRightMM:0};
+const atPlusOne={...make([after]),marginLeftMM:1,marginRightMM:0};
+assert.equal(ez.plan(atMinimum).rows[0].margin,1,
+  "Zero user margin selects documented printer minimum ESC M01");
+assert.equal(ez.plan(atPlusOne).rows[0].margin,2,
+  "One extra millimeter selects ESC M02");
+assert(Buffer.from(ez.build(atPlusOne).base64,"base64")
+  .includes(Buffer.from([27,77,48,50])),
+  "ESC M02 must be emitted for a 1-mm extra left margin");
 assert.equal(plan.rows[0].text,"┌───────┬──────────────────────┬────────┐");
 assert.equal(plan.rows[2].text,"├───────┼──────────────────────┼────────┤");
 assert.equal(plan.rows[5].text,"└───────┴──────────────────────┴────────┘");
@@ -40,8 +51,12 @@ assert.equal(ez.plan(make([separator])).rows[0].text,"═".repeat(40));
 assert.equal(ez.plan(make([{...separator,lineSymbol:"█",lineChars:8}])).rows[0].text,"█".repeat(8));
 assert.throws(()=>ez.plan(make([{...table,value:"ID | NAME | QTY\n"+"01 | LONG | 1\n".repeat(18)}])),/18 строк/);
 const html=fs.readFileSync("LabelDesk/Resources/editor.html","utf8");
-assert.match(html,/nativePreviewOrigin=\{leftMM:2,topMM:1\}/,
-  "Preview uses measured approximate offsets, without changing the serial stream");
+assert.match(html,/nativePreviewOrigin=window\.EZ2Text\.previewOrigin/,
+  "Editor shares the measured hardware preview offset with settings");
+assert.match(html,/className="hardware-origin-guide"/,
+  "Editor distinguishes physical origin from user-configured left margin");
+assert.match(html,/layout\.margins\.left,x:nativePreviewOrigin\.leftMM/,
+  "User margin appears after the printer origin, not at the label edge");
 assert.match(html,/data-add="textTable"/);
 assert.match(html,/data-add="inverseText"/);
 assert.match(html,/\.text-preview-row\.is-reverse\{background:#111\}/);

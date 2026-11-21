@@ -276,4 +276,4 @@ jobs:
             --repo "$GITHUB_REPOSITORY" \
             --target "$GITHUB_SHA" \
             --title "LabelDesk ${APP_VERSION}" \
-            --notes "LabelDesk 1.0.28 for Intel macOS 15+. Native CP866 text layout and field width now follow the configured roll width (up to 60 mm), removing the prior hard 55 mm software restriction. This includes line wrapping, alignment, optional text margins, preview, and native Mnn position validation. Existing saved templates remain unchanged. ESC G55 raster mode and serial transport are unchanged. Edge printing beyond 55 mm has not been validated on hardware and is used at operator risk. Ad-hoc signed, not notarized."
+            --notes "LabelDesk 1.0.29 for Intel macOS 15+. Clarifies CP866 left print origin versus extra user margins. Settings show ESC M01 minimum, current Mnn and approximate measured paper position, with an explicit 0/0 reset (saving required). Editor separately shades observed physical origin and additional margin. Shared G01/G02 measured preview offset; no unsupported M00 command. Printer protocol, saved labels and feed unchanged. Ad-hoc signed, not notarized."

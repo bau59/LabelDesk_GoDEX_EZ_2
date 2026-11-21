@@ -68,6 +68,9 @@ input{user-select:text}
 .marginguide{position:absolute;top:0;bottom:0;z-index:4;pointer-events:none;
  background:repeating-linear-gradient(135deg,#a7b2c02b 0px,#a7b2c02b 5px,#a7b2c009 5px,#a7b2c009 10px);
  border-right:1px dashed #9aa7b8}
+.hardware-origin-guide{position:absolute;top:0;bottom:0;z-index:4;pointer-events:none;
+ background:repeating-linear-gradient(135deg,#7a84992a 0px,#7a84992a 5px,#7a849909 5px,#7a849909 10px);
+ border-right:1px dashed #6d788a}
 .printzone{position:absolute;top:0;bottom:0;z-index:4;pointer-events:none;border-left:2px dashed #8293a9;background:repeating-linear-gradient(135deg,#95a4b530 0px,#95a4b530 5px,#95a4b509 5px,#95a4b509 10px)}
 .mediazone{position:absolute;z-index:4;pointer-events:none;border-left:2px dashed #dc6473;border-top:2px dashed #dc6473;background:repeating-linear-gradient(135deg,#e1667833 0px,#e1667833 5px,#e1667810 5px,#e1667810 10px)}
 
@@ -421,9 +424,8 @@ body[data-editor-mode="text"] #label{border-color:#c0c8d2}
 let doc=null, selected=null, zoom=8, zoomMode="fit", history=[], future=[], snap=true;
 let sampleItems=[],sampleID=null,sampleSearch="";
 let printerMedia={widthMM:58,heightMM:38,gapMM:2,marginLeftMM:0,marginRightMM:0};
-// Physical print-head origin estimated from G01 on 58×38 mm stock.
-// Preview only: never modifies ESC Mnn, F0, CR or paper advance commands.
-const nativePreviewOrigin={leftMM:2,topMM:1};
+// G01/G02 measured paper alignment; preview only, not an ESC command.
+const nativePreviewOrigin=window.EZ2Text.previewOrigin;
 const $=id=>document.getElementById(id);
 const typeNames={text:"Текст",barcode:"Штрихкод",line:"Линия CP866",rectangle:"Рамка",textFrame:"Рамка CP866 с текстом",framedText:"Рамка с текстом",textTable:"Таблица CP866"};
 const patterns={"0":"nnnwwnwnn","1":"wnnwnnnnw","2":"nnwwnnnnw","3":"wnwwnnnnn","4":"nnnwwnnnw","5":"wnnwwnnnn","6":"nnwwwnnnn","7":"nnnwnnwnw","8":"wnnwnnwnn","9":"nnwwnnwnn","A":"wnnnnwnnw","B":"nnwnnwnnw","C":"wnwnnwnnn","D":"nnnnwwnnw","E":"wnnnwwnnn","F":"nnwnwwnnn","G":"nnnnnwwnw","H":"wnnnnwwnn","I":"nnwnnwwnn","J":"nnnnwwwnn","K":"wnnnnnnww","L":"nnwnnnnww","M":"wnwnnnnwn","N":"nnnnwnnww","O":"wnnnwnnwn","P":"nnwnwnnwn","Q":"nnnnnnwww","R":"wnnnnnwwn","S":"nnwnnnwwn","T":"nnnnwnwwn","U":"wwnnnnnnw","V":"nwwnnnnnw","W":"wwwnnnnnn","X":"nwnnwnnnw","Y":"wwnnwnnnn","Z":"nwwnwnnnn","-":"nwnnnnwnw",".":"wwnnnnwnn"," ":"nwwnnnwnn","$":"nwnwnwnnn","/":"nwnwnnnwn","+":"nwnnnwnwn","%":"nnnwnwnwn","*":"nwnnwnwnn"};
@@ -693,7 +695,17 @@ node.appendChild(svg);
        "\nПечать запрещена до исправления.";
      canvas.appendChild(warning);
    }
-   for(const g of [{width:layout.margins.left,x:0},
+   // Printer's observed left origin and user-configured extra margin differ.
+   if(nativePreviewOrigin.leftMM>0){
+     const hardware=document.createElement("div");
+     hardware.className="hardware-origin-guide";
+     hardware.style.left="0";
+     hardware.style.width=(nativePreviewOrigin.leftMM*scale)+"px";
+     hardware.title="Наблюдаемое смещение начала печати ≈"+
+       nativePreviewOrigin.leftMM+" мм (G01/G02). Не управляется отступами.";
+     canvas.appendChild(hardware);
+   }
+   for(const g of [{width:layout.margins.left,x:nativePreviewOrigin.leftMM},
      {width:layout.margins.right,x:doc.widthMM-layout.margins.right}]){
      if(!g.width)continue;
      const guide=document.createElement("div");guide.className="marginguide";
@@ -714,7 +726,7 @@ node.appendChild(svg);
 }
 
 function renderCanvas(){
- const el=$("label");el.querySelectorAll(".obj,.printzone,.mediazone,.marginguide,.text-preview-row,.text-preview-error,.native-fixed-field").forEach(n=>n.remove());if(!doc)return;
+ const el=$("label");el.querySelectorAll(".obj,.printzone,.mediazone,.marginguide,.hardware-origin-guide,.text-preview-row,.text-preview-error,.native-fixed-field").forEach(n=>n.remove());if(!doc)return;
  if(zoomMode==="fit"){
    const desk=$("desk");
    const usableWidth=Math.max(220,desk.clientWidth-100);
@@ -1223,8 +1235,14 @@ function renderProps(){
    details.appendChild(prop("Способ печати",choice));
    const configure=document.createElement("button");configure.type="button";
    configure.textContent="Настроить поля печати";configure.onclick=()=>send("openSettings");
-   details.appendChild(prop("Отступы: "+(printerMedia.marginLeftMM||0)+" мм слева, "+
-     (printerMedia.marginRightMM||0)+" мм справа",configure));
+   details.appendChild(prop("Дополнительные отступы: "+
+     (printerMedia.marginLeftMM||0)+" / "+(printerMedia.marginRightMM||0)+" мм",configure));
+   const physicalNote=document.createElement("p");
+   physicalNote.className="inline-note";
+   physicalNote.textContent="На G01/G02 начало печати ≈"+
+     nativePreviewOrigin.leftMM+" мм от края рулона. Слева добавлено ещё "+
+     (printerMedia.marginLeftMM||0)+" мм из настроек.";
+   details.appendChild(physicalNote);
    details.appendChild(checkbox("Привязка к сетке 1 мм",snap,n=>{snap=n;}));
    root.appendChild(details);
    return;

@@ -5,6 +5,9 @@
 (function(root) {
   "use strict";
   const ESC=27, CR=13, LF=10;
+  // Measured on G01/G02 labels; affects editor visualization only.
+  // EZ-2 manual documents ESC M01 as the minimum horizontal setting.
+  const PREVIEW_ORIGIN=Object.freeze({leftMM:2,topMM:1});
   // Native CP866 width follows the selected roll. Edge coverage beyond
   // the previously tested 55 mm is intentionally user-controlled.
   const BOTTOM_RESERVE_DOTS=48; // original 6-mm margin (38mm -> 256 dots)
@@ -362,5 +365,5 @@
       rows:layout.rows.length,usedDots:layout.usedDots,mode:"text",
       description:"Штатные строки CP866 + "+(layout.barcode?"штрихкод":"текст")};
   }
-  root.EZ2Text={cp866,font,frameLines,plan,build,wrapText};
+  root.EZ2Text={cp866,font,frameLines,plan,build,wrapText,previewOrigin:PREVIEW_ORIGIN};
 })(window);

@@ -980,6 +980,20 @@
     }
   }
 
+  function renderMarginPosition(){
+    const left=Number($("marginLeft").value),right=Number($("marginRight").value);
+    const label=$("marginPositionInfo");
+    if(!Number.isInteger(left)||left<0||left>15||
+       !Number.isInteger(right)||right<0||right>15){
+      label.textContent="Укажите дополнительные отступы от 0 до 15 мм.";
+      return;
+    }
+    const measured=Number(window.EZ2Text?.previewOrigin?.leftMM??2);
+    label.textContent="Слева: ESC M"+String(left+1).padStart(2,"0")+
+      " · примерное начало на бумаге ≈"+(measured+left)+
+      " мм (≈"+measured+" мм физическое смещение + "+left+
+      " мм дополнительный отступ). При 0 мм используется ESC M01.";
+  }
   function renderSettings(){
     $("interval").value=state.profile.labelIntervalSeconds;
     $("threshold").value=state.profile.rasterThreshold;
@@ -988,6 +1002,7 @@
     $("mediaGap").value=media().gapMM;
     $("marginLeft").value=Number(state.profile.marginLeftMM||0);
     $("marginRight").value=Number(state.profile.marginRightMM||0);
+    renderMarginPosition();
     $("mediaSupport").textContent=EZ2Raster.transportReady(media())?
       "ESC q"+String(EZ2Raster.labelPitch(media())).padStart(3,"0")+
       " (высота + зазор). Формат 38+2 мм проверен физически; другие форматы сначала проверьте на одной этикетке. CP866 — по ширине рулона; растр — до 55 мм.":
@@ -1279,6 +1294,12 @@
   });
   $("saveSettings").addEventListener("click",saveSettings);
   $("saveMarginSettings").addEventListener("click",saveSettings);
+  $("marginLeft").addEventListener("input",renderMarginPosition);
+  $("marginRight").addEventListener("input",renderMarginPosition);
+  $("zeroTextMargins").addEventListener("click",()=>{
+    $("marginLeft").value="0";$("marginRight").value="0";
+    renderMarginPosition();
+  });
   $("openRuntime").addEventListener("click",()=>native("openRuntime").catch(e=>note(e.message,true)));
   $("makeBackup").addEventListener("click",async()=>{
     try{

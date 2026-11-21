@@ -829,14 +829,18 @@ input[type="number"]::-webkit-inner-spin-button,input[type="number"]::-webkit-ou
         <p class="muted">Отдельный предел растровой команды EZ-2 — 55 мм (ESC G55). Он не равен ширине рулона; в редакторе отмечается серым, а не красным.</p>
       </div>
       <div class="card">
-        <h3>Отступы текстовой печати</h3>
-        <p class="muted">Расстояние от левого и правого края печатаемой области 55 мм. Применяется ко всем этикеткам в режиме CP866. Растровые макеты используют свои координаты.</p>
+        <h3>Дополнительные отступы CP866</h3>
+        <p class="muted">Здесь задаётся сдвиг <strong>сверх минимальной позиции принтера</strong>. При 0 мм слева отправляется ESC M01 — меньшую позицию руководство EZ-2 не предусматривает. По тестам G01/G02 печать физически начинается примерно в 2 мм от левого края; этот участок не исчезает при нулевой настройке.</p>
         <div class="media-fields margin-settings">
           <div><label for="marginLeft">Слева, мм</label><input id="marginLeft" type="number" min="0" max="15" step="1" value="0"></div>
           <div><label for="marginRight">Справа, мм</label><input id="marginRight" type="number" min="0" max="15" step="1" value="0"></div>
         </div>
-        <p class="muted">Ноль сохраняет существующее размещение. Новые значения влияют на перенос строк и показываются в редакторе.</p>
-        <button id="saveMarginSettings" type="button" class="primary">Сохранить поля печати</button>
+        <p id="marginPositionInfo" class="muted" aria-live="polite"></p>
+        <p class="muted">Правый отступ ограничивает ширину строк; растровая печать не затрагивается. Изменения не применятся до сохранения.</p>
+        <div class="flex">
+          <button id="zeroTextMargins" type="button">Установить 0 / 0 мм</button>
+          <button id="saveMarginSettings" type="button" class="primary">Сохранить отступы</button>
+        </div>
       </div>
       <div class="card">
         <h3>RS-232</h3>
