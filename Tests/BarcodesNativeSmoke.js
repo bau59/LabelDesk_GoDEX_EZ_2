@@ -57,7 +57,8 @@ assert.throws(()=>native.packet(doc("text",{xMM:5})),/левого края/);
 assert.throws(()=>native.packet(doc("text",{renderMode:"auto"})),/Встроенный ASCII/);
 const html=fs.readFileSync("LabelDesk/Resources/editor.html","utf8");
 assert.match(html,/barcodeType:"CODE128"/,"New barcode element defaults to Code128");
-assert.match(html,/const full=Math\.min\(55,doc.widthMM\)/,"New block width defaults to print width");
+assert.match(html,/const full=doc\.printMode==="text"\?doc\.widthMM:Math\.min\(55,doc\.widthMM\)/,
+  "CP866 block follows roll width while raster remains at G55");
 assert.match(html,/\["EAN13","EAN-13"\]/,"EAN-13 remains exposed via new button controls");
 assert.match(html,/Текст CP866/);
 const app=fs.readFileSync("LabelDesk/Resources/app.html","utf8");
