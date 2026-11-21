@@ -272,4 +272,4 @@ jobs:
             --repo "$GITHUB_REPOSITORY" \
             --target "$GITHUB_SHA" \
             --title "LabelDesk ${APP_VERSION}" \
-            --notes "LabelDesk 1.0.25 for Intel macOS 15+. Fixes invisible text on the editor primary Add Text button caused by CSS selector specificity; unifies toolbar button heights, sizes and hover colors across label settings, add actions, extra menu, layer controls and zoom. Print engine, stored templates and printer commands unchanged. Ad-hoc signed, not notarized."
+            --notes "LabelDesk 1.0.26 for Intel macOS 15+. Fixes toolbar overflow: Fit zoom button has natural text width rather than a 38px icon-only square; plus/minus remain square, and the More dropdown now uses a centered, rotating CSS chevron. No changes to printer protocol, printing, or saved templates. Ad-hoc signed, not notarized."

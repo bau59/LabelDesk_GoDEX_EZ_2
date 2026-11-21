@@ -21,7 +21,16 @@ assert.match(html,/Макет готов/);
 assert.match(html,/\.tools > button,[\s\S]*?\.tools \.zoom-controls > button\{[\s\S]*?height:38px;min-height:38px;/);
 assert.match(html,/\.tools \.mode-toolset > button\.tool-add-main\[data-add\]\{[\s\S]*?color:#fff;background:#172132;/);
 assert.match(html,/\.tools \.mode-toolset > button\.tool-add-main\[data-add\]:hover,[\s\S]*?color:#fff;background:#304259;/);
-assert.match(html,/\.tools \.zoom-controls > button\{width:38px;padding:0;/);
+assert.match(html,/\.tools \.zoom-controls > button#zoomFit\{[\s\S]*?min-width:84px;/,
+  "Fit button must have enough width for its caption");
+assert.match(html,/\.tools \.zoom-controls > button#zoomMinus,[\s\S]*?button#zoomPlus\{[\s\S]*?min-width:38px;/,
+  "Only icon zoom buttons are square");
+assert.match(html,/\.add-more>summary::after\{[\s\S]*?transform:rotate\(45deg\)/,
+  "Dropdown arrow is a centered CSS icon");
+assert.match(html,/\.add-more\[open\]>summary::after\{transform:rotate\(225deg\)/,
+  "Dropdown arrow rotates only when expanded");
+assert.equal((html.match(/<summary>Ещё<\/summary>/g)||[]).length,2,
+  "Both modes have an identical More menu");
 assert(!html.includes(".tools .tool-add-main{background:#172132;"),
   "Primary background must not be overridden by more specific data-add selector");
 const source=html.match(/function labelFor\(e\)\{[\s\S]*?(?=function renderLayers\()/);

@@ -1,5 +1,10 @@
 # LabelDesk — original GoDEX EZ-2 on macOS (WebKit + zsh)
 
+## Toolbar zoom/dropdown layout fix (1.0.26)
+
+The **Вписать** zoom button now sizes to its text (minimum 84px); only zoom **−** and **+** remain fixed-width 38px icon buttons. This prevents the zoom caption spilling into the adjacent redo button. The **Ещё** disclosure arrow is a CSS chevron aligned to the center of its 38px control, rotated when expanded; no OS font-dependent arrow glyph. The toolbar can wrap as needed at narrower widths. These are editor-only changes and do not affect the EZ-2 printer protocol.
+
+
 ## Toolbar contrast and sizing fix (1.0.25)
 
 The editor toolbar controls now share 38px height and 12px label text. The primary **＋ Текст** button has explicit sufficiently specific color, dark background, and visible hover/focus colors, overriding the older `.tools button[data-add]` white background. Secondary actions, **Ещё**, list and undo/redo/zoom controls use a consistent neutral treatment. Only editor styles were changed; printer commands and saved data were not modified.
