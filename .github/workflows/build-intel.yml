@@ -64,6 +64,7 @@ jobs:
           node Tests/WebRasterSmoke.js
           node Tests/MediaCompatibilitySmoke.js
           node Tests/SidebarWorkflowSmoke.js
+          node Tests/DesignImportSmoke.js
           node Tests/DishCatalogSmoke.js
           node Tests/AICatalogSmoke.js
           node Tests/BarcodesNativeSmoke.js
@@ -201,6 +202,7 @@ jobs:
           node Tests/WebRasterSmoke.js
           node Tests/MediaCompatibilitySmoke.js
           node Tests/SidebarWorkflowSmoke.js
+          node Tests/DesignImportSmoke.js
           node Tests/DishCatalogSmoke.js
           node Tests/AICatalogSmoke.js
           node Tests/BarcodesNativeSmoke.js
@@ -276,4 +278,4 @@ jobs:
             --repo "$GITHUB_REPOSITORY" \
             --target "$GITHUB_SHA" \
             --title "LabelDesk ${APP_VERSION}" \
-            --notes "LabelDesk 1.0.29 for Intel macOS 15+. Clarifies CP866 left print origin versus extra user margins. Settings show ESC M01 minimum, current Mnn and approximate measured paper position, with an explicit 0/0 reset (saving required). Editor separately shades observed physical origin and additional margin. Shared G01/G02 measured preview offset; no unsupported M00 command. Printer protocol, saved labels and feed unchanged. Ad-hoc signed, not notarized."
+            --notes "LabelDesk 1.0.30 for Intel macOS 15+. Adds a safe ChatGPT JSON label-design workflow: copy a mode-specific prompt (native CP866 or raster) reflecting installed stock, paste an AI-authored template, validate its fields and actual layout, and import as a new saved template without replacing documents or sending print jobs. Accepts strict JSON and JSON code fences. Printer driver, calibration, printing and saved templates remain unchanged. Ad-hoc signed, not notarized."

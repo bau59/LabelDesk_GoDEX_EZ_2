@@ -1,5 +1,56 @@
 # LabelDesk — original GoDEX EZ-2 on macOS (WebKit + zsh)
 
+## Designing labels with ChatGPT JSON (1.0.30)
+
+**Этикетки → Импорт JSON / ИИ** opens an offline design-transfer dialog.
+
+1. Select **Встроенные шрифты CP866** or **Растровый дизайн**, then click **Скопировать промпт**. The prompt includes current stock width/height/gap, a JSON example, supported elements and layout rules. Paste the prompt into ChatGPT, describe your label, and request the JSON response.
+2. Paste that JSON (or a single fenced JSON code block) into the dialog. **Проверить JSON** runs strict schema and geometry validation without saving or sending to the printer.
+3. Click **Импортировать макет**. The app assigns fresh IDs to the document and every element, puts the new label in the currently selected folder if any, persists it via the existing native save method, and opens it for inspection. No previous label is overwritten or printed.
+
+Example native text label (all units are millimeters; array order = actual print-row order):
+
+```json
+{
+  "name": "Контроль качества",
+  "widthMM": 58,
+  "heightMM": 30,
+  "gapMM": 2,
+  "printMode": "text",
+  "elements": [
+    {
+      "kind": "text",
+      "value": "",
+      "deviceFont": "A00",
+      "fixedRows": 9,
+      "isVariable": false
+    },
+    {
+      "kind": "text",
+      "value": "Контроль качества пройден",
+      "deviceFont": "A03",
+      "fixedRows": 1,
+      "textAlignment": "center",
+      "isVariable": false
+    },
+    {
+      "kind": "text",
+      "prefix": "Изготовлено: ",
+      "dynamicValue": "printDateTime",
+      "deviceFont": "A00",
+      "fixedRows": 1,
+      "textAlignment": "center",
+      "isVariable": false
+    }
+  ]
+}
+```
+
+The importer supports **native** `text`, `line`, `barcode`, and **raster** `text`, `line`, `rectangle`, `framedText`, `barcode`. In native mode, text uses real `A00–A04`/`A11–A48` fonts and 1–20 fixed rows; rows print in array order, with no absolute Y control. Reverse-print text supports `reversePrint` and `inversePadLeft`/`inversePadRight`. Native `dynamicValue:"printDateTime"` is supported only for text, not raster. Rasters require explicit geometry `xMM,yMM,widthMM,heightMM`; line wrapping does **not** grow blocks. Native output is limited by real CP866 glyph support and print-width checks; raster output retains its 55-mm physical print limit and 3-mm bottom reserve. Code 128/39 and EAN-8/13 barcodes are validated by the existing generator.
+
+The importer accepts only known schema keys, 1–32 native or 1–60 raster elements, ≤120,000 characters of input, stock width 10–60 mm, integer height 10–100 mm and integer gap 1–10 mm. Malformed or overflowing designs are rejected **before** the native write. An incompatible installed roll is flagged, but the template can still be saved for later. Saved user templates and queued print jobs are never modified by an import.
+
+
 ## CP866 print origin and operator margins (1.0.29)
 
 The original GoDEX EZ-2/4 command reference documents `ESC Mnn` with allowed values **M01–M99** (default M03), so **M00 is not supported**. In LabelDesk, zero additional left margin already maps to **M01**, the earliest documented printable position. G01/G02 physical tests estimated an additional **≈2 mm** paper-edge displacement (specific to the tested roll/printer alignment). The app cannot cancel that physical displacement by specifying a negative ESC margin.

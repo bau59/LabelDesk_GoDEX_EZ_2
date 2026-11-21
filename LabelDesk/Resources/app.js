@@ -175,6 +175,283 @@
     else if(type==="openSettings"){selectView("settings");}
   });
 
+  // Chat-generated JSON is untrusted: import as a NEW template, never execute it.
+  const DESIGN_KINDS={text:["text","line","barcode"],
+    raster:["text","line","rectangle","framedText","barcode"]};
+  function designKeys(data,allowed,where){
+    if(!data||typeof data!=="object"||Array.isArray(data))
+      throw Error(where+": требуется объект JSON.");
+    for(const key of Object.keys(data))
+      if(!allowed.includes(key))throw Error(where+": неизвестное поле «"+key+"»");
+  }
+  function designNum(value,name,min,max,fallback){
+    if(value===undefined)value=fallback;
+    if(typeof value!=="number"||!Number.isFinite(value)||value<min||value>max)
+      throw Error(name+": число от "+min+" до "+max);
+    return value;
+  }
+  function designStr(value,name,max=2000,fallback=""){
+    if(value===undefined)value=fallback;
+    if(typeof value!=="string"||value.length>max)
+      throw Error(name+": текст до "+max+" символов");
+    return value;
+  }
+  function designBool(value,name,fallback=false){
+    if(value===undefined)return fallback;
+    if(typeof value!=="boolean")throw Error(name+": укажите true или false");
+    return value;
+  }
+  function parseDesignJSON(input){
+    let source=String(input||"").trim();
+    if(source.length<2||source.length>120000)
+      throw Error("Вставьте JSON макета (до 120 000 символов).");
+    // Accept the usual fenced answer pasted from ChatGPT.
+    const fence=String.fromCharCode(96).repeat(3);
+    if(source.startsWith(fence)){
+      const begin=source.indexOf("\n"),end=source.lastIndexOf(fence);
+      if(begin<0||end<=begin||source.slice(end+3).trim())
+        throw Error("Вставьте один JSON без дополнительного текста.");
+      const lang=source.slice(3,begin).trim().toLowerCase();
+      if(lang&&lang!=="json")throw Error("Ожидается JSON, а не "+lang);
+      source=source.slice(begin+1,end).trim();
+    }
+    let raw;
+    try{raw=JSON.parse(source);}
+    catch(e){throw Error("Ошибка синтаксиса JSON: "+e.message);}
+    designKeys(raw,["schemaVersion","id","folderID","name","widthMM","heightMM",
+      "gapMM","printMode","elements","updatedAt"],"Макет");
+    if(raw.schemaVersion!==undefined&&raw.schemaVersion!==1)
+      throw Error("Поддерживается schemaVersion: 1.");
+    const widthMM=designNum(raw.widthMM,"Ширина этикетки",10,60);
+    const heightMM=designNum(raw.heightMM,"Высота этикетки",10,100);
+    const gapMM=designNum(raw.gapMM,"Зазор",1,10);
+    if(!Number.isInteger(heightMM)||!Number.isInteger(gapMM))
+      throw Error("Высота и зазор должны быть целыми числами.");
+    const name=designStr(raw.name,"Название",80).trim();
+    if(!name)throw Error("Укажите название макета.");
+    if(!DESIGN_KINDS[raw.printMode])
+      throw Error('printMode: "text" (CP866) или "raster".');
+    if(!Array.isArray(raw.elements)||raw.elements.length===0||
+       raw.elements.length>(raw.printMode==="text"?32:60))
+      throw Error("Количество элементов: 1–"+(raw.printMode==="text"?32:60));
+    const doc={schemaVersion:1,id:uuid(),name,widthMM,heightMM,gapMM,
+      printMode:raw.printMode,elements:[],updatedAt:stamp(),
+      folderID:findFolder(state.selectedFolderID)?.id||null};
+    const keys=["id","kind","xMM","yMM","widthMM","heightMM","value","prefix",
+      "deviceFont","fixedRows","textAlignment","reversePrint",
+      "inversePadLeft","inversePadRight","dynamicValue","isVariable","fieldName",
+      "barcodeType","showsHumanReadable","lineChars","lineSymbol","fontSize",
+      "isBold","rotation","frameBorderMM","framePaddingMM"];
+    for(let i=0;i<raw.elements.length;i++){
+      const data=raw.elements[i],where="Элемент "+(i+1);
+      designKeys(data,keys,where);
+      if(!DESIGN_KINDS[doc.printMode].includes(data.kind))
+        throw Error(where+": вид «"+String(data.kind)+"» не поддерживается в "+doc.printMode);
+      const native=doc.printMode==="text",kind=data.kind;
+      const code=designStr(data.deviceFont,where+" / deviceFont",3,"A00");
+      if(native&&kind==="text")EZ2Text.font(code);
+      const rows=designNum(data.fixedRows,where+" / fixedRows",1,20,1);
+      if(!Number.isInteger(rows))throw Error(where+": fixedRows — целое число.");
+      if(native&&kind==="barcode"&&i!==raw.elements.length-1)
+        throw Error(where+": встроенный штрихкод должен быть последним.");
+      const defaultHeight=native?(kind==="barcode"?12:
+        kind==="line"?1.25:rows*EZ2Text.font(code).heightDots/8):
+        (kind==="text"?8:kind==="barcode"?13:kind==="line"?1:10);
+      if(!native)
+        for(const key of ["xMM","yMM","widthMM","heightMM"])
+          if(data[key]===undefined)throw Error(where+": требуется "+key);
+      const el={id:uuid(),kind,
+        xMM:designNum(data.xMM,where+" / xMM",0,60,0),
+        yMM:designNum(data.yMM,where+" / yMM",0,100,0),
+        widthMM:designNum(data.widthMM,where+" / widthMM",0.125,60,widthMM),
+        heightMM:designNum(data.heightMM,where+" / heightMM",0.125,100,defaultHeight),
+        value:designStr(data.value,where+" / value"),
+        prefix:designStr(data.prefix,where+" / prefix",500),
+        textAlignment:data.textAlignment??"left",
+        isVariable:designBool(data.isVariable,where+" / isVariable"),
+        fieldName:designStr(data.fieldName,where+" / fieldName",100),
+        rotation:designNum(data.rotation,where+" / rotation",0,359,0)};
+      if(!["left","center","right"].includes(el.textAlignment))
+        throw Error(where+": textAlignment: left, center или right.");
+      if(native&&el.rotation!==0)throw Error(where+": CP866 не поддерживает поворот.");
+      if(kind==="text"){
+        if(!native&&(data.dynamicValue!==undefined||
+          data.reversePrint!==undefined||data.inversePadLeft!==undefined||
+          data.inversePadRight!==undefined||data.fixedRows!==undefined||
+          data.deviceFont!==undefined))
+          throw Error(where+": динамические даты, CP866-шрифты и инверсия"+
+            " доступны только в режиме text.");
+        if(native&&data.fontSize!==undefined)
+          throw Error(where+": fontSize доступен только в растровом режиме.");
+        if(native){
+          el.deviceFont=code;el.fixedRows=rows;
+          el.reversePrint=designBool(data.reversePrint,where+" / reversePrint");
+          el.inversePadLeft=designNum(data.inversePadLeft,where+" / inversePadLeft",0,12,0);
+          el.inversePadRight=designNum(data.inversePadRight,where+" / inversePadRight",0,12,0);
+          if(!Number.isInteger(el.inversePadLeft)||!Number.isInteger(el.inversePadRight))
+            throw Error(where+": отступы инверсии должны быть целыми.");
+          if(data.dynamicValue!==undefined){
+            if(data.dynamicValue!=="printDateTime")
+              throw Error(where+": поддерживается только dynamicValue=printDateTime.");
+            el.dynamicValue=data.dynamicValue;el.isVariable=false;
+          }
+        }else{
+          el.fontSize=designNum(data.fontSize,where+" / fontSize",4,40,12);
+          el.isBold=designBool(data.isBold,where+" / isBold");
+        }
+      }
+      if(kind==="barcode"){
+        el.barcodeType=designStr(data.barcodeType,where+" / barcodeType",8,"CODE128");
+        if(!["CODE128","CODE39","EAN13","EAN8"].includes(el.barcodeType))
+          throw Error(where+": неизвестный формат штрихкода.");
+        el.showsHumanReadable=designBool(data.showsHumanReadable,
+          where+" / showsHumanReadable",true);
+        if(!el.value.trim())throw Error(where+": укажите данные штрихкода.");
+        EZ2Barcodes.generate(el.barcodeType,el.value);
+      }
+      if(kind==="line"&&native){
+        el.lineSymbol=designStr(data.lineSymbol,where+" / lineSymbol",1,"─");
+        if(!["─","═","█"].includes(el.lineSymbol))
+          throw Error(where+": lineSymbol: ─, ═ или █.");
+        el.lineChars=designNum(data.lineChars,where+" / lineChars",1,60,30);
+        if(!Number.isInteger(el.lineChars))
+          throw Error(where+": lineChars должно быть целым.");
+      }
+      if(kind==="framedText"){
+        el.fontSize=designNum(data.fontSize,where+" / fontSize",4,40,12);
+        el.isBold=designBool(data.isBold,where+" / isBold");
+        el.frameBorderMM=designNum(data.frameBorderMM,where+" / frameBorderMM",0.125,3,0.25);
+        el.framePaddingMM=designNum(data.framePaddingMM,where+" / framePaddingMM",0,10,1.5);
+      }
+      if(el.xMM+el.widthMM>doc.widthMM+0.001||
+         el.yMM+el.heightMM>doc.heightMM+0.001)
+        throw Error(where+": объект выходит за границы этикетки.");
+      doc.elements.push(el);
+    }
+    if(doc.printMode==="text")EZ2Text.plan({...doc,marginLeftMM:0,marginRightMM:0});
+    else EZ2Raster.draw(doc);
+    return doc;
+  }
+  function designPrompt(){
+    const m=media(),mode=$("designPromptMode").value;
+    const common=[
+      "Составь один JSON-макет для LabelDesk (GoDEX EZ-2). Ответ — ТОЛЬКО JSON,"+
+        " без Markdown и пояснений.",
+      "Рулон: "+m.widthMM+"×"+m.heightMM+" мм, зазор "+m.gapMM+
+        " мм. Используй эти размеры, если я не укажу другие.",
+      "Формат: {name,widthMM,heightMM,gapMM,printMode,elements}. Числа — числа,"+
+        " не строки; высота 10–100 мм, зазор 1–10 мм (целые)."+
+        " Не придумывай id, folderID, updatedAt: программа добавит их.",
+      "Поддержка текстовых полей: value, prefix, textAlignment: left/center/right."+
+        " Фиксированный текст isVariable:false; заполняемый при печати —"+
+        " isVariable:true с fieldName.",
+      "Штрихкод: kind:\"barcode\", barcodeType:\"CODE128\"/\"CODE39\""+
+        "/\"EAN13\"/\"EAN8\", value с допустимыми данными.",
+      "Никаких несуществующих методов, свободного HTML, CSS, команд принтера"+
+        " или неизвестных полей. Импорт сохраняет новый макет, но не печатает."
+    ];
+    if(mode==="raster")return [...common,
+      "Режим: printMode:\"raster\"; виды элементов: text, line, rectangle, framedText, barcode.",
+      "Каждый элемент ОБЯЗАТЕЛЬНО имеет xMM,yMM,widthMM,heightMM."+
+        " Не выходи за размеры наклейки; печатаемая ширина до 55 мм;"+
+        " снизу 3 мм технологический резерв.",
+      "Текст: fontSize в пунктах (4–40), isBold true/false."+
+        " Перенос происходит внутри высоты поля; он не увеличивает блок."+
+        " Автоматическая дата/время и инверсия ESC V доступны только для CP866.",
+      "Пример JSON:",
+      JSON.stringify({name:"Пример",widthMM:m.widthMM,heightMM:m.heightMM,
+        gapMM:Math.max(1,m.gapMM),printMode:"raster",elements:[
+          {kind:"text",xMM:2,yMM:2,widthMM:Math.min(50,m.widthMM-4),
+            heightMM:Math.min(6,m.heightMM-5),
+            value:m.widthMM<30?"А":"Название",fontSize:10,
+            isBold:true,textAlignment:"center"}
+        ]},null,2)
+    ].join("\n\n");
+    return [...common,
+      "Режим: printMode:\"text\"; CP866 встроенные шрифты."+
+        " Виды элементов: text, line, barcode (не больше одного barcode и последним).",
+      "Строки идут строго в порядке массива elements сверху вниз; yMM не"+
+        " задаёт реальную вертикальную позицию. Для пустого промежутка"+
+        " используй text со значением value:\"\", deviceFont:\"A00\","+
+        " fixedRows:N, isVariable:false.",
+      "Шрифты: A00–A04, A11–A48. A00=8×10 точек, A03=8×30; 8 точек ≈1 мм."+
+        " Для каждого text указывай deviceFont, fixedRows:1–20, widthMM до ширины рулона."+
+        " Высота текстового поля фиксирована. Если текст не помещается,"+
+        " уменьши размер/длину, не увеличивай блок автоматически.",
+      "Автоматическая дата/время Mac: dynamicValue:\"printDateTime\" у kind:text."+
+        " Можно добавить prefix; значение value не требуется.",
+      "Инверсия: reversePrint:true, inversePadLeft/inversePadRight 0–12"+
+        " в ячейках символов. Не используй произвольные X/Y координаты для CP866.",
+      "Используй символы CP866, включая русские буквы, Ё/ё.",
+      "Пример JSON:",
+      JSON.stringify({name:"Контроль качества",widthMM:m.widthMM,
+        heightMM:m.heightMM,gapMM:Math.max(1,m.gapMM),printMode:"text",
+        elements:m.widthMM>=30&&m.heightMM>=18?[
+          {kind:"text",value:"",deviceFont:"A00",fixedRows:5,isVariable:false},
+          {kind:"text",value:"Контроль качества пройден",deviceFont:"A03",
+            fixedRows:1,textAlignment:"center",isVariable:false},
+          {kind:"text",prefix:"Изготовлено: ",value:"",
+            dynamicValue:"printDateTime",deviceFont:"A00",fixedRows:1,
+            textAlignment:"center",isVariable:false}
+        ]:[{kind:"text",value:"Контроль пройден",
+          deviceFont:"A00",fixedRows:2,isVariable:false}]},null,2)
+    ].join("\n\n");
+  }
+  async function copyDesignPrompt(){
+    const prompt=designPrompt();
+    const area=$("designPromptCopy");
+    try{
+      if(window.navigator?.clipboard?.writeText){
+        await window.navigator.clipboard.writeText(prompt);
+      }else{
+        area.value=prompt;area.hidden=false;area.focus();area.select();
+        if(!document.execCommand("copy"))
+          throw Error("Не удалось скопировать; выделите текст вручную.");
+        area.hidden=true;
+      }
+      $("designImportFeedback").textContent="Промпт скопирован. Вставьте в ChatGPT.";
+      $("designImportFeedback").className="ai-fill-feedback ok";
+    }catch(e){
+      area.value=prompt;area.hidden=false;area.focus();area.select();
+      $("designImportFeedback").textContent=e.message;
+      $("designImportFeedback").className="ai-fill-feedback";
+    }
+  }
+  function validateDesignInput(){
+    const doc=parseDesignJSON($("designImportJSON").value);
+    const check=compatibility(doc);
+    $("designImportFeedback").textContent=doc.name+" · "+doc.widthMM+"×"+doc.heightMM+
+      " мм · "+doc.elements.length+" элементов · "+
+      (doc.printMode==="text"?"CP866":"Растр")+
+      (check.ok?" · подходит рулону":" · "+check.reason);
+    $("designImportFeedback").className="ai-fill-feedback ok";
+    return doc;
+  }
+  function openDesignImport(){
+    $("designImportJSON").value="";
+    $("designPromptCopy").hidden=true;
+    $("designImportFeedback").textContent="";
+    $("designImportFeedback").className="ai-fill-feedback";
+    $("designImportDialog").hidden=false;
+  }
+  function closeDesignImport(){$("designImportDialog").hidden=true;}
+  async function importDesign(){
+    try{
+      const doc=validateDesignInput();
+      if(state.dirty&&!confirmDiscard())return;
+      await saveTemplateDocument(doc);
+      state.current=clone(doc);state.selectedID=doc.id;
+      state.dirty=false;state.quickValues={};editorEditing=true;
+      state.folderFilter=doc.folderID||"unfiled";
+      state.selectedFolderID=doc.folderID;moveTemplateID=null;
+      closeDesignImport();renderLibrary();selectView("editor");
+      note("Импортирован макет «"+doc.name+"». Печать не запускалась.");
+    }catch(e){
+      $("designImportFeedback").textContent=e.message;
+      $("designImportFeedback").className="ai-fill-feedback";
+    }
+  }
+
   function renderLibrary(){
     updateCounts();
     const count=id=>state.templates.filter(t=>keySame(t.folderID,id)).length;
@@ -1260,6 +1537,21 @@
   $("printEditorSample").addEventListener("click",printEditorSample);
   $("newTemplate").addEventListener("click",makeCurrent);
   $("newTemplateMain").addEventListener("click",makeCurrent);
+  $("openDesignImport").addEventListener("click",openDesignImport);
+  $("designImportClose").addEventListener("click",closeDesignImport);
+  $("designImportCancel").addEventListener("click",closeDesignImport);
+  $("designCopyPrompt").addEventListener("click",copyDesignPrompt);
+  $("designImportCheck").addEventListener("click",()=>{
+    try{validateDesignInput();}
+    catch(e){
+      $("designImportFeedback").textContent=e.message;
+      $("designImportFeedback").className="ai-fill-feedback";
+    }
+  });
+  $("designImportSave").addEventListener("click",importDesign);
+  document.addEventListener("keydown",event=>{
+    if(event.key==="Escape"&&!$("designImportDialog").hidden)closeDesignImport();
+  });
   $("backToTemplates").addEventListener("click",()=>{
     if(!confirmDiscard())return;
     editorEditing=false;moveTemplateID=null;state.dirty=false;selectView("editor");

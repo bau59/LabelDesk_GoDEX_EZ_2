@@ -590,6 +590,29 @@ input[type="number"]::-webkit-inner-spin-button,input[type="number"]::-webkit-ou
 @media(max-width:700px){.operator-overlay{padding:7px}.operator-panel{padding:14px}
   .operator-body{grid-template-columns:1fr}.operator-head h3{font-size:16px}}
 
+
+/* JSON exchange: same typography as catalog AI form, no background requests. */
+.design-transfer-overlay[hidden],#designPromptCopy[hidden]{display:none!important}
+.design-transfer-overlay{position:fixed;inset:0;z-index:1650;background:#111827a9;
+ display:grid;place-items:center;padding:18px}
+.design-transfer-panel{width:min(850px,100%);max-height:94vh;overflow:auto;
+ border-radius:14px;border:1px solid #dae1ec;background:#fff;padding:22px;
+ box-shadow:0 24px 80px #11182755}
+.design-transfer-panel .ai-fill-top{align-items:flex-start}
+.design-transfer-panel .ai-fill-section{margin-top:14px;padding-top:15px}
+.design-transfer-choice{display:grid;gap:6px;font-size:12px;font-weight:600;color:#536277}
+.design-transfer-choice select{min-height:37px;min-width:240px;border:1px solid #d2dce8;
+ border-radius:8px;background:#fff;padding:7px 10px}
+.design-transfer-panel textarea{display:block;width:100%;min-height:235px;resize:vertical;
+ padding:12px;border:1px solid #cfd9e6;border-radius:9px;background:#fff;
+ font:12px/1.6 ui-monospace,Menlo,Consolas,monospace}
+#designPromptCopy{min-height:100px;margin-top:12px}
+.design-transfer-actions{display:flex;justify-content:flex-end;gap:8px;flex-wrap:wrap;
+ padding-top:13px}
+.design-transfer-panel .ai-fill-feedback{min-height:17px;margin-top:11px}
+@media(max-width:640px){.design-transfer-overlay{padding:6px}
+ .design-transfer-panel{padding:14px}.design-transfer-choice select{min-width:0;width:100%}}
+
 </style>
 </head>
 <body>
@@ -738,7 +761,10 @@ input[type="number"]::-webkit-inner-spin-button,input[type="number"]::-webkit-ou
     <div id="editorLibrary" class="page" style="max-width:1450px">
       <div class="page-intro"><div><h2>Этикетки <small id="librarySummary"></small></h2>
         <p class="intro">Папки выбираются слева. Действия находятся у каждой этикетки.</p></div>
-        <button id="newTemplateMain" class="primary">＋ Новая этикетка</button></div>
+        <div class="flex">
+           <button id="openDesignImport" type="button">⇩ Импорт JSON / ИИ</button>
+           <button id="newTemplateMain" class="primary">＋ Новая этикетка</button>
+         </div></div>
       <div class="card">
         <h3>Шаблоны <span id="templateCount"></span></h3>
         <p class="muted" id="folderDetail"></p>
@@ -902,6 +928,46 @@ input[type="number"]::-webkit-inner-spin-button,input[type="number"]::-webkit-ou
 </main>
 
 
+
+<div id="designImportDialog" class="design-transfer-overlay" role="dialog" aria-modal="true"
+     aria-labelledby="designImportTitle" hidden>
+  <div class="design-transfer-panel">
+    <div class="ai-fill-top">
+      <div><h3 id="designImportTitle">Дизайн этикетки из ChatGPT</h3>
+        <p class="ai-fill-help">Промпт → ответ JSON → проверка → новый макет. Без отправки на печать.</p>
+      </div>
+      <button id="designImportClose" type="button">✕ Закрыть</button>
+    </div>
+    <section class="ai-fill-section">
+      <h4>1. Скопировать правила для ChatGPT</h4>
+      <p class="ai-fill-help">Промпт содержит размеры установленного рулона, допустимые элементы, шрифты и пример JSON.</p>
+      <div class="flex">
+        <label class="design-transfer-choice">Способ печати
+          <select id="designPromptMode" aria-label="Режим дизайна">
+            <option value="text">Встроенные шрифты CP866</option>
+            <option value="raster">Растровый дизайн</option>
+          </select>
+        </label>
+        <button id="designCopyPrompt" class="primary" type="button">Скопировать промпт</button>
+      </div>
+      <textarea id="designPromptCopy" aria-label="Промпт для ручного копирования" hidden
+                spellcheck="false" readonly></textarea>
+    </section>
+    <section class="ai-fill-section">
+      <h4>2. Вставить готовый JSON</h4>
+      <p class="ai-fill-help">Один объект JSON с name, widthMM, heightMM, gapMM, printMode и elements.
+        Можно вставить JSON в кодовом блоке из чата. Существующие макеты не перезаписываются.</p>
+      <textarea id="designImportJSON" aria-label="JSON дизайна этикетки" spellcheck="false"
+                placeholder='{"name":"Моя этикетка","widthMM":58,"heightMM":30,"gapMM":2,"printMode":"text","elements":[{"kind":"text","value":"Текст","deviceFont":"A00","fixedRows":1}]}'></textarea>
+      <div id="designImportFeedback" class="ai-fill-feedback" role="status" aria-live="polite"></div>
+      <div class="design-transfer-actions">
+        <button id="designImportCancel" type="button">Отмена</button>
+        <button id="designImportCheck" type="button">Проверить JSON</button>
+        <button id="designImportSave" class="primary" type="button">Импортировать макет</button>
+      </div>
+    </section>
+  </div>
+</div>
 <div id="templatePrintDialog" class="operator-overlay" role="dialog" aria-modal="true"
      aria-labelledby="operatorPrintTitle" hidden>
   <div class="operator-panel">

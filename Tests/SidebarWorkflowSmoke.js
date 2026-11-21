@@ -5,6 +5,11 @@ const assert = require("node:assert/strict");
 const fs = require("node:fs");
 const vm = require("node:vm");
 const source = fs.readFileSync("LabelDesk/Resources/app.js","utf8");
+const nativeRoot={};
+for(const filename of ["barcodes.js","text-engine.js"])
+  vm.runInNewContext(fs.readFileSync("LabelDesk/Resources/"+filename,"utf8"),
+    {window:nativeRoot,btoa:text=>Buffer.from(text,"binary").toString("base64")});
+const EZ2Text=nativeRoot.EZ2Text,EZ2Barcodes=nativeRoot.EZ2Barcodes;
 const html = fs.readFileSync("LabelDesk/Resources/app.html","utf8");
 const uuid = n => "00000000-0000-4000-8000-"+String(n).padStart(12,"0");
 const base = {
@@ -101,6 +106,8 @@ const window = {
     }catch(err){window.labelDeskReceive({id,error:err.message});}
   }}}}
 };
+let copiedDesignPrompt="";
+window.navigator={clipboard:{writeText:async value=>{copiedDesignPrompt=value;}}};
 const EZ2Raster = {
   mediaFromProfile:p=>({widthMM:+(p.mediaWidthMM??58),heightMM:+(p.mediaHeightMM??38),gapMM:+(p.mediaGapMM??2)}),
   compatibility:(doc,media)=>{
@@ -116,7 +123,7 @@ const EZ2Raster = {
 };
 let sequence=1000;
 const crypto={randomUUID:()=>uuid(sequence++)};
-const context={window,document,crypto,EZ2Raster,Date,console,Number,String,Object,Array,
+const context={window,document,crypto,EZ2Raster,EZ2Text,EZ2Barcodes,Date,console,Number,String,Object,Array,
   setTimeout,Uint8Array,Math};
 vm.runInNewContext(source,context,{filename:"LabelDesk/Resources/app.js"});
 async function settle(){await new Promise(resolve=>setTimeout(resolve,0));}
@@ -302,5 +309,37 @@ function assertExistsName(name){assert.ok(store.templates.some(t=>t.name===name)
   assert.match(element("marginPositionInfo").textContent,/≈3 мм/);
 
 
-  console.log("Sidebar workflow passed: pure folders, direct rename/delete, template edit/move/delete, draft guard, rollback.");
+  // Chat-generated design workflow: prompt copied, invalid JSON rejected,
+  // valid JSON persisted once as a new template, never sent to printer.
+  const savedBefore=store.templates.length,sentBefore=store.printJobs.length;
+  await trigger("openDesignImport");
+  assert.equal(element("designImportDialog").hidden,false);
+  element("designPromptMode").value="text";
+  await trigger("designCopyPrompt");
+  assert.match(copiedDesignPrompt,/GoDEX EZ-2/);
+  assert.match(copiedDesignPrompt,/58×38/);
+  assert.match(copiedDesignPrompt,/fixedRows/);
+  assert.match(copiedDesignPrompt,/printDateTime/);
+  element("designImportJSON").value="{invalid";
+  await trigger("designImportSave");
+  assert.equal(store.templates.length,savedBefore);
+  assert.match(element("designImportFeedback").textContent,/Ошибка синтаксиса JSON/);
+  const payload={name:"Чат: контроль качества",widthMM:58,heightMM:38,
+    gapMM:2,printMode:"text",elements:[
+      {kind:"text",value:"Контроль качества пройден",deviceFont:"A00",
+        fixedRows:1,isVariable:false}]};
+  element("designImportJSON").value=JSON.stringify(payload);
+  await trigger("designImportCheck");
+  assert.match(element("designImportFeedback").textContent,/1 элементов/);
+  assert.equal(store.templates.length,savedBefore,"Check cannot persist a template");
+  await trigger("designImportSave");
+  assert.equal(store.templates.length,savedBefore+1);
+  const imported=store.templates.find(t=>t.name===payload.name);
+  assert(imported&&imported.id&&imported.elements[0].id);
+  assert.notEqual(imported.id,base.id);
+  assert.equal(imported.elements[0].value,"Контроль качества пройден");
+  assert.equal(element("designImportDialog").hidden,true);
+  assert.equal(store.printJobs.length,sentBefore,"Import never prints");
+
+  console.log("Sidebar workflow passed: folders, editor, isolated design import, prompt copy, no printer access.");
 })().catch(err=>{console.error(err);process.exitCode=1;});
