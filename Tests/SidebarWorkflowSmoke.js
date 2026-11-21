@@ -48,7 +48,8 @@ const bodyListeners = new Map();
 const document = {
   getElementById:element,
   querySelectorAll:()=>[],
-  body:{addEventListener:(type,handler)=>bodyListeners.set(type,handler)}
+  body:{addEventListener:(type,handler)=>bodyListeners.set(type,handler)},
+  addEventListener:()=>{}
 };
 const prompts = [];
 const log=[];
@@ -132,18 +133,63 @@ function assertExistsName(name){assert.ok(store.templates.some(t=>t.name===name)
   assert.equal(store.folders.length,1);
   assert.equal(store.templates.length,2);
 
-  // Print a saved layout directly in a batch, with no catalog item.
+  // Operator form opens before printing and does not require a catalog item.
+  assert.match(html,/id="templatePrintDialog"/);
   assert.match(element("templates").innerHTML,/data-template-print=/);
-  element("template-copies-"+secondary.id).value="5";
   await click("template-print",secondary.id);
+  assert.equal(element("templatePrintDialog").hidden,false);
+  assert.match(element("operatorFields").innerHTML,/Название/);
+  element("operator-field-"+secondary.elements[0].id).value="Проверка из формы";
+  element("operator-field-"+secondary.elements[1].id).value="123456";
+  element("operatorCopies").value="3";
+  await trigger("operatorQueue");
+  assert.equal(store.printJobs.length,0,"Queue action may not send to printer");
+  assert.equal(store.queue.at(-1).copies,3);
+  assert.equal(store.queue.at(-1).document.elements[0].value,"Проверка из формы");
+  const pending=store.queue.at(-1).id;
+  assert.equal(store.queue.at(-1).state,"pending");
+
+  await click("template-print",secondary.id);
+  element("operator-field-"+secondary.elements[0].id).value="Отдельная печать";
+  element("operator-field-"+secondary.elements[1].id).value="123456";
+  element("operatorCopies").value="5";
+  await trigger("operatorSend");
   assert.equal(store.printJobs.length,1,"Only one dedicated print job is sent");
   assert.equal(store.printJobs[0].copies,5,"Entire batch uses one request");
   assert.equal(store.printJobs[0].pitchMM,40,"Legacy 38+2 pitch unchanged");
   assert.equal(store.queue.at(-1).document.id,secondary.id);
+  assert.equal(store.queue.at(-1).document.elements[0].value,"Отдельная печать");
   assert.equal(store.queue.at(-1).state,"sent");
-  element("template-copies-"+secondary.id).value="0";
+  assert.equal(store.queue.find(j=>j.id===pending).state,"pending",
+    "Previously queued jobs remain untouched");
+  assert.equal(element("templatePrintDialog").hidden,true);
+
+  // Invalid quantity does not create or send a job.
   await click("template-print",secondary.id);
-  assert.equal(store.printJobs.length,1,"Invalid count cannot enqueue a job");
+  element("operatorCopies").value="0";
+  await trigger("operatorSend");
+  assert.equal(store.printJobs.length,1);
+  assert.equal(store.queue.length,2);
+  await trigger("operatorCancel");
+
+  // Manual production timestamp is frozen in the queue snapshot.
+  const originalText=copy(store.templates[0].elements[0]);
+  store.templates[0].elements[0].dynamicValue="printDateTime";
+  store.templates[0].elements[0].isVariable=false;
+  await click("template-print",base.id);
+  assert.equal(element("operatorStampControls").hidden,false);
+  element("operatorStampMode").value="manual";
+  await trigger("operatorStampMode","change");
+  element("operatorStampManual").value="2026-11-21T13:47";
+  element("operator-field-"+base.elements[1].id).value="123456";
+  element("operatorCopies").value="2";
+  await trigger("operatorQueue");
+  assert.equal(store.queue.at(-1).document.elements[0].value,"21.11.2026 13:47");
+  assert.equal(store.queue.at(-1).document.elements[0].dynamicValue,undefined);
+  assert.equal(store.templates[0].elements[0].dynamicValue,"printDateTime",
+    "Saved template remains dynamic and unchanged");
+  store.templates[0].elements[0]=originalText;
+  assert.equal(store.printJobs.length,1,"Manual timestamp queue never prints");
 
   // Folder selection shows the main label list, not an arbitrary first editor.
   await click("folder",firstFolder.id);

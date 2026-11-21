@@ -203,15 +203,13 @@
         (!check.ok?'<small class="media-incompatible">⚠ '+esc(check.reason)+'</small>':'')+
         '</div><div class="record-actions">'+
         '<button data-template="'+esc(t.id)+'" class="primary">Редактировать</button>'+
+        '<button data-template-print="'+esc(t.id)+'" class="primary"'+
+        (!check.ok?' disabled title="Размер рулона не совпадает с шаблоном"':'')+
+        '>Печатать</button>'+
         '<button data-template-copy="'+esc(t.id)+'">Копировать</button>'+
         '<button data-template-move="'+esc(t.id)+'">Переместить</button>'+
         '<button data-template-remove="'+esc(t.id)+'" class="danger">Удалить</button></div>'+
-        '<div class="template-print-run">'+
-        '<label for="template-copies-'+esc(t.id)+'">Тираж</label>'+
-        '<input id="template-copies-'+esc(t.id)+'" type="number" min="1" max="200" step="1" value="1" inputmode="numeric" aria-label="Количество экземпляров макета">'+
-        '<button type="button" data-template-print="'+esc(t.id)+'" class="primary"'+
-        (!check.ok?' disabled title="Размер рулона не совпадает с шаблоном"':'')+
-        '>Печатать</button></div>'+
+
         (moving?'<div class="record-folder-choices"><strong style="font-size:11px">В папку:</strong>'+
           targets.map(f=>'<button type="button" data-move-to="'+esc(f.id)+'" data-template-id="'+esc(t.id)+'"'+
           (keySame(t.folderID,f.id)||(f.id==="unfiled"&&!t.folderID)?' disabled class="selected"':'')+
@@ -510,30 +508,166 @@
     state.jobs=jobs;renderQueue();
     return job.id;
   }
-  async function printSavedTemplate(id){
+  // Operator form: one selected saved template, separate from catalog/editor.
+  // Only a print snapshot is changed; original user documents stay untouched.
+  let operatorTemplateID=null;
+  const operatorFields=doc=>(doc.elements||[]).filter(e=>
+    (e.kind==="text"||e.kind==="barcode")&&e.isVariable!==false&&
+    e.dynamicValue!=="printDateTime");
+  const isPlaceholder=value=>/^\[[^\]]+\]$/.test(String(value||"").trim());
+  function formatOperatorDate(d){
+    const pad=n=>String(n).padStart(2,"0");
+    return pad(d.getDate())+"."+pad(d.getMonth()+1)+"."+d.getFullYear()+
+      " "+pad(d.getHours())+":"+pad(d.getMinutes());
+  }
+  function operatorDate(){
+    if($("operatorStampMode").value!=="manual")return new Date();
+    const value=String($("operatorStampManual").value||"");
+    if(!/^\d{4}-\d\d-\d\dT\d\d:\d\d$/.test(value))
+      throw Error("Укажите дату и время изготовления.");
+    const d=new Date(value);
+    if(!Number.isFinite(d.getTime())||
+       d.getFullYear()!==Number(value.slice(0,4))||
+       d.getMonth()+1!==Number(value.slice(5,7))||
+       d.getDate()!==Number(value.slice(8,10))||
+       d.getHours()!==Number(value.slice(11,13))||
+       d.getMinutes()!==Number(value.slice(14,16)))
+      throw Error("Некорректная дата или время.");
+    return d;
+  }
+  function operatorDocument(){
+    const source=findTemplate(operatorTemplateID);
+    if(!source)throw Error("Сохранённый макет больше не существует.");
+    const doc=clone(source);
+    const now=operatorDate();
+    for(const e of doc.elements||[]){
+      if(e.dynamicValue==="printDateTime"){
+        // Freeze timestamp per job. Replay/queue will retain exact values.
+        delete e.dynamicValue;
+        e.value=formatOperatorDate(now);
+        e.isVariable=false;
+      }else if((e.kind==="text"||e.kind==="barcode")&&e.isVariable!==false){
+        const input=$("operator-field-"+e.id);
+        const value=String(input?.value??"");
+        e.value=value;
+        if(!value.trim()){
+          // No placeholder or prefix escapes to the printer.
+          e.prefix="";
+          if(e.kind==="barcode"){
+            doc.elements=doc.elements.filter(item=>item!==e);
+          }
+        }
+      }
+    }
+    return doc;
+  }
+  function closeOperator(){
+    operatorTemplateID=null;$("templatePrintDialog").hidden=true;
+  }
+  function renderOperatorPreview(){
+    if(!operatorTemplateID)return;
+    const feedback=$("operatorPrintFeedback");
+    feedback.textContent="";
+    try{
+      const count=Number($("operatorCopies").value);
+      if(!Number.isInteger(count)||count<1||count>200)
+        throw Error("Тираж: от 1 до 200 этикеток.");
+      const doc=operatorDocument();
+      const checked=compatibility(doc);
+      if(!checked.ok)throw Error("Макет не подходит рулону: "+checked.reason);
+      if(!EZ2Raster.transportReady(media()))throw Error("Рулон без зазора не поддерживается.");
+      encodeJob(doc,count);
+      $("operatorPrintSize").textContent=doc.widthMM+" × "+doc.heightMM+
+        " мм · "+(isTextDoc(doc)?"Текст CP866":"Растр")+
+        " · тираж "+count+" шт.";
+      if(isTextDoc(doc)){
+        const layout=EZ2Text.plan(withPrintMargins(doc));
+        let y=0;
+        const rows=layout.rows.map(row=>{
+          const height=row.kind==="barcode"?120:row.font.heightDots;
+          const left=(row.kind==="barcode"?layout.margins.left:row.margin-1)*100/doc.widthMM;
+          const top=y*100/(Number(doc.heightMM)*8);
+          y+=height;
+          if(row.kind==="barcode")
+            return '<div class="operator-native-line" style="left:'+left+
+              '%;top:'+top+'%;height:'+(height*100/(doc.heightMM*8))+
+              '%">▥ Штрихкод</div>';
+          const width=Array.from(row.text).length*row.font.widthDots*100/(doc.widthMM*8);
+          const cls=row.reverse?" operator-inverse":"";
+          return '<div class="operator-native-line'+cls+'" style="left:'+left+
+            '%;top:'+top+'%;width:'+Math.min(width,100-left)+
+            '%;height:'+(height*100/(doc.heightMM*8))+'%;font-size:'+
+            Math.max(8,Math.min(19,row.font.heightDots*0.63))+'px">'+
+            esc(row.text)+'</div>';
+        }).join("");
+        $("operatorPrintPreview").innerHTML='<div class="operator-paper" style="aspect-ratio:'+
+          Number(doc.widthMM)+' / '+Number(doc.heightMM)+'">'+rows+'</div>'+
+          '<p class="muted">Схема CP866: размеры строк расчётные; рисунок букв приблизительный.</p>';
+      }else{
+        const img=EZ2Raster.draw(doc);
+        $("operatorPrintPreview").innerHTML='<img class="operator-raster" alt="Предпросмотр макета" src="'+
+          img.toDataURL("image/png")+'">';
+      }
+      $("operatorSend").disabled=false;
+      $("operatorQueue").disabled=false;
+    }catch(error){
+      feedback.textContent=error.message;
+      $("operatorSend").disabled=true;
+      $("operatorQueue").disabled=true;
+      $("operatorPrintPreview").innerHTML="";
+    }
+  }
+  function openOperator(id){
     const doc=findTemplate(id);
-    if(!doc){note("Шаблон не найден",true);return;}
-    if(state.running){note("Принтер выполняет другое задание",true);return;}
-    if(!state.profile.portPath){note("Выберите RS-232 порт в настройках",true);return;}
-    const count=Number($("template-copies-"+doc.id)?.value);
-    if(!Number.isInteger(count)||count<1||count>200){
-      note("Тираж: от 1 до 200 этикеток",true);return;
+    if(!doc){note("Сохранённый макет не найден",true);return;}
+    operatorTemplateID=doc.id;
+    $("operatorPrintTitle").textContent=doc.name;
+    $("operatorCopies").value="1";
+    $("operatorStampMode").value="now";
+    $("operatorStampManual").value="";
+    $("operatorStampManualWrap").hidden=true;
+    const hasDate=doc.elements.some(e=>e.dynamicValue==="printDateTime");
+    $("operatorStampControls").hidden=!hasDate;
+    $("operatorFields").innerHTML=operatorFields(doc).map((e,i)=>{
+      const name=esc(e.fieldName?.trim()||(e.kind==="barcode"?"Штрихкод ":"Текст ")+(i+1));
+      const inputID="operator-field-"+e.id;
+      const value=isPlaceholder(e.value)?"":String(e.value??"");
+      return '<label class="operator-field" for="'+esc(inputID)+'"><span>'+name+'</span>'+
+        (e.kind==="text"?'<textarea rows="2"':'<input type="text" value="'+esc(value)+'"')+
+        ' id="'+esc(inputID)+'" data-operator-field="'+esc(e.id)+
+        '" placeholder="'+(e.kind==="barcode"?"Данные штрихкода":"Текст для этикетки")+
+        '">'+(e.kind==="text"?esc(value)+"</textarea>":"")+'</label>';
+    }).join("");
+    $("templatePrintDialog").hidden=false;
+    renderOperatorPreview();
+  }
+  async function submitOperator(direct){
+    if(!operatorTemplateID||state.running)return;
+    if(direct&&!state.profile.portPath){
+      $("operatorPrintFeedback").textContent="Выберите RS-232 порт в настройках.";
+      return;
     }
     try{
-      // The saved template is printed as-is, without an item/catalog record.
-      // No previous queue entries may be sent by this action.
-      if(!compatibility(doc).ok)throw Error("Размер макета не совпадает с установленным рулоном.");
+      const count=Number($("operatorCopies").value);
+      if(!Number.isInteger(count)||count<1||count>200)
+        throw Error("Тираж: от 1 до 200 этикеток.");
+      const doc=operatorDocument();
       encodeJob(doc,count);
-      if(!window.confirm("Напечатать «"+doc.name+"» — "+count+" шт.? "+
-        "В очереди могут быть другие задания; они не будут запущены."))return;
+      if(direct&&!window.confirm("Передать в принтер «"+doc.name+"», "+count+
+        " шт.? Другие задания очереди не запускаются."))return;
       const jobID=await queueDocument(doc,count);
+      if(!direct){
+        closeOperator();note("В очередь добавлено: "+doc.name+", "+count+" шт.");return;
+      }
       await printQueue(true,[jobID]);
+      closeOperator();
       const job=state.jobs.find(j=>j.id===jobID);
-      if(job?.state==="sent")note("Передан тираж: "+doc.name+", "+count+" шт. Физическую печать проверьте.");
-      else if(job?.state==="pending")note("Тираж остался в очереди: печать не подтверждена.");
-      else if(job?.state==="failed"||job?.state==="uncertain")note(
-        "Тираж: "+(job.errorMessage||"Ошибка передачи"),true);
-    }catch(error){note("Печать макета: "+error.message,true);}
+      if(job?.state==="sent")note("Тираж "+count+" шт. передан в принтер. Проверьте физическую печать.");
+      else note("Тираж сохранён в очереди: "+(job?.errorMessage||"передача не подтверждена"),true);
+    }catch(error){
+      $("operatorPrintFeedback").textContent=error.message;
+      note("Печать макета: "+error.message,true);
+    }
   }
   async function printEditorSample(){
     if(!editorEditing||!state.current){
@@ -1039,7 +1173,7 @@
       return;
     }
     const templatePrint=ev.target.closest("[data-template-print]");
-    if(templatePrint){await printSavedTemplate(templatePrint.dataset.templatePrint);return;}
+    if(templatePrint){openOperator(templatePrint.dataset.templatePrint);return;}
     const copyRow=ev.target.closest("[data-template-copy]");
     if(copyRow){await duplicateCurrent(copyRow.dataset.templateCopy);return;}
     const deleteRow=ev.target.closest("[data-template-remove]");
@@ -1066,6 +1200,20 @@
         j.state="pending";j.errorMessage=null;await persistQueue();renderQueue();
       }
     }
+  });
+  $("operatorClose").addEventListener("click",closeOperator);
+  $("operatorCancel").addEventListener("click",closeOperator);
+  $("operatorCopies").addEventListener("input",renderOperatorPreview);
+  $("operatorStampMode").addEventListener("change",()=>{
+    $("operatorStampManualWrap").hidden=$("operatorStampMode").value!=="manual";
+    renderOperatorPreview();
+  });
+  $("operatorStampManual").addEventListener("input",renderOperatorPreview);
+  $("operatorFields").addEventListener("input",renderOperatorPreview);
+  $("operatorQueue").addEventListener("click",()=>submitOperator(false));
+  $("operatorSend").addEventListener("click",()=>submitOperator(true));
+  document.addEventListener("keydown",event=>{
+    if(event.key==="Escape"&&!$("templatePrintDialog").hidden)closeOperator();
   });
   $("catalogGoPrint").addEventListener("click",()=>selectView("print"));
   $("sendDishToPrint").addEventListener("click",()=>{

@@ -1144,10 +1144,33 @@ function renderProps(){
        details.appendChild(summary);
        details.appendChild(fontGallery(e,["A13","A14","A31","A32","A33","A41","A42","A48"]));
        root.appendChild(details);
+       const code=e.deviceFont||"A00";
+       if(/^A[1-4][1-8]$/.test(code)){
+         const changeScale=(axis,value)=>{
+           const h=axis==="x"?Math.round(value):Number(e.deviceFont[1]);
+           const v=axis==="y"?Math.round(value):Number(e.deviceFont[2]);
+           e.deviceFont="A"+h+v;
+           const f=window.EZ2Text.font(e.deviceFont);
+           if(Number.isInteger(e.fixedRows)&&e.fixedRows>0)
+             e.heightMM=e.fixedRows*f.heightDots/8;
+           renderProps();
+         };
+         root.appendChild(pair(
+           prop("Масштаб по ширине (X)",numInput(Number(code[1]),n=>changeScale("x",n),1,4,1)),
+           prop("Масштаб по высоте (Y)",numInput(Number(code[2]),n=>changeScale("y",n),1,8,1))));
+       }
        const f=window.EZ2Text.font(e.deviceFont||"A00");
+       const usableWidth=Math.max(0,Math.min(Number(e.widthMM||55),
+         55-Number(printerMedia.marginLeftMM||0)-
+         Number(printerMedia.marginRightMM||0)-Number(e.xMM||0)));
+       const capacity=Math.floor(usableWidth*8/f.widthDots);
+       const pitch=f.heightDots+(e.reversePrint?10:0);
+       const used=Number.isInteger(e.fixedRows)&&e.fixedRows>0?
+         (e.fixedRows*pitch/8).toFixed(2)+" мм":"по содержимому";
        const info=document.createElement("p");info.className="font-summary";
        info.textContent="ESC "+f.code+" · "+f.widthDots+"×"+f.heightDots+
-          " точек на символ · 8 точек ≈ 1 мм. Форма букв приблизительная, размеры и перенос — из планировщика печати.";
+         " точек · до "+capacity+" символов в строке · высота блока: "+used+
+         ". Перенос и выравнивание рассчитываются по ширине. Форма букв приблизительная.";
        root.appendChild(info);
      }else{
        root.appendChild(prop("Размер диагностического шрифта",fontGallery(e,

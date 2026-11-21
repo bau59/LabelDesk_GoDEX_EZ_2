@@ -44,4 +44,16 @@ assert.match(html, /e\.yMM=Math\.max\(0,\(doc\.heightMM-e\.heightMM\)\/2\)/,
              "Selected block must support vertical centering");
 assert.match(html,/numInput\(doc\.widthMM,n=>\{doc\.widthMM=n;\},10,60,0\.5\)/, "Physical media width must allow 60mm");
 assert.match(html,/className="printzone"/, "Editor must hatch unreachable ESC G area");
-console.log("Editor geometry smoke test passed: selection, media width, print-zone hatch, text and four-corner resizing.");
+// Native CP866 scaling uses only documented Axy font codes; never invent XY commands.
+assert.match(html,/Масштаб по ширине \(X\)/);
+assert.match(html,/Масштаб по высоте \(Y\)/);
+assert.match(html,/e\.deviceFont="A"\+h\+v/);
+assert.match(html,/до "\+capacity\+" символов в строке/);
+const nativeSource=fs.readFileSync("LabelDesk/Resources/text-engine.js","utf8");
+const native={};vm.runInNewContext(nativeSource,{window:native});
+for(let x=1;x<=4;x++)for(let y=1;y<=8;y++){
+  const m=native.EZ2Text.font("A"+x+y);
+  assert.equal(m.widthDots,x*16);
+  assert.equal(m.heightDots,y*26);
+}
+console.log("Editor geometry smoke test passed: selection, print zones, CP866 X/Y scaling and four-corner resizing.");

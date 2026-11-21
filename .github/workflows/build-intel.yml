@@ -269,4 +269,4 @@ jobs:
             --repo "$GITHUB_REPOSITORY" \
             --target "$GITHUB_SHA" \
             --title "LabelDesk ${APP_VERSION}" \
-            --notes "LabelDesk 1.0.21 for Intel macOS 15+. Print any saved label directly from the template library without linking a catalog item: select 1-200 copies and press Print. Uses only the selected queue job; existing jobs are untouched. Automatic Mac-local date/time is resolved once per print batch. Compatible with the 58x30 quality-control label. Ad-hoc signed, not notarized."
+            --notes "LabelDesk 1.0.22 for Intel macOS 15+. Operator print form with editable text/barcode variables, 1-200 copies, CP866 plan or raster preview, manual or current Mac local date-time, queue or isolated print. Date/time frozen per queued print snapshot. CP866 editor now offers separate X/Y scaling for documented Axy fonts and character-capacity information. Existing saved labels and EZ-2 serial protocol unchanged. Validate one physical label before production batches. Ad-hoc signed, not notarized."

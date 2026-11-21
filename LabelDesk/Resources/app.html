@@ -405,14 +405,6 @@ footer{color:#8993a1}
 .record-actions button{padding:8px 11px;font-size:11px}
 .record-actions button.danger{color:#b73344}
 .record-actions button.primary{background:#172132;border-color:#172132;color:#fff}
-.template-print-run{grid-column:1/-1;display:flex;gap:9px;align-items:center;
-  padding-top:10px;border-top:1px solid #eef0f4;flex-wrap:wrap}
-.template-print-run label{font-size:12px;color:#64748b}
-.template-print-run input{width:76px;min-height:34px;padding:6px 8px;
-  border:1px solid #d6dde7;border-radius:7px;font-size:13px;text-align:center}
-.template-print-run button{padding:8px 13px;font-size:12px}
-.template-print-run button.primary{background:#172132;border-color:#172132;color:#fff}
-.template-print-run button:disabled{opacity:.45;cursor:not-allowed}
 .record-folder-choices{grid-column:1/-1;border-top:1px solid #eef0f4;
  padding-top:12px;display:flex;gap:7px;flex-wrap:wrap}
 .record-folder-choices button{font-size:11px;padding:7px 10px;background:#fff}
@@ -558,6 +550,48 @@ input[type="number"]::-webkit-inner-spin-button,input[type="number"]::-webkit-ou
 .ai-fill-inline{display:inline-flex;align-items:center;gap:7px;font-size:12px}
 @media(max-width:640px){.ai-field-list{grid-template-columns:1fr}
   .ai-fill-panel{padding:15px}.ai-fill-overlay{padding:8px}}
+
+/* Independent operator print form, with no item/catalog dependency. */
+.operator-overlay[hidden],#operatorStampControls[hidden],#operatorStampManualWrap[hidden]{display:none!important}
+.operator-overlay{position:fixed;inset:0;z-index:1600;background:#1118279e;
+  display:grid;place-items:center;padding:22px}
+.operator-panel{width:min(880px,100%);max-height:93vh;overflow:auto;
+  background:#fff;border-radius:15px;border:1px solid #d9e0e9;
+  box-shadow:0 28px 78px #17213245;padding:22px}
+.operator-head{display:flex;justify-content:space-between;align-items:flex-start;gap:16px}
+.operator-head h3{font-size:18px;margin:0 0 6px}
+.operator-head p{font-size:12px;color:#718097;margin:0}
+.operator-body{display:grid;grid-template-columns:minmax(0,1fr) minmax(255px,.95fr);
+  gap:22px;margin-top:20px}
+.operator-fields{display:grid;gap:11px;max-height:270px;overflow:auto}
+.operator-field{display:grid;gap:5px;color:#49576d;font-size:12px;font-weight:600}
+.operator-field textarea,.operator-field input,.operator-control input,.operator-control select{
+  width:100%;min-height:38px;border:1px solid #d6dfe9;border-radius:7px;
+  padding:8px 10px;background:white;color:#1f2937;font:13px -apple-system,sans-serif}
+.operator-field textarea{min-height:54px;resize:vertical}
+.operator-control{display:grid;gap:6px;font-size:12px;color:#536277;font-weight:600;
+  margin-top:15px}
+.operator-stamp{border-top:1px solid #e7ebf0;padding-top:2px;margin-top:12px}
+.operator-preview-card{background:#f7f9fc;border:1px solid #e6ebf1;
+  border-radius:10px;padding:15px;min-width:0}
+.operator-preview-card h4{margin:0 0 12px;font-size:12px;color:#394b61}
+.operator-paper{position:relative;width:100%;background:#fff;overflow:hidden;
+  border:1px solid #e2e5eb;box-shadow:0 3px 12px #11182715}
+.operator-native-line{position:absolute;white-space:pre;overflow:hidden;
+  font-family:Menlo,Monaco,monospace;color:#111;line-height:1.1;font-weight:600}
+.operator-native-line.operator-inverse{background:#111;color:#fff}
+.operator-raster{display:block;max-width:100%;margin:auto;background:#fff}
+.operator-preview-card .muted{font-size:11px;margin:8px 0 0;line-height:1.5}
+.operator-actions{display:flex;align-items:center;justify-content:flex-end;gap:9px;
+  flex-wrap:wrap;border-top:1px solid #e7ebf2;margin-top:18px;padding-top:15px}
+.operator-actions button{padding:10px 14px;font-size:12px}
+.operator-actions button.primary{background:#172132;color:#fff;border-color:#172132}
+.operator-actions button:disabled{opacity:.5;cursor:not-allowed}
+.operator-feedback{color:#b43243;font-size:12px;white-space:pre-wrap;
+  margin:12px 0 0;min-height:18px}
+@media(max-width:700px){.operator-overlay{padding:7px}.operator-panel{padding:14px}
+  .operator-body{grid-template-columns:1fr}.operator-head h3{font-size:16px}}
+
 </style>
 </head>
 <body>
@@ -864,6 +898,49 @@ input[type="number"]::-webkit-inner-spin-button,input[type="number"]::-webkit-ou
     </div>
   </section>
 </main>
+
+
+<div id="templatePrintDialog" class="operator-overlay" role="dialog" aria-modal="true"
+     aria-labelledby="operatorPrintTitle" hidden>
+  <div class="operator-panel">
+    <div class="operator-head">
+      <div><h3 id="operatorPrintTitle">Печать этикетки</h3>
+        <p>Готовый макет · без привязки к каталогу</p></div>
+      <button id="operatorClose" type="button" aria-label="Закрыть форму">✕ Закрыть</button>
+    </div>
+    <div class="operator-body">
+      <div>
+        <div class="operator-fields" id="operatorFields"></div>
+        <div id="operatorStampControls" class="operator-stamp" hidden>
+          <label class="operator-control" for="operatorStampMode">Дата и время для этикетки
+            <select id="operatorStampMode">
+              <option value="now">Текущие на момент запуска</option>
+              <option value="manual">Указать вручную</option>
+            </select>
+          </label>
+          <label id="operatorStampManualWrap" class="operator-control" for="operatorStampManual" hidden>
+            Дата и время изготовления
+            <input id="operatorStampManual" type="datetime-local" step="60">
+          </label>
+        </div>
+        <label class="operator-control" for="operatorCopies">Тираж, шт. (1–200)
+          <input id="operatorCopies" type="number" min="1" max="200" step="1" value="1">
+        </label>
+      </div>
+      <div class="operator-preview-card">
+        <h4>Предпросмотр перед печатью</h4>
+        <div id="operatorPrintPreview"></div>
+        <p id="operatorPrintSize" class="muted"></p>
+      </div>
+    </div>
+    <p id="operatorPrintFeedback" class="operator-feedback" role="status"></p>
+    <div class="operator-actions">
+      <button id="operatorCancel" type="button">Отмена</button>
+      <button id="operatorQueue" type="button">В очередь</button>
+      <button id="operatorSend" type="button" class="primary">Печатать</button>
+    </div>
+  </div>
+</div>
 
 <div id="aiFillDialog" class="ai-fill-overlay" role="dialog" aria-modal="true" aria-label="AI-заполнение карточки" hidden>
   <div class="ai-fill-panel">

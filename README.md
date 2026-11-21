@@ -1,5 +1,18 @@
 # LabelDesk — original GoDEX EZ-2 on macOS (WebKit + zsh)
 
+## Operator print form and CP866 editor controls (1.0.22)
+
+Open **Редактор этикеток → [saved label] → Печатать**. A dedicated operator form opens without editing the original document or creating an item in the catalog:
+
+- **Editable fields** appear only for the template's text/barcode fields with \`isVariable!==false\`. Saved literal text remains fixed. Existing placeholders are not printed; empty fields render blank rows and empty barcodes are omitted.
+- **Production/packing date-time** for a \`dynamicValue:"printDateTime"\` element can use the Mac local clock at job creation or an explicit operator-supplied local date-time. The formatted value is **frozen in the queued document snapshot**; replay does not unexpectedly change the production date. Saved templates retain the dynamic marker.
+- **Preview** uses the real EZ-2 text row planner (horizontal margins, resident font metrics, wrapping, inversions, fixed line slots) or the normal raster renderer. CP866 glyph outlines in the form are illustrative; the native serial encoder remains the source of truth. Incompatible media, invalid dates and overflowing text prevent sending.
+- **1–200 copies**; choose **В очередь** to store without sending or **Печатать** to send *only* the new job. Existing queued jobs stay intact; there is no claim of physical completion without printer feedback.
+- In the native CP866 editor, fonts \`A11..A48\` now expose separate **X 1–4 / Y 1–8** controls. These generate only existing documented \`Axy\` codes. The inspector reports current dot dimensions, character capacity and fixed field height. \`A00..A04\` remain separate preset font codes.
+
+No changes to \`printer.sh\`, transport calibration, \`ESC qNNN\`, or stored template schema are required. Stock other than the physically verified 38+2 mm still requires a single-label positioning test.
+
+
 ## Direct template batches (1.0.21)
 
 The template library now has a **Тираж** count (1–200) and **Печатать** action on each saved label. This prints the selected saved document directly, without selecting or creating any item in the catalog. It uses the existing validated `queueDocument` and isolated `printQueue(true,[jobID])` flow, so earlier queued jobs are not transmitted. Existing documents are not modified. Unsupported roll dimensions and printer errors are still reported.
