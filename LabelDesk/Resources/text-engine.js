@@ -195,8 +195,8 @@
       if(el.rotation && Number(el.rotation)!==0)throw Error("Поворот строки невозможен в EZ-2");
       if(el.kind==="textTable"){
         const f=font("A00"); // Native box characters verified at A00 in G01/G02.
-        const lines=tableLines(el,margins.width-x);
         const x=Math.max(0,Number(el.xMM||0));
+        const lines=tableLines(el,margins.width-x);
         const usableWidth=margins.width-x;
         for(const line of lines){
           if(Array.from(line).length>usableWidth)
