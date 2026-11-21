@@ -132,6 +132,19 @@ function assertExistsName(name){assert.ok(store.templates.some(t=>t.name===name)
   assert.equal(store.folders.length,1);
   assert.equal(store.templates.length,2);
 
+  // Print a saved layout directly in a batch, with no catalog item.
+  assert.match(element("templates").innerHTML,/data-template-print=/);
+  element("template-copies-"+secondary.id).value="5";
+  await click("template-print",secondary.id);
+  assert.equal(store.printJobs.length,1,"Only one dedicated print job is sent");
+  assert.equal(store.printJobs[0].copies,5,"Entire batch uses one request");
+  assert.equal(store.printJobs[0].pitchMM,40,"Legacy 38+2 pitch unchanged");
+  assert.equal(store.queue.at(-1).document.id,secondary.id);
+  assert.equal(store.queue.at(-1).state,"sent");
+  element("template-copies-"+secondary.id).value="0";
+  await click("template-print",secondary.id);
+  assert.equal(store.printJobs.length,1,"Invalid count cannot enqueue a job");
+
   // Folder selection shows the main label list, not an arbitrary first editor.
   await click("folder",firstFolder.id);
   assert.match(element("topTitle").textContent,/Редактор этикеток/);

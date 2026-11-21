@@ -206,6 +206,12 @@
         '<button data-template-copy="'+esc(t.id)+'">Копировать</button>'+
         '<button data-template-move="'+esc(t.id)+'">Переместить</button>'+
         '<button data-template-remove="'+esc(t.id)+'" class="danger">Удалить</button></div>'+
+        '<div class="template-print-run">'+
+        '<label for="template-copies-'+esc(t.id)+'">Тираж</label>'+
+        '<input id="template-copies-'+esc(t.id)+'" type="number" min="1" max="200" step="1" value="1" inputmode="numeric" aria-label="Количество экземпляров макета">'+
+        '<button type="button" data-template-print="'+esc(t.id)+'" class="primary"'+
+        (!check.ok?' disabled title="Размер рулона не совпадает с шаблоном"':'')+
+        '>Печатать</button></div>'+
         (moving?'<div class="record-folder-choices"><strong style="font-size:11px">В папку:</strong>'+
           targets.map(f=>'<button type="button" data-move-to="'+esc(f.id)+'" data-template-id="'+esc(t.id)+'"'+
           (keySame(t.folderID,f.id)||(f.id==="unfiled"&&!t.folderID)?' disabled class="selected"':'')+
@@ -503,6 +509,31 @@
     await native("saveData",{key:"queue",json:JSON.stringify(jobs)});
     state.jobs=jobs;renderQueue();
     return job.id;
+  }
+  async function printSavedTemplate(id){
+    const doc=findTemplate(id);
+    if(!doc){note("Шаблон не найден",true);return;}
+    if(state.running){note("Принтер выполняет другое задание",true);return;}
+    if(!state.profile.portPath){note("Выберите RS-232 порт в настройках",true);return;}
+    const count=Number($("template-copies-"+doc.id)?.value);
+    if(!Number.isInteger(count)||count<1||count>200){
+      note("Тираж: от 1 до 200 этикеток",true);return;
+    }
+    try{
+      // The saved template is printed as-is, without an item/catalog record.
+      // No previous queue entries may be sent by this action.
+      if(!compatibility(doc).ok)throw Error("Размер макета не совпадает с установленным рулоном.");
+      encodeJob(doc,count);
+      if(!window.confirm("Напечатать «"+doc.name+"» — "+count+" шт.? "+
+        "В очереди могут быть другие задания; они не будут запущены."))return;
+      const jobID=await queueDocument(doc,count);
+      await printQueue(true,[jobID]);
+      const job=state.jobs.find(j=>j.id===jobID);
+      if(job?.state==="sent")note("Передан тираж: "+doc.name+", "+count+" шт. Физическую печать проверьте.");
+      else if(job?.state==="pending")note("Тираж остался в очереди: печать не подтверждена.");
+      else if(job?.state==="failed"||job?.state==="uncertain")note(
+        "Тираж: "+(job.errorMessage||"Ошибка передачи"),true);
+    }catch(error){note("Печать макета: "+error.message,true);}
   }
   async function printEditorSample(){
     if(!editorEditing||!state.current){
@@ -1007,6 +1038,8 @@
       else if(command==="delete-selected")await deleteCurrent();
       return;
     }
+    const templatePrint=ev.target.closest("[data-template-print]");
+    if(templatePrint){await printSavedTemplate(templatePrint.dataset.templatePrint);return;}
     const copyRow=ev.target.closest("[data-template-copy]");
     if(copyRow){await duplicateCurrent(copyRow.dataset.templateCopy);return;}
     const deleteRow=ev.target.closest("[data-template-remove]");

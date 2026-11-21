@@ -36,6 +36,11 @@ assert.equal(packet.subarray(0,12).toString("hex"),"1b46301b713033321b4d3031",
   "58x30 + 2 mm gap must emit q032");
 assert.match(packet.toString("binary"),/\d\d\.\d\d\.\d{4} \d\d:\d\d/);
 assert.equal(packet.subarray(-6).toString("hex"),"1b451b503031");
+const batchPacket=Buffer.from(root.EZ2Text.build(doc,120).base64,"base64");
+assert.equal(batchPacket.subarray(-9).toString("hex"),"1b451b703132300d0a",
+  "120 identical date-stamped labels must use native P120 in a single job");
+assert.equal((batchPacket.toString("binary").match(/\\d\\d\\.\\d\\d\\.\\d{4} \\d\\d:\\d\\d/g)||[]).length,1,
+  "Batch payload contains a single shared print timestamp");
 const catalogFilled=root.EZ2Dishes.fill(doc,{name:"Любое блюдо"},{});
 assert.equal(catalogFilled.elements.length,3,"Catalog fill keeps automatic stamp");
 assert.equal(catalogFilled.elements[2].dynamicValue,"printDateTime");

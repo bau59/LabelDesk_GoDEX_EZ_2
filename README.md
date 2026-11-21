@@ -1,5 +1,12 @@
 # LabelDesk — original GoDEX EZ-2 on macOS (WebKit + zsh)
 
+## Direct template batches (1.0.21)
+
+The template library now has a **Тираж** count (1–200) and **Печатать** action on each saved label. This prints the selected saved document directly, without selecting or creating any item in the catalog. It uses the existing validated `queueDocument` and isolated `printQueue(true,[jobID])` flow, so earlier queued jobs are not transmitted. Existing documents are not modified. Unsupported roll dimensions and printer errors are still reported.
+
+For the **Контроль качества · 58×30** text template, one buffered CP866 packet includes the current Mac-local date/time and the native copy count, so every label of the same batch has the same production/packing timestamp. If the count exceeds 200, split it into separate batches. Confirm the physical stock/registration on one label before large production runs.
+
+
 ## Quality control label, 58×30 mm (1.0.20)
 
 **Этикетки → Контроль качества → Контроль качества · 58×30** is installed once as an ordinary editable template (separate version marker `qualityPresetPack`). It has two centered, visible CP866 lines:
