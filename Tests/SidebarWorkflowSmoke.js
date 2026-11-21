@@ -67,6 +67,9 @@ const window = {
         result={templates:copy(store.templates),folders:copy(store.folders),settings:copy(store.settings),
           queue:copy(store.queue),runtimePath:"/tmp/test/live"};break;
       case "ports":result=["/dev/cu.usbserial-1430"];break;
+      case "initPrinter":
+        assert.equal(data.pitchMM,40,"Default roll must retain ESC q040");
+        break;
       case "saveTemplate":{
         const doc=JSON.parse(data.document);
         assert.ok(doc.id&&Array.isArray(doc.elements));
@@ -101,7 +104,8 @@ const EZ2Raster = {
     const ok=doc.widthMM===media.widthMM&&doc.heightMM===media.heightMM&&doc.gapMM===media.gapMM;
     return {ok,reason:ok?"":"Несовместимые размеры"};
   },
-  transportReady:m=>m.heightMM===38&&m.gapMM===2,
+  transportReady:m=>m.gapMM>=1,
+  labelPitch:m=>m.heightMM+m.gapMM,
   draw:()=>({toDataURL:()=>"data:image/png;base64,AA=="}),
   encode:()=>({base64:"QUJDREVGRw==",widthBytes:10,rows:280,size:4000}),
   validateMedia:m=>m
