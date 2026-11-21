@@ -245,6 +245,63 @@ body[data-editor-mode="text"] #label{border-color:#c0c8d2}
 .sample-options button.current{background:#1d2b42;color:#fff}
 #samplePreview{max-width:100%;margin:10px 0;border:1px solid #d6dde8;background:#fff}
 
+
+/* Simplified editor: primary actions first, technical controls on demand. */
+.tools{flex-wrap:nowrap;gap:8px;padding:10px 13px;min-height:57px;position:relative;z-index:12}
+.tools .mode-toolset{flex-wrap:nowrap;gap:7px}
+.tools .tool-add-main{background:#172132;border-color:#172132;color:#fff}
+.tools .tool-add-main:hover{background:#304259;color:#fff}
+.tools-right{display:flex;gap:6px;align-items:center;margin-left:auto;min-width:0}
+.toolbar-divider{width:1px;height:22px;background:#e2e7ef;flex:none}
+.add-more{position:relative;flex:none}
+.add-more>summary{list-style:none;display:flex;gap:7px;align-items:center;cursor:pointer;
+ border:1px solid #dce3eb;border-radius:8px;padding:8px 12px;color:#263240;font-weight:550}
+.add-more>summary::-webkit-details-marker{display:none}
+.add-more[open]>summary{background:#f3f5f8;border-color:#b8c4d2}
+.add-menu{position:absolute;z-index:15;top:calc(100% + 7px);left:0;width:198px;
+ padding:5px;display:grid;gap:2px;background:#fff;border:1px solid #d8e0e9;
+ border-radius:10px;box-shadow:0 12px 28px #15213424}
+.add-menu button{width:100%;text-align:left;border:0;padding:10px 12px;background:transparent}
+.add-menu button:hover{background:#f2f5f9}
+#editorModeIndicator{display:none!important}
+#props{padding:18px 16px}
+#props .prop{gap:6px;margin-bottom:13px}
+#props .prop>label{font-size:12px;color:#536277}
+#props .editor-stepper{max-width:none}
+#props .editor-stepper input{min-width:35px}
+#props .font-summary{padding:9px 11px;margin:8px 0 13px;font-size:11px;line-height:1.45}
+#props .hint{line-height:1.5;margin:7px 0 11px}
+#props .warn{line-height:1.4}
+#props .checkbox{font-size:12px;margin:10px 0}
+#props .inspector-section{border-top:1px solid #e9edf2;margin-top:18px;padding-top:13px}
+#props .inspector-section>summary{list-style:none;cursor:pointer;color:#536277;
+ font-size:12px;font-weight:650;padding:4px 0 8px}
+#props .inspector-section>summary::-webkit-details-marker{display:none}
+#props .inspector-section>summary::after{content:"⌄";float:right;font-size:15px;color:#8794a6}
+#props .inspector-section[open]>summary::after{content:"⌃"}
+#props .inspector-section>.prop,#props .inspector-section>.prop-row{margin-top:8px}
+#props .inline-note{background:#f5f7fa;border-radius:8px;padding:9px 11px;
+ font-size:11px;color:#536277;line-height:1.5;margin:6px 0 13px}
+#props .inspector-intro{margin:0 0 17px;font-size:12px;color:#758295}
+#props>strong{margin:0 0 12px}
+.layer{padding:10px 9px;gap:10px;align-items:center}
+.layer .label{white-space:normal;line-height:1.35;display:-webkit-box;
+ -webkit-line-clamp:2;-webkit-box-orient:vertical;overflow:hidden;color:#394b60}
+.layer .glyph{font-size:13px;width:28px;height:28px;border-radius:8px}
+.layer.selected{border-color:#bfccdc;background:#f0f4f8;box-shadow:inset 3px 0 #192c47}
+.layer.selected .label{color:#14243a}
+#layers{padding:9px}
+#foot{min-height:32px;padding:9px 14px;white-space:normal}
+#editorValidation{min-height:32px;padding:8px 13px;margin:0;max-width:none;
+ border-top:1px solid #e8edf2;background:#fff}
+#editorValidation.error{background:#fff2f1;color:#ad2932}
+.mode-choices{gap:7px;margin:12px 0}
+.mode-choice{padding:11px 12px;gap:9px}
+.mode-choice .mode-mark{width:29px;height:29px}
+.mode-choice small{font-size:10px}
+@media(max-width:1080px){.tools{flex-wrap:wrap}.tools-right{margin-left:0}}
+@media(max-width:700px){.tools .mode-toolset{flex-wrap:wrap}}
+
 </style>
 </head>
 <body>
@@ -261,39 +318,44 @@ body[data-editor-mode="text"] #label{border-color:#c0c8d2}
  </aside>
  <main class="work">
    <div class="tools">
-     <button id="docSettings" title="Настройки размеров макета">⚙ Макет</button>
-     <button id="toggleLayers" title="Показать или скрыть список слоёв">☷ Слои</button>
-      <select id="layerPicker" class="layer-picker" aria-label="Выбрать слой" title="Быстрый выбор слоя"></select>
-      <input id="layersWidth" class="layer-width-control" type="range" min="165" max="320" step="5" value="210" title="Ширина панели слоёв" aria-label="Ширина панели слоёв">
-      <div class="divider"></div>
-      <div class="mode-toolset" data-mode-tools="text">
-        <button data-add="text">＋ Строка</button>
-        <button data-add="line">＋ Линия CP866</button>
-        <button data-add="inverseText">▰ Чёрная плашка</button>
-        <button data-add="textTable">☷ Таблица</button>
-        <button data-add="textFrame">▢ Рамка с текстом</button>
-        <button data-add="barcode">＋ Штрихкод</button>
-      </div>
-      <div class="mode-toolset" data-mode-tools="raster">
-        <button data-add="text">＋ Текст</button>
-        <button data-add="line">＋ Линия</button>
-        <button data-add="rectangle">＋ Рамка</button>
-        <button data-add="framedText">▣ Рамка с текстом</button>
-        <button data-add="barcode">＋ Штрихкод</button>
-      </div>
-      <span class="editor-mode-indicator" id="editorModeIndicator" title="Режим задаётся в настройках макета">Текст CP866</span>
-      <div class="divider"></div>
-     <button id="undo" title="Отменить · ⌘Z">↶</button>
-     <button id="redo" title="Повторить · ⌘⇧Z">↷</button>
-     <div class="zoom-controls"><button id="zoomFit" type="button" title="Вписать всю этикетку">Вписать</button><button id="zoomMinus" type="button" title="Уменьшить">−</button><span id="zoomIndicator" aria-live="polite">Авто</span><button id="zoomPlus" type="button" title="Увеличить">+</button></div>
+     <button id="docSettings" type="button" title="Размер, зазор и режим печати">Этикетка</button>
+     <span class="toolbar-divider" aria-hidden="true"></span>
+     <div class="mode-toolset" data-mode-tools="text">
+       <button type="button" class="tool-add-main" data-add="text">＋ Текст</button>
+       <button type="button" data-add="barcode">▥ Штрихкод</button>
+       <details class="add-more"><summary>Ещё ⌄</summary><div class="add-menu">
+         <button type="button" data-add="line">Линия</button>
+         <button type="button" data-add="inverseText">Текст на плашке</button>
+         <button type="button" data-add="textTable">Таблица</button>
+         <button type="button" data-add="textFrame">Рамка с текстом</button>
+       </div></details>
+     </div>
+     <div class="mode-toolset" data-mode-tools="raster">
+       <button type="button" class="tool-add-main" data-add="text">＋ Текст</button>
+       <button type="button" data-add="barcode">▥ Штрихкод</button>
+       <details class="add-more"><summary>Ещё ⌄</summary><div class="add-menu">
+         <button type="button" data-add="line">Линия</button>
+         <button type="button" data-add="rectangle">Рамка</button>
+         <button type="button" data-add="framedText">Рамка с текстом</button>
+       </div></details>
+     </div>
+     <div class="tools-right">
+       <button id="toggleLayers" type="button" title="Показать или скрыть список элементов">☷ Список</button>
+       <select id="layerPicker" class="layer-picker" aria-label="Выбрать слой"></select>
+       <input id="layersWidth" class="layer-width-control" type="range" min="165" max="320" step="5" value="210" title="Ширина панели слоёв" aria-label="Ширина панели слоёв">
+       <button id="undo" type="button" title="Отменить · ⌘Z">↶</button>
+       <button id="redo" type="button" title="Повторить · ⌘⇧Z">↷</button>
+       <div class="zoom-controls"><button id="zoomFit" type="button" title="Вписать этикетку">Вписать</button><button id="zoomMinus" type="button" title="Уменьшить масштаб">−</button><span id="zoomIndicator" aria-live="polite">Авто</span><button id="zoomPlus" type="button" title="Увеличить масштаб">+</button></div>
+     </div>
+     <span id="editorModeIndicator" class="editor-mode-indicator" hidden>Текст CP866</span>
    </div>
    <div id="desk"><div id="label" aria-label="Макет этикетки"><div id="grid"></div></div></div>
-   <div id="foot">Щёлкните по объекту или слою для выбора · перетащите для перемещения · тяните за угол для размера · двойной щелчок — текст · стрелки — точное движение</div>
+   <div id="foot">Выберите элемент на этикетке или в списке, чтобы изменить его.</div>
    <div id="editorValidation" role="status"></div>
  </main>
  <aside class="panel right">
    <div class="panelhead" id="propsTitle">Свойства</div>
-   <div class="dochead"><label for="docname">Название макета</label><input id="docname" type="text" autocomplete="off"></div>
+   <div class="dochead"><label for="docname">Название этикетки</label><input id="docname" type="text" autocomplete="off"></div>
    <div id="props"></div>
    <details id="samplePanel" class="sample-panel"><summary>Предпросмотр с данными каталога</summary>
      <input id="sampleSearch" type="search" placeholder="Найти позицию…" aria-label="Поиск образца из каталога">
@@ -383,10 +445,18 @@ function duplicate(){const e=selectedObj();if(!e)return;checkpoint();let copy=cl
  if(doc.printMode==="text"){copy.xMM=0;copy.widthMM=Math.min(55,doc.widthMM);}
  else {copy.xMM=Math.min(Math.max(0,doc.widthMM-copy.widthMM),copy.xMM+1);copy.yMM=Math.min(Math.max(0,doc.heightMM-copy.heightMM),copy.yMM+1);}doc.elements.push(copy);selected=copy.id;draw();commit();}
 function labelFor(e){
- const variable=(["text","barcode","textFrame","framedText"].includes(e.kind)&&e.isVariable!==false)?" · перем.":"";
- const title=String(e.fieldName||"").trim();
- return (title||typeNames[e.kind])+variable+
-   (title?"":" · "+String(e.value||"").slice(0,38));
+ const value=String(e.value||"").trim(),name=String(e.fieldName||"").trim();
+ if(e.kind==="text"){
+   if(!value&&!e.prefix&&!e.dynamicValue&&e.isVariable===false&&Number(e.fixedRows)>1){
+     const first=doc?.elements?.[0]===e;
+     return (first?"Отступ сверху":"Пустой интервал")+" · "+e.fixedRows+" строк";
+   }
+   if(e.dynamicValue==="printDateTime")return name||"Дата и время";
+   if(value&&!/^\[[^\]]+\]$/.test(value))return value.slice(0,74);
+   return name||"Текст";
+ }
+ if(e.kind==="barcode")return "Штрихкод"+(name?" · "+name:"");
+ return name||typeNames[e.kind];
 }
 function renderLayers(){
  const root=$("layers");root.replaceChildren();
@@ -398,7 +468,7 @@ function renderLayers(){
    b.append(glyph,name);b.addEventListener("click",()=>setSelected(e.id));root.appendChild(b);
  });
  $("layerCount").textContent=doc?"("+doc.elements.length+")":"";
- $("leftPanelTitle").textContent=doc?.printMode==="text"?"Строки":"Слои";
+ $("leftPanelTitle").textContent=doc?.printMode==="text"?"Содержание":"Элементы";
   const picker=$("layerPicker");picker.replaceChildren();
   if(doc){
    (doc.printMode==="text"?doc.elements:doc.elements.slice().reverse()).forEach(e=>{
@@ -555,6 +625,10 @@ node.appendChild(svg);
    }
    const overflowIDs=new Set((layout.issues||[]).map(issue=>issue.elementID));
    for(const area of fixedAreas.values()){
+     const field=area.element;
+     const blank=field.isVariable===false&&!field.dynamicValue&&
+       !String(field.value||"").trim()&&!String(field.prefix||"").trim();
+     if(blank&&selected!==field.id)continue;
      const boundary=document.createElement("div");
      boundary.className="native-fixed-field"+
        (selected===area.element.id?" selected":"")+
@@ -927,49 +1001,182 @@ function choiceButtons(options,chosen,onChange){
   }
   return box;
 }
+function renderNativeTextProps(root,e){
+ const automatic=e.dynamicValue==="printDateTime";
+ const dateControl=()=>checkbox("Дата и время автоматически",automatic,enabled=>{
+   if(enabled){e.dynamicValue="printDateTime";e.isVariable=false;}
+   else delete e.dynamicValue;
+   draw();
+ });
+ if(automatic)root.appendChild(dateControl());
+ if(!automatic)root.appendChild(prop("Текст",textInput(e.value,
+   value=>{e.value=value;},true,"field-value")));
+ if(e.prefix||automatic)root.appendChild(prop("Подпись перед значением",
+   textInput(e.prefix||"",value=>{e.prefix=value;},false,"field-prefix")));
+ if(automatic){
+   const hint=document.createElement("p");hint.className="inline-note";
+   hint.textContent="Дата и время подставятся при печати. Для разового тиража их можно изменить в окне печати.";
+   root.appendChild(hint);
+ }
+ const names=[
+  ["A00","Мелкий"],["A01","Мелкий жирный"],["A02","Узкий высокий"],
+  ["A03","Очень высокий"],["A04","Широкий жирный"],
+  ["A11","Средний"],["A12","Средний высокий"],
+  ["A21","Крупный"],["A22","Крупный высокий"]
+ ];
+ const code=e.deviceFont||"A00";
+ if(!names.some(item=>item[0]===code))names.push([code,"Другой размер"]);
+ const chooser=document.createElement("select");chooser.id="nativeFontChoice";
+ for(const [name,label] of names){
+   const option=document.createElement("option");option.value=name;
+   option.textContent=label+" ("+name+")";chooser.appendChild(option);
+ }
+ chooser.value=code;
+ chooser.onchange=()=>{
+   checkpoint();e.deviceFont=chooser.value;
+   if(Number.isInteger(e.fixedRows)&&e.fixedRows>0)
+     e.heightMM=e.fixedRows*window.EZ2Text.font(e.deviceFont).heightDots/8;
+   draw();commit();
+ };
+ root.appendChild(prop("Размер шрифта",chooser));
+ const align=document.createElement("div");align.className="text-align-controls";
+ for(const [mode,title,glyph] of [
+   ["left","По левому краю","⫷"],["center","По центру","≡"],["right","По правому краю","⫸"]]){
+   const button=document.createElement("button");button.type="button";
+   button.textContent=glyph;button.title=title;button.setAttribute("aria-label",title);
+   button.className=(e.textAlignment||"left")===mode?"current":"";
+   button.onclick=()=>{checkpoint();e.textAlignment=mode;draw();commit();};
+   align.appendChild(button);
+ }
+ root.appendChild(prop("Выравнивание",align));
+ const hasRows=Number.isInteger(e.fixedRows)&&e.fixedRows>=1;
+ if(hasRows){
+   root.appendChild(pair(
+     prop("Ширина, мм",numInput(Number(e.widthMM||55),n=>{
+       e.widthMM=n;renderProps();
+     },1,55,1)),
+     prop("Строк в поле",numInput(e.fixedRows,n=>{
+       e.fixedRows=Math.round(n);
+       e.heightMM=e.fixedRows*window.EZ2Text.font(e.deviceFont||"A00").heightDots/8;
+       renderProps();
+     },1,20,1))));
+ }else{
+   root.appendChild(prop("Ширина, мм",numInput(Number(e.widthMM||55),
+     n=>{e.widthMM=n;renderProps();},1,55,1)));
+   const fix=document.createElement("button");fix.type="button";
+   fix.textContent="Закрепить высоту поля";
+   fix.onclick=()=>{
+     try{
+       const font=window.EZ2Text.font(e.deviceFont||"A00");
+       const width=Math.min(Number(e.widthMM||55),
+         55-Number(printerMedia.marginLeftMM||0)-
+         Number(printerMedia.marginRightMM||0)-Number(e.xMM||0));
+       const cap=Math.floor(width*8/font.widthDots);
+       const count=window.EZ2Text.wrapText(String(e.prefix||"")+
+         (automatic?"21.11.2026 12:00":String(e.value||"")),cap).length;
+       if(count>20)throw Error("Текст не помещается в 20 строк.");
+       checkpoint();e.fixedRows=Math.max(1,count);
+       e.heightMM=e.fixedRows*font.heightDots/8;draw();commit();
+     }catch(error){window.alert(error.message);}
+   };
+   root.appendChild(fix);
+ }
+ const font=window.EZ2Text.font(e.deviceFont||"A00");
+ const width=Math.max(0,Math.min(Number(e.widthMM||55),
+   55-Number(printerMedia.marginLeftMM||0)-
+   Number(printerMedia.marginRightMM||0)-Number(e.xMM||0)));
+ const capacity=Math.floor(width*8/font.widthDots);
+ const info=document.createElement("p");info.className="inline-note";
+ info.textContent="До "+capacity+" символов в строке"+
+   (hasRows?" · "+e.fixedRows+" строк":" · авто-высота")+
+   ". Длинный текст переносится внутри поля.";
+ root.appendChild(info);
+ if(!automatic){
+   root.appendChild(checkbox("Заполнять перед печатью",e.isVariable!==false,value=>{
+     e.isVariable=value;renderProps();renderLayers();
+   }));
+   if(e.isVariable!==false){
+     root.appendChild(prop("Название поля",textInput(e.fieldName||"",
+       value=>{e.fieldName=value;},false,"field-name")));
+   }
+ }
+ const advanced=document.createElement("details");advanced.className="inspector-section";
+ const summary=document.createElement("summary");summary.textContent="Дополнительно";
+ advanced.appendChild(summary);
+ if(!automatic)advanced.appendChild(dateControl());
+ advanced.appendChild(checkbox("Инверсия (белый текст на чёрном)",
+   e.reversePrint===true,value=>{e.reversePrint=value;renderProps();}));
+ if(/^A[1-4][1-8]$/.test(code)){
+   const scale=(axis,value)=>{
+     checkpoint();
+     const h=axis==="x"?Math.round(value):Number(e.deviceFont[1]);
+     const v=axis==="y"?Math.round(value):Number(e.deviceFont[2]);
+     e.deviceFont="A"+h+v;
+     if(Number.isInteger(e.fixedRows)&&e.fixedRows>0)
+       e.heightMM=e.fixedRows*window.EZ2Text.font(e.deviceFont).heightDots/8;
+     draw();commit();
+   };
+   advanced.appendChild(pair(
+     prop("Масштаб X",numInput(Number(code[1]),n=>scale("x",n),1,4,1)),
+     prop("Масштаб Y",numInput(Number(code[2]),n=>scale("y",n),1,8,1))));
+ }
+ if(!automatic&&e.isVariable!==false)
+   advanced.appendChild(prop("Поля каталога",variableChooser(e)));
+ if(!automatic){
+   const symbols=document.createElement("div");symbols.className="symbol-palette";
+   for(const ch of ["─","│","┌","┐","└","┘","┼","═","║","█"]){
+     const button=document.createElement("button");button.type="button";
+     button.textContent=ch;button.title="Добавить символ CP866";
+     button.onclick=()=>{checkpoint();e.value=(e.value||"")+ch;draw();commit();};
+     symbols.appendChild(button);
+   }
+   advanced.appendChild(prop("Символы рамок",symbols));
+ }
+ root.appendChild(advanced);
+ const actions=document.createElement("div");actions.className="actions inspector-actions";
+ for(const [label,fn] of [["Дублировать",duplicate],["Удалить",remove]]){
+   const button=document.createElement("button");button.type="button";
+   button.textContent=label;button.onclick=fn;actions.appendChild(button);
+ }
+ root.appendChild(actions);
+}
 function renderProps(){
  const root=$("props");root.replaceChildren();if(!doc)return;
  const e=selectedObj();
  if(!e){
-   const h=document.createElement("strong");h.textContent="Настройки макета";root.appendChild(h);
-   const inset=document.createElement("p");inset.className="hint";
-   inset.textContent="Текстовые поля: слева "+(printerMedia.marginLeftMM||0)+
-     " мм, справа "+(printerMedia.marginRightMM||0)+" мм.";
-   root.appendChild(inset);
-   const configure=document.createElement("button");configure.type="button";
-   configure.textContent="Изменить отступы";configure.onclick=()=>send("openSettings");
-   root.appendChild(prop("Настройки текстовой печати",configure));
-   root.appendChild(pair(prop("Ширина ленты, мм",numInput(doc.widthMM,n=>{doc.widthMM=n;},10,60,0.5)),
-                        prop("Высота, мм",numInput(doc.heightMM,n=>{doc.heightMM=Math.round(n);},10,100,1))));
+   const h=document.createElement("strong");h.textContent="Размер этикетки";root.appendChild(h);
+   root.appendChild(pair(
+     prop("Ширина, мм",numInput(doc.widthMM,n=>{doc.widthMM=n;},10,60,0.5)),
+     prop("Высота, мм",numInput(doc.heightMM,n=>{doc.heightMM=Math.round(n);},10,100,1))));
    root.appendChild(prop("Зазор, мм",numInput(doc.gapMM,n=>{doc.gapMM=Math.round(n);},0,10,1)));
-   let note=document.createElement("p");note.className="hint";
-   note.textContent=doc.printMode==="text"?
-     "Настройка отступов: "+(printerMedia.marginLeftMM||0)+" мм слева и "+
-     (printerMedia.marginRightMM||0)+" мм справа. Заштрихованной полосы в текстовом редакторе нет: ограничение 55 мм относится к подтверждённой области ESC G и текстовому планировщику, а не к вашим полям.":
-     "Установленный рулон "+doc.widthMM+" мм. Растровая команда ESC G подтверждена до 55 мм; если лента шире, справа обозначена область за пределами подтверждённой печати.";
-   root.appendChild(note);
+   const details=document.createElement("details");details.className="inspector-section";
+   const summary=document.createElement("summary");
+   summary.textContent="Режим и дополнительные настройки";details.appendChild(summary);
    const choice=document.createElement("div");choice.className="mode-choices";
    for(const [key,title,desc,icon] of [
-     ["text","Текст CP866","Штатные размеры шрифта, строки подряд, рамка из символов.","≡"],
-     ["raster","Растр","Свободные X/Y, графика, размер объектов в миллиметрах.","▦"]
+     ["text","Встроенный текст","Печать CP866, строки одна за другой.","≡"],
+     ["raster","Растр","Свободное размещение объектов.","▦"]
    ]){
      const button=document.createElement("button");button.type="button";
      button.className="mode-choice"+((doc.printMode||"raster")===key?" selected":"");
      const mark=document.createElement("span");mark.className="mode-mark";mark.textContent=icon;
-     const body=document.createElement("span"),h=document.createElement("strong"),hint=document.createElement("small");
-     h.textContent=title;hint.textContent=desc;body.append(h,hint);button.append(mark,body);
+     const body=document.createElement("span"),head=document.createElement("strong"),hint=document.createElement("small");
+     head.textContent=title;hint.textContent=desc;body.append(head,hint);button.append(mark,body);
      button.onclick=()=>changeEditorMode(key);choice.appendChild(button);
    }
-   root.appendChild(prop("Режим этого макета",choice));
-   const desc=document.createElement("p");desc.className="hint";
-   desc.textContent=doc.printMode==="text"?
-     "Печать встроенным шрифтом CP866. Строки идут по порядку слоёв снизу вверх в списке. Точные координаты Y принтер не поддерживает; размеры в эскизе приблизительные.":
-     "Растровый режим сохраняет координаты и размещение объектов.";
-   root.appendChild(desc);
-   root.appendChild(checkbox("Привязка к сетке 1 мм",snap,n=>{snap=n;}));
+   details.appendChild(prop("Способ печати",choice));
+   const configure=document.createElement("button");configure.type="button";
+   configure.textContent="Настроить поля печати";configure.onclick=()=>send("openSettings");
+   details.appendChild(prop("Отступы: "+(printerMedia.marginLeftMM||0)+" мм слева, "+
+     (printerMedia.marginRightMM||0)+" мм справа",configure));
+   details.appendChild(checkbox("Привязка к сетке 1 мм",snap,n=>{snap=n;}));
+   root.appendChild(details);
    return;
  }
- let h=document.createElement("strong");h.textContent=typeNames[e.kind];root.appendChild(h);
+ // Type is shown in the inspector header; do not repeat a large heading.
+ if(e.kind==="text"&&doc.printMode==="text"){
+   renderNativeTextProps(root,e);return;
+ }
  if(e.kind==="textTable"){
    root.appendChild(prop("Строки таблицы (колонки через |)",textInput(
      e.value,v=>{e.value=v;},true,"field-value")));
@@ -1223,22 +1430,25 @@ function renderProps(){
       ["CODE128","Code 128"],["CODE39","Code 39"],["EAN13","EAN-13"],["EAN8","EAN-8"]],
       e.barcodeType||"CODE128",v=>{checkpoint();e.barcodeType=v;draw();commit();})));
    root.appendChild(checkbox("Печатать цифры под штрихкодом",e.showsHumanReadable,n=>{e.showsHumanReadable=n;}));
-   root.appendChild(checkbox("Менять данные при заполнении",e.isVariable!==false,n=>{e.isVariable=n;renderLayers();}));
+   root.appendChild(checkbox("Заполнять перед печатью",e.isVariable!==false,n=>{
+     e.isVariable=n;renderLayers();renderProps();
+   }));
    if(e.isVariable!==false){
-     root.appendChild(prop("Имя поля в карточке каталога",
+     root.appendChild(prop("Название поля",
        textInput(e.fieldName||"",v=>{e.fieldName=v;},false,"field-name")));
-     root.appendChild(prop("Выбрать поле каталога",variableChooser(e)));
+     const advanced=document.createElement("details");advanced.className="inspector-section";
+     const summary=document.createElement("summary");summary.textContent="Поля каталога";
+     advanced.appendChild(summary);
+     advanced.appendChild(variableChooser(e));root.appendChild(advanced);
    }
-   const status=document.createElement("p");status.className="hint";
+   const status=document.createElement("p");status.className="inline-note";
    try{
      const coded=window.EZ2Barcodes.layout(e.barcodeType||"CODE39",e.value,e.widthMM*8);
-     status.textContent="Код: "+coded.display+" · "+coded.moduleDots+" точек/модуль"+
-       (coded.checksum!==undefined?" · проверка: "+coded.checksum:"");
+     status.textContent="✓ Код готов: "+coded.display;
+     status.title=coded.moduleDots+" точек/модуль"+
+       (coded.checksum!==undefined?" · контрольная сумма: "+coded.checksum:"");
    }catch(error){status.className="warn";status.textContent=error.message;}
    root.appendChild(status);
-   const info=document.createElement("p");info.className="hint";
-   info.textContent="Штрихкод генерируется как сканируемые модули, не шрифт. В редакторе и в печати используется один кодировщик. EAN: контрольная цифра рассчитывается или проверяется.";
-   root.appendChild(info);
  }
  let positionActions=document.createElement("div");positionActions.className="actions";
  for(const [axis,title] of [["x","Блок по центру X"],["y","Блок по центру Y"]]){
@@ -1275,9 +1485,10 @@ function renderValidation(){
      const p=window.EZ2Text.plan({...doc,
        marginLeftMM:printerMedia.marginLeftMM,marginRightMM:printerMedia.marginRightMM},
        {allowPlaceholders:true});
-     el.textContent="CP866: "+p.usedDots+" / 256 точек · "+p.rows.length+
-       " строк · X≈"+nativePreviewOrigin.leftMM+" мм, Y≈"+
-       nativePreviewOrigin.topMM+" мм (по G01)";el.classList.remove("error");
+     const budget=Number(doc.heightMM)*8-48;
+     el.textContent="Макет готов · "+p.rows.length+" строк · "+
+       (p.usedDots/8).toFixed(1)+" из "+(budget/8).toFixed(1)+" мм доступной высоты";
+     el.classList.remove("error");
    }else{
      window.EZ2Raster.draw(doc); // Uses the same text-overflow checks as printing.
      const beyond=doc.elements.find(e=>e.xMM+e.widthMM>55||
@@ -1292,10 +1503,11 @@ function draw(){
  $("docname").value=doc.name;
  document.body.dataset.editorMode=doc.printMode||"raster";
  $("editorModeIndicator").textContent=doc.printMode==="text"?"Текст CP866":"Растр XY";
- $("propsTitle").textContent=selectedObj()?(doc.printMode==="text"?"Настройки строки":"Свойства объекта"):"Настройки макета";
+ $("propsTitle").textContent=selectedObj()?(doc.printMode==="text"?
+   (labelFor(selectedObj()).slice(0,38)||"Свойства элемента"):"Свойства объекта"):"Этикетка";
  $("foot").textContent=doc.printMode==="text"?
-   "Текст CP866: размеры строк и символов калиброваны по G01/G02. Положение от края приблизительное, форма букв прошивки условная. Стрелки меняют порядок.":
-   "Растр: перемещайте и масштабируйте объекты, точные координаты X/Y будут сохранены.";
+   "Строки печатаются сверху вниз. Порядок меняется стрелками в списке.":
+   "Выберите элемент на этикетке и переместите или измените его размер.";
  renderLayers();renderCanvas();renderProps();renderValidation();
  if($("samplePanel").open)renderSample();
  $("undo").disabled=!history.length;$("redo").disabled=!future.length;
@@ -1316,7 +1528,10 @@ window.labelDeskLoad=function(next,items){
  doc=clone(next);const same=doc.elements.find(e=>e.id.toLowerCase()===previousSelected);
  selected=same?same.id:null;history=[];future=[];draw();
 };
-document.querySelectorAll("[data-add]").forEach(b=>b.addEventListener("click",()=>newElem(b.dataset.add)));
+document.querySelectorAll("[data-add]").forEach(b=>b.addEventListener("click",()=>{
+  b.closest(".add-more")?.removeAttribute("open");
+  newElem(b.dataset.add);
+}));
 $("docname").addEventListener("focus",()=>{if(doc)checkpoint();});
  const layout=document.querySelector(".layout");
  let layersOpen=true,preferredWidth=210;

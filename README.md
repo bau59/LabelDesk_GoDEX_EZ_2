@@ -1,5 +1,14 @@
 # LabelDesk — original GoDEX EZ-2 on macOS (WebKit + zsh)
 
+## Editor interface refresh (1.0.24)
+
+The editor is now centered on **add → select → edit**. The toolbar shows **Этикетка**, **＋ Текст**, **▥ Штрихкод**, and **Ещё** for less common object types; zoom and undo are on the right. Other tools remain available behind the expandable menu. Selecting **Этикетка** opens concise physical width/height/gap controls, with printer mode, margins, and grid behind **Режим и дополнительные настройки**.
+
+Selecting native CP866 text shows its content or print-time date/time, a simple font selector, alignment, width, and fixed row count first. Variable fields are explicitly named **Заполнять перед печатью**; optional glyphs, X/Y font scales and catalog field mapping are under **Дополнительно**. Existing template structure remains intact.
+
+The layer list now shows actual line content and names blank fixed-row spacers (e.g., **Отступ сверху · 9 строк**). Invisible blank spacer boundaries are hidden when unselected, but their printer-reserved heights are unchanged. The footer and capacity status now provide concise, correct information for every label height, instead of the old hard-coded 38 mm limit. This release changes only `editor.html`; no EZ-2 driver, encoder, media configuration, or saved labels are migrated.
+
+
 ## Operator CP866 preview fix (1.0.23)
 
 The operator print dialog now uses a responsive SVG viewBox of `label.widthMM × 8` by `label.heightMM × 8` dots. Every resident-font row uses exactly the positions (`Mnn`), widths (`character count × font.widthDots`), row heights, and reverse-print information from `EZ2Text.plan()`. SVG `textLength` and `lengthAdjust="spacingAndGlyphs"` keep preview text inside its actual allocated font cells, avoiding the old clipping of “Контроль качества пройден” and full production date/time. There is no CSS font-size guess for print geometry. Text glyph shapes are still approximate; output packets, stored templates, and printer commands are unchanged.

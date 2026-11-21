@@ -69,6 +69,7 @@ jobs:
           node Tests/QualityLabelSmoke.js
           node Tests/OperatorPreviewSmoke.js
           node Tests/EditorGeometrySmoke.js
+          node Tests/EditorUXSmoke.js
           node Tests/PrinterDiagnosticsSmoke.js
           node Tests/PrinterTransportSmoke.js
           node Tests/EditorSamplePrintSmoke.js
@@ -271,4 +272,4 @@ jobs:
             --repo "$GITHUB_REPOSITORY" \
             --target "$GITHUB_SHA" \
             --title "LabelDesk ${APP_VERSION}" \
-            --notes "LabelDesk 1.0.23 for Intel macOS 15+. Fixes clipped CP866 text in the operator print preview: native font rows now render as scalable SVG on the same exact dot grid as the print compiler, keeping full captions and date/time visible. No changes to saved labels, font encoders, serial transport, or paper positioning. Ad-hoc signed, not notarized."
+            --notes "LabelDesk 1.0.24 for Intel macOS 15+. Reworks editor usability: two primary insert actions, collapsible advanced objects, concise label size settings, simpler native CP866 text inspector (font, alignment, width, fixed rows), advanced source/scale controls, readable layer names and clean preview for reserved blank rows. Native printer commands, existing saved documents and calibration are unchanged. Ad-hoc signed, not notarized."
