@@ -5,7 +5,8 @@
 (function(root) {
   "use strict";
   const ESC=27, CR=13, LF=10;
-  const PRINTABLE_DOTS=440; // verified 55-mm width at 203dpi
+  // Native CP866 width follows the selected roll. Edge coverage beyond
+  // the previously tested 55 mm is intentionally user-controlled.
   const BOTTOM_RESERVE_DOTS=48; // original 6-mm margin (38mm -> 256 dots)
   const BOX=Object.freeze({
     "│":179,"─":196,"┌":218,"┐":191,"└":192,"┘":217,
@@ -76,7 +77,12 @@
     if(!Number.isInteger(left)||!Number.isInteger(right)||
        left<0||right<0||left>15||right>15||left+right>=50)
       throw Error("Поля печати: от 0 до 15 мм слева и справа, суммарно менее 50 мм");
-    return {left,right,width:PRINTABLE_DOTS/8-left-right};
+    const rollWidth=Number(doc.widthMM);
+    if(!Number.isFinite(rollWidth)||rollWidth<10||rollWidth>60)
+      throw Error("Ширина рулона для CP866: от 10 до 60 мм");
+    if(left+right>=rollWidth)
+      throw Error("Отступы печати больше ширины рулона");
+    return {left,right,width:rollWidth-left-right,rollWidth};
   }
   function marginMM(e,lineWidth,fontWidth,usableWidth,leftMM){
     const x=Math.max(0,Number(e.xMM||0));
@@ -107,7 +113,7 @@
       {tl:"╔",tr:"╗",bl:"╚",br:"╝",h:"═",v:"║"}:
       {tl:"┌",tr:"┐",bl:"└",br:"┘",h:"─",v:"│"};
     const width=Number(el.frameChars??30);
-    if(!Number.isInteger(width)||width<4||width>55||width>capacity)
+    if(!Number.isInteger(width)||width<4||width>60||width>capacity)
       throw Error("Ширина рамки больше доступной области: "+width+" символов");
     const alignment=["left","center","right"].includes(el.textAlignment)?el.textAlignment:"left";
     const inner=width-4;
@@ -130,13 +136,13 @@
       ...Array.from({length:count},(_,i)=>place(lines[i]||"")),
       glyphs.bl+glyphs.h.repeat(width-2)+glyphs.br];
   }
-  function tableLines(el){
+  function tableLines(el,maxWidthMM){
     const widths=String(el.tableWidths||"7,22,8").split(",").map(x=>Number(x.trim()));
     if(widths.length<2||widths.length>4||
        widths.some(n=>!Number.isInteger(n)||n<2||n>48))
       throw Error("Таблица: укажите 2–4 ширины колонок от 2 до 48 символов через запятую");
     const total=widths.reduce((a,b)=>a+b,0)+widths.length+1;
-    if(total>55)throw Error("Таблица шире 55 мм: "+total+" символов A00");
+    if(total>maxWidthMM)throw Error("Таблица шире доступной ширины рулона: "+total+" мм");
     const source=String(el.value||"").split(/\r?\n/).filter(x=>x.trim()!=="");
     if(!source.length)throw Error("Добавьте строки таблицы");
     if(source.length>18)throw Error("Таблица: максимум 18 строк данных");
@@ -189,9 +195,9 @@
       if(el.rotation && Number(el.rotation)!==0)throw Error("Поворот строки невозможен в EZ-2");
       if(el.kind==="textTable"){
         const f=font("A00"); // Native box characters verified at A00 in G01/G02.
-        const lines=tableLines(el);
+        const lines=tableLines(el,margins.width-x);
         const x=Math.max(0,Number(el.xMM||0));
-        const usableWidth=Math.min(55,margins.width-x);
+        const usableWidth=margins.width-x;
         for(const line of lines){
           if(Array.from(line).length>usableWidth)
             throw Error("Таблица выходит за правую границу: "+line.length+" мм");
@@ -208,7 +214,7 @@
         const f=font(el.deviceFont||"A00");
         const x=Math.max(0,Number(el.xMM||0));
         if(x>=margins.width)throw Error("Рамка выходит за правую границу");
-        const capacity=Math.floor(Math.min(55,Math.max(1,Number(el.widthMM||55)),
+        const capacity=Math.floor(Math.min(Number(doc.widthMM),Math.max(1,Number(el.widthMM||doc.widthMM)),
           margins.width-x)*8/f.widthDots);
         const lines=frameLines(el,capacity);
         for(const line of lines){
@@ -235,16 +241,16 @@
         throw Error("Заполните поле «"+(el.fieldName||"Строка")+"» перед печатью");
       const code=el.kind==="line"?"A00":(el.deviceFont||"A00");
       const f=font(code);
-      const requestedWidth=Math.min(55,Math.max(1,Number(el.widthMM||55)));
+      const requestedWidth=Math.min(margins.rollWidth,Math.max(1,Number(el.widthMM||doc.widthMM)));
       const x=Math.max(0,Number(el.xMM||0));
-      if(x+requestedWidth>Number(doc.widthMM)+0.001||x>=55)
+      if(x+requestedWidth>Number(doc.widthMM)+0.001||x>=margins.rollWidth)
         throw Error("Текстовый блок выходит за установленную ширину этикетки");
       if(x>=margins.width)throw Error("Блок за пределами области с отступами");
       const usableWidth=Math.min(requestedWidth,margins.width-x);
       const cellCapacity=Math.floor(usableWidth*8/f.widthDots);
       const value=el.kind==="line" ?
         (["─","═","█"].includes(el.lineSymbol)?el.lineSymbol:"─").repeat(
-          Math.min(cellCapacity,Math.max(1,Math.min(54,Math.round(Number(el.lineChars)||54))))):
+          Math.min(cellCapacity,Math.max(1,Math.min(60,Math.round(Number(el.lineChars)||60))))):
         String(el.prefix||"")+(el.dynamicValue==="printDateTime" ?
           formatPrintDateTime(options.now??new Date()):String(el.value??""));
       // ESC V inverts the native character cells, including blank ones.
@@ -282,10 +288,10 @@
           " ".repeat(leftPad)+raw+" ".repeat(rightPad):raw;
         cp866(line);
         const position=marginMM(el,Array.from(line).length,f.widthDots,margins.width,margins.left);
-        if(position<1 || position>55)
-          throw Error("Позиция Mnn за областью печати");
-        if((position-1)*8+Array.from(line).length*f.widthDots>PRINTABLE_DOTS-margins.right*8)
-          throw Error("Строка выходит за 55 мм печати: "+line);
+        if(position<1 || position>Math.min(99,margins.rollWidth))
+          throw Error("Позиция Mnn за шириной рулона");
+        if((position-1)*8+Array.from(line).length*f.widthDots>margins.rollWidth*8-margins.right*8)
+          throw Error("Строка выходит за ширину рулона: "+line);
         const reverse=el.reversePrint===true&&i<visible.length;
         rows.push({kind:"text",text:line,font:f,margin:position,element:el,
           reverse,inverseSpacingHandled:fixed&&el.reversePrint===true,

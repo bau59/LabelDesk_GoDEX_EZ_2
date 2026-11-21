@@ -990,7 +990,7 @@
     $("marginRight").value=Number(state.profile.marginRightMM||0);
     $("mediaSupport").textContent=EZ2Raster.transportReady(media())?
       "ESC q"+String(EZ2Raster.labelPitch(media())).padStart(3,"0")+
-      " (высота + зазор). Формат 38+2 мм проверен физически; другие форматы сначала проверьте на одной этикетке. Печать до 55 мм по ширине.":
+      " (высота + зазор). Формат 38+2 мм проверен физически; другие форматы сначала проверьте на одной этикетке. CP866 — по ширине рулона; растр — до 55 мм.":
       "Для рулона без зазора нужен другой режим датчика. Печать доступна при зазоре от 1 мм.";
     renderPorts();
     $("runtimePath").textContent=state.runtimePath;

@@ -455,7 +455,8 @@ function newElem(kind){
    window.alert("Элемент доступен только в другом режиме. Смените режим в настройках макета.");
    return;
  }
- const full=Math.min(55,doc.widthMM), last=doc.elements.reduce((n,e)=>Math.max(n,e.yMM+e.heightMM),0);
+ const full=doc.printMode==="text"?doc.widthMM:Math.min(55,doc.widthMM);
+ const last=doc.elements.reduce((n,e)=>Math.max(n,e.yMM+e.heightMM),0);
  const defaults={text:[0,3,full,7,"Текст"],barcode:[0,12,full,13,"1234567890"],
    line:[0,20,full,0.4,""],rectangle:[0,3,full,18,""],textFrame:[0,0,full,4,"Заголовок"],
     framedText:[1,3,Math.max(10,full-2),13,"Заголовок"],
@@ -485,7 +486,7 @@ function moveLayer(delta){
 }
 function remove(){if(!selected||!doc)return;checkpoint();doc.elements=doc.elements.filter(e=>e.id!==selected);selected=null;draw();commit();}
 function duplicate(){const e=selectedObj();if(!e)return;checkpoint();let copy=clone(e);copy.id=uid();
- if(doc.printMode==="text"){copy.xMM=0;copy.widthMM=Math.min(55,doc.widthMM);}
+ if(doc.printMode==="text"){copy.xMM=0;copy.widthMM=Math.min(doc.widthMM,copy.widthMM);}
  else {copy.xMM=Math.min(Math.max(0,doc.widthMM-copy.widthMM),copy.xMM+1);copy.yMM=Math.min(Math.max(0,doc.heightMM-copy.heightMM),copy.yMM+1);}doc.elements.push(copy);selected=copy.id;draw();commit();}
 function labelFor(e){
  const value=String(e.value||"").trim(),name=String(e.fieldName||"").trim();
@@ -567,7 +568,7 @@ function renderTextFlow(canvas,scale,widthMM){
      const barcode=row.kind==="barcode";
      const metrics=barcode?{widthDots:8,heightDots:120}:row.font;
      const chars=barcode?45:Array.from(row.text||"").length;
-     const dots=barcode?(55-layout.margins.left-layout.margins.right)*8:
+     const dots=barcode?layout.margins.width*8:
        Math.max(1,chars*metrics.widthDots);
      const x=barcode?layout.margins.left:(row.margin-1);
      if(!barcode&&row.element.kind==="text"&&
@@ -577,7 +578,7 @@ function renderTextFlow(canvas,scale,widthMM){
          fixedAreas.set(element.id,{
            x:Number(element.xMM||0)+layout.margins.left+nativePreviewOrigin.leftMM,
            y:at/8+nativePreviewOrigin.topMM,
-           width:Math.max(1,Math.min(Number(element.widthMM||55),
+           width:Math.max(1,Math.min(Number(element.widthMM||doc.widthMM),
              layout.margins.width-Number(element.xMM||0))),
            heightDots:0,element
          });
@@ -693,7 +694,7 @@ node.appendChild(svg);
      canvas.appendChild(warning);
    }
    for(const g of [{width:layout.margins.left,x:0},
-     {width:layout.margins.right,x:55-layout.margins.right}]){
+     {width:layout.margins.right,x:doc.widthMM-layout.margins.right}]){
      if(!g.width)continue;
      const guide=document.createElement("div");guide.className="marginguide";
      guide.style.left=(g.x*scale)+"px";
@@ -757,7 +758,7 @@ function renderCanvas(){
    const flow=flowPositions.get(e.id);
    node.style.left=((textMode?insetLeft:e.xMM)*zoom)+"px";
    node.style.top=(flow?flow.top/8*zoom:e.yMM*zoom)+"px";
-   node.style.width=Math.max(3,(textMode?Math.max(1,Math.min(55,doc.widthMM)-insetLeft-insetRight):e.widthMM)*zoom)+"px";
+   node.style.width=Math.max(3,(textMode?Math.max(1,doc.widthMM-insetLeft-insetRight):e.widthMM)*zoom)+"px";
    node.style.height=Math.max(3,(flow?flow.height/8:e.heightMM)*zoom)+"px";
    let visual=document.createElement("div");visual.className="visual "+e.kind;
    if(e.kind==="text"){
@@ -822,7 +823,7 @@ function renderCanvas(){
  });
  // User-defined text margins are separate from the fixed ESC G55 limit.
  if(textMode){
-   for(const g of [{width:insetLeft,x:0},{width:insetRight,x:55-insetRight}]){
+   for(const g of [{width:insetLeft,x:0},{width:insetRight,x:doc.widthMM-insetRight}]){
      if(g.width<=0)continue;
      const guide=document.createElement("div");guide.className="marginguide";
      guide.style.left=(g.x*zoom)+"px";guide.style.width=(g.width*zoom)+"px";
@@ -1109,24 +1110,24 @@ function renderNativeTextProps(root,e){
  const hasRows=Number.isInteger(e.fixedRows)&&e.fixedRows>=1;
  if(hasRows){
    root.appendChild(pair(
-     prop("Ширина, мм",numInput(Number(e.widthMM||55),n=>{
+     prop("Ширина, мм",numInput(Number(e.widthMM||doc.widthMM),n=>{
        e.widthMM=n;renderProps();
-     },1,55,1)),
+     },1,doc.widthMM,1)),
      prop("Строк в поле",numInput(e.fixedRows,n=>{
        e.fixedRows=Math.round(n);
        e.heightMM=e.fixedRows*window.EZ2Text.font(e.deviceFont||"A00").heightDots/8;
        renderProps();
      },1,20,1))));
  }else{
-   root.appendChild(prop("Ширина, мм",numInput(Number(e.widthMM||55),
-     n=>{e.widthMM=n;renderProps();},1,55,1)));
+   root.appendChild(prop("Ширина, мм",numInput(Number(e.widthMM||doc.widthMM),
+     n=>{e.widthMM=n;renderProps();},1,doc.widthMM,1)));
    const fix=document.createElement("button");fix.type="button";
    fix.textContent="Закрепить высоту поля";
    fix.onclick=()=>{
      try{
        const font=window.EZ2Text.font(e.deviceFont||"A00");
-       const width=Math.min(Number(e.widthMM||55),
-         55-Number(printerMedia.marginLeftMM||0)-
+       const width=Math.min(Number(e.widthMM||doc.widthMM),
+         doc.widthMM-Number(printerMedia.marginLeftMM||0)-
          Number(printerMedia.marginRightMM||0)-Number(e.xMM||0));
        const cap=Math.floor(width*8/font.widthDots);
        const count=window.EZ2Text.wrapText(String(e.prefix||"")+
@@ -1139,8 +1140,8 @@ function renderNativeTextProps(root,e){
    root.appendChild(fix);
  }
  const font=window.EZ2Text.font(e.deviceFont||"A00");
- const width=Math.max(0,Math.min(Number(e.widthMM||55),
-   55-Number(printerMedia.marginLeftMM||0)-
+ const width=Math.max(0,Math.min(Number(e.widthMM||doc.widthMM),
+   doc.widthMM-Number(printerMedia.marginLeftMM||0)-
    Number(printerMedia.marginRightMM||0)-Number(e.xMM||0)));
  const capacity=Math.floor(width*8/font.widthDots);
  const info=document.createElement("p");info.className="inline-note";
@@ -1279,7 +1280,7 @@ function renderProps(){
      root.appendChild(checkbox("Жирный текст",e.isBold,n=>{e.isBold=n;}));
    }else{
      root.appendChild(pair(
-       prop("Ширина, символов",numInput(e.frameChars??34,n=>{e.frameChars=Math.round(n);},4,55,1)),
+       prop("Ширина, символов",numInput(e.frameChars??34,n=>{e.frameChars=Math.round(n);},4,doc.widthMM,1)),
        prop("Строк внутри (0 = авто)",numInput(e.frameRows??0,n=>{e.frameRows=Math.round(n);},0,24,1))));
      root.appendChild(prop("Размер символов CP866",fontGallery(e,
        ["A00","A01","A02","A03","A04","A11","A12","A21","A22"])));
@@ -1349,9 +1350,9 @@ function renderProps(){
  }
  if(e.kind==="text"){
    if(doc.printMode==="text"){
-     root.appendChild(prop("Ширина поля, мм",numInput(e.widthMM||55,n=>{
+     root.appendChild(prop("Ширина поля, мм",numInput(e.widthMM||doc.widthMM,n=>{
        e.widthMM=n;
-     },1,55,1)));
+     },1,doc.widthMM,1)));
      if(Number.isInteger(e.fixedRows)&&e.fixedRows>=1){
        root.appendChild(prop("Высота поля, строк",numInput(e.fixedRows,n=>{
          e.fixedRows=Math.round(n);
@@ -1377,8 +1378,8 @@ function renderProps(){
        fix.onclick=()=>{
          try{
            const f=window.EZ2Text.font(e.deviceFont||"A00");
-           const capacity=Math.floor(Math.min(55,Math.max(1,Number(e.widthMM||55)),
-             55-Number(printerMedia.marginLeftMM||0)-
+           const capacity=Math.floor(Math.min(doc.widthMM,Math.max(1,Number(e.widthMM||doc.widthMM)),
+             doc.widthMM-Number(printerMedia.marginLeftMM||0)-
              Number(printerMedia.marginRightMM||0)-Number(e.xMM||0))*8/f.widthDots);
            const rows=window.EZ2Text.wrapText(String(e.prefix||"")+String(e.value||""),capacity).length;
            if(rows>20)throw Error("Нужно более 20 строк. Уменьшите содержимое или шрифт.");
@@ -1422,8 +1423,8 @@ function renderProps(){
            prop("Масштаб по высоте (Y)",numInput(Number(code[2]),n=>changeScale("y",n),1,8,1))));
        }
        const f=window.EZ2Text.font(e.deviceFont||"A00");
-       const usableWidth=Math.max(0,Math.min(Number(e.widthMM||55),
-         55-Number(printerMedia.marginLeftMM||0)-
+       const usableWidth=Math.max(0,Math.min(Number(e.widthMM||doc.widthMM),
+         doc.widthMM-Number(printerMedia.marginLeftMM||0)-
          Number(printerMedia.marginRightMM||0)-Number(e.xMM||0)));
        const capacity=Math.floor(usableWidth*8/f.widthDots);
        const pitch=f.heightDots+(e.reversePrint?10:0);
@@ -1521,7 +1522,7 @@ function renderProps(){
    const full=document.createElement("button");full.type="button";
    full.textContent="На всю ширину печати";
    full.onclick=()=>{
-     checkpoint();e.xMM=0;e.widthMM=Math.min(55,doc.widthMM);
+     checkpoint();e.xMM=0;e.widthMM=doc.printMode==="text"?doc.widthMM:Math.min(55,doc.widthMM);
      renderCanvas();renderProps();commit();
    };
    if(doc.printMode!=="text")root.appendChild(prop("Ширина блока",full));

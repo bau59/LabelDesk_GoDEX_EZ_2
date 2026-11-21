@@ -53,6 +53,7 @@ jobs:
           node Tests/NativeCalibrationSmoke.js
           node Tests/FixedTextHeightSmoke.js
           node Tests/InversePaddingSmoke.js
+          node Tests/NativeRollWidthSmoke.js
           node --check LabelDesk/Resources/dish-controller.js
           node --check LabelDesk/Resources/dish-engine.js
           node --check LabelDesk/Resources/text-engine.js
@@ -77,6 +78,7 @@ jobs:
           node Tests/NativeCalibrationSmoke.js
           node Tests/FixedTextHeightSmoke.js
           node Tests/InversePaddingSmoke.js
+          node Tests/NativeRollWidthSmoke.js
 
   build-intel:
     name: Build x86_64 .app and .dmg
@@ -274,4 +276,4 @@ jobs:
             --repo "$GITHUB_REPOSITORY" \
             --target "$GITHUB_SHA" \
             --title "LabelDesk ${APP_VERSION}" \
-            --notes "LabelDesk 1.0.27 for Intel macOS 15+. Native CP866 inverse-text labels gain independently configurable left and right padding in font-character cells (0-12). Pads are added after wrapping, preserved in ESC V packets, shown in both previews and validated against fixed field width. Explicit trailing spaces are kept for inverted lines. Existing templates default to zero padding. No serial transport or paper positioning changes. Verify one physical label before batch production. Ad-hoc signed, not notarized."
+            --notes "LabelDesk 1.0.28 for Intel macOS 15+. Native CP866 text layout and field width now follow the configured roll width (up to 60 mm), removing the prior hard 55 mm software restriction. This includes line wrapping, alignment, optional text margins, preview, and native Mnn position validation. Existing saved templates remain unchanged. ESC G55 raster mode and serial transport are unchanged. Edge printing beyond 55 mm has not been validated on hardware and is used at operator risk. Ad-hoc signed, not notarized."

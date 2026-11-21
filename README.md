@@ -1,5 +1,12 @@
 # LabelDesk — original GoDEX EZ-2 on macOS (WebKit + zsh)
 
+## Native CP866 print width follows roll (1.0.28)
+
+The 55 mm **software** ceiling for native CP866 rows is removed. On a 58 mm label, a new native text element uses a 58 mm width and the editor can set existing fields to 58 mm. Resident font wrapping, alignment, inverse spacing, text margins, preview and native output checks use `doc.widthMM` instead of 55 mm (rolls are configurable in the 10–60 mm range). Existing saved labels keep their widths unless explicitly edited; duplicate preserves original width. The native row margin `ESC Mnn` can now express positions up to the configured roll width. Text tables and frame capacity use the same available roll width.
+
+The independently verified **raster** limit (`ESC G55`) stays 55 mm. This is an operator-selected experiment: actual printable head coverage beyond 55 mm has **not** been confirmed physically on the EZ-2. The driver, calibration, feed and printer commands remain unchanged; the first wide CP866 label should be checked before a batch.
+
+
 ## Native CP866 inverse padding (1.0.27)
 
 For a native text field with **Чёрная плашка (инверсия)** enabled, the editor offers **Отступ слева, симв.** and **Отступ справа, симв.** (0–12 character cells each). They map to optional `inversePadLeft` and `inversePadRight` fields. One cell is the native font's width in printer dots, e.g. 1 mm for A03. Each side is part of the reverse `ESC V` row, including blank cells, and the full padded string is validated against print width and fixed-height text slots. The right pad is appended *after* `wrapText`, which otherwise strips trailing blanks. User-typed trailing spaces are also retained for inverted fields, while normal text wrapping remains unchanged. This applies equally to automatic date/time fields and free text. The two previews derive their width from the same native line planner.
